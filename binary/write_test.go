@@ -133,8 +133,8 @@ func TestWriteLogsOnSuccess(t *testing.T) {
 	if e.Path != "notes.md" {
 		t.Errorf("path: got %q, want %q", e.Path, "notes.md")
 	}
-	if !strings.Contains(string(e.Payload), wantVersion) {
-		t.Errorf("payload should contain version %q, got %s", wantVersion, e.Payload)
+	if e.Version != wantVersion {
+		t.Errorf("version: got %q, want %q", e.Version, wantVersion)
 	}
 }
 

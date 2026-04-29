@@ -227,8 +227,8 @@ func TestEditLogEntryWrittenOnSuccess(t *testing.T) {
 	if e.Path != "notes.md" {
 		t.Errorf("path: got %q, want %q", e.Path, "notes.md")
 	}
-	if !strings.Contains(string(e.Payload), wantVersion) {
-		t.Errorf("payload should contain version %q, got %s", wantVersion, e.Payload)
+	if e.Version != wantVersion {
+		t.Errorf("version: got %q, want %q", e.Version, wantVersion)
 	}
 }
 
@@ -243,7 +243,7 @@ func TestEditLogEntryNotWrittenOnFailure(t *testing.T) {
 		t.Fatal("expected failure for ambiguous match")
 	}
 
-	if _, err := os.Stat(logJSONLPath(mount)); !os.IsNotExist(err) {
+	if logExists(mount) {
 		t.Error("log file should not exist after failed edit")
 	}
 }

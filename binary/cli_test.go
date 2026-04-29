@@ -18,29 +18,16 @@ func runDispatchWithStdin(t *testing.T, stdin string, args ...string) (string, s
 	return out.String(), errOut.String(), code
 }
 
-func TestStubbedSubcommandShapeParity(t *testing.T) {
-	tests := []struct {
-		name    string
-		args    []string
-		wantOut string
-		wantRC  int
-	}{
-		{"grep", []string{"grep", "--pattern", "foo"}, "", ExitOK},
-		{"rm", []string{"rm", "foo"}, `{"log_status":"ok"}` + "\n", ExitOK},
-		{"mv", []string{"mv", "a", "b"}, `{"log_status":"ok"}` + "\n", ExitOK},
-		// log is now a real implementation; mount must be set.
-		// The test sets MYCELIUM_MOUNT via t.Setenv inside the subtest below.
+func TestGrepSubcommandShapeParity(t *testing.T) {
+	// grep is a real implementation; mount must be set.
+	mount := t.TempDir()
+	t.Setenv("MYCELIUM_MOUNT", mount)
+	out, errOut, rc := runDispatch(t, "grep", "--pattern", "foo")
+	if rc != ExitOK {
+		t.Errorf("exit code: got %d, want %d (stderr=%q)", rc, ExitOK, errOut)
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			out, errOut, rc := runDispatch(t, tt.args...)
-			if rc != tt.wantRC {
-				t.Errorf("exit code: got %d, want %d (stderr=%q)", rc, tt.wantRC, errOut)
-			}
-			if out != tt.wantOut {
-				t.Errorf("stdout: got %q, want %q", out, tt.wantOut)
-			}
-		})
+	if out != "" {
+		t.Errorf("stdout: got %q, want empty (no matches)", out)
 	}
 }
 

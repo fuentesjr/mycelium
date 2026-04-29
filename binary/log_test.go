@@ -6,47 +6,64 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 	"time"
 )
 
-// fixedNow is a stable timestamp used in tests that call appendLog directly.
+// fixedNow is a stable timestamp used in tests that call appendLog/appendActivity directly.
 var fixedNow = time.Date(2024, 1, 15, 10, 30, 0, 123456789, time.UTC)
 
-// logJSONLPath returns the expected path of the log file under mount.
-func logJSONLPath(mount string) string {
-	return filepath.Join(mount, ".mycelium", "log.jsonl")
+// logExists returns true if any _activity/**/*.jsonl file exists under mount.
+func logExists(mount string) bool {
+	matches, _ := filepath.Glob(filepath.Join(mount, "_activity", "*", "*", "*", "*.jsonl"))
+	return len(matches) > 0
 }
 
-// readLogLines reads all lines from log.jsonl and returns them as parsed LogEntry values.
+// readLogLines finds all _activity/**/*.jsonl files under mount, sorts them,
+// concatenates and parses all JSONL lines. Tests typically don't span days,
+// so usually exactly one file is matched.
 func readLogLines(t *testing.T, mount string) []LogEntry {
 	t.Helper()
-	data, err := os.ReadFile(logJSONLPath(mount))
+	matches, err := filepath.Glob(filepath.Join(mount, "_activity", "*", "*", "*", "*.jsonl"))
 	if err != nil {
-		t.Fatalf("read log.jsonl: %v", err)
+		t.Fatalf("glob _activity: %v", err)
 	}
+	if len(matches) == 0 {
+		t.Fatalf("no _activity/**/*.jsonl files found under %s", mount)
+	}
+	sort.Strings(matches)
+
 	var entries []LogEntry
-	sc := bufio.NewScanner(strings.NewReader(string(data)))
-	for sc.Scan() {
-		line := sc.Text()
-		if line == "" {
-			continue
+	for _, path := range matches {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read %s: %v", path, err)
 		}
-		var e LogEntry
-		if err := json.Unmarshal([]byte(line), &e); err != nil {
-			t.Fatalf("unmarshal log line %q: %v", line, err)
+		sc := bufio.NewScanner(strings.NewReader(string(data)))
+		for sc.Scan() {
+			line := sc.Text()
+			if line == "" {
+				continue
+			}
+			var e LogEntry
+			if err := json.Unmarshal([]byte(line), &e); err != nil {
+				t.Fatalf("unmarshal log line %q: %v", line, err)
+			}
+			entries = append(entries, e)
 		}
-		entries = append(entries, e)
 	}
 	return entries
 }
+
+// --- appendActivity / appendLog unit tests ---
 
 func TestLogHappyPathNoPathNoPayload(t *testing.T) {
 	mount := t.TempDir()
 	id := Identity{AgentID: "agent-1", SessionID: "sess-1", Mount: mount}
 
-	rc := appendLog(strings.NewReader(""), io.Discard, io.Discard, id, "context_signal", "", "", false, fixedNow)
+	rc := appendActivity(io.Discard, io.Discard, id, LogEntry{Op: "context_signal"}, fixedNow)
 	if rc != ExitOK {
 		t.Fatalf("rc: got %d, want %d", rc, ExitOK)
 	}
@@ -71,8 +88,8 @@ func TestLogHappyPathNoPathNoPayload(t *testing.T) {
 	if e.Path != "" {
 		t.Errorf("path should be absent, got %q", e.Path)
 	}
-	if e.Payload != nil {
-		t.Errorf("payload should be absent, got %s", e.Payload)
+	if e.SignalPath != "" {
+		t.Errorf("signal_path should be absent, got %q", e.SignalPath)
 	}
 }
 
@@ -80,7 +97,7 @@ func TestLogWithPath(t *testing.T) {
 	mount := t.TempDir()
 	id := Identity{AgentID: "a", SessionID: "s", Mount: mount}
 
-	rc := appendLog(strings.NewReader(""), io.Discard, io.Discard, id, "read", "memory.md", "", false, fixedNow)
+	rc := appendActivity(io.Discard, io.Discard, id, LogEntry{Op: "read", Path: "memory.md"}, fixedNow)
 	if rc != ExitOK {
 		t.Fatalf("rc: got %d, want %d", rc, ExitOK)
 	}
@@ -103,12 +120,26 @@ func TestLogWithPayloadJSON(t *testing.T) {
 		t.Fatalf("rc: got %d, want %d", rc, ExitOK)
 	}
 
+	// _activity entry should exist with signal_path set.
 	entries := readLogLines(t, mount)
 	if len(entries) != 1 {
-		t.Fatalf("expected 1 entry, got %d", len(entries))
+		t.Fatalf("expected 1 activity entry, got %d", len(entries))
+	}
+	if entries[0].SignalPath == "" {
+		t.Error("signal_path should be set when payload is provided")
+	}
+	if !strings.HasPrefix(entries[0].SignalPath, "logs/") {
+		t.Errorf("signal_path should start with logs/, got %q", entries[0].SignalPath)
+	}
+
+	// logs/ payload file should exist with correct content.
+	payloadFile := filepath.Join(mount, filepath.FromSlash(entries[0].SignalPath))
+	data, err := os.ReadFile(payloadFile)
+	if err != nil {
+		t.Fatalf("read payload file %s: %v", payloadFile, err)
 	}
 	var got map[string]interface{}
-	if err := json.Unmarshal(entries[0].Payload, &got); err != nil {
+	if err := json.Unmarshal(data, &got); err != nil {
 		t.Fatalf("payload not valid JSON: %v", err)
 	}
 	if got["x"] != float64(1) {
@@ -129,8 +160,13 @@ func TestLogWithStdin(t *testing.T) {
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 entry, got %d", len(entries))
 	}
+	if entries[0].SignalPath == "" {
+		t.Error("signal_path should be set when stdin payload provided")
+	}
+	payloadFile := filepath.Join(mount, filepath.FromSlash(entries[0].SignalPath))
+	data, _ := os.ReadFile(payloadFile)
 	var got map[string]interface{}
-	if err := json.Unmarshal(entries[0].Payload, &got); err != nil {
+	if err := json.Unmarshal(data, &got); err != nil {
 		t.Fatalf("payload not valid JSON: %v", err)
 	}
 	if got["y"] != float64(2) {
@@ -149,7 +185,7 @@ func TestLogBothPayloadJSONAndStdinIsUsageError(t *testing.T) {
 	if !strings.Contains(errOut, "mutually exclusive") {
 		t.Errorf("stderr should mention mutual exclusion, got %q", errOut)
 	}
-	if _, err := os.Stat(logJSONLPath(mount)); !os.IsNotExist(err) {
+	if logExists(mount) {
 		t.Error("log file should not be created on usage error")
 	}
 }
@@ -163,7 +199,7 @@ func TestLogInvalidPayloadJSON(t *testing.T) {
 	if rc != ExitUsage {
 		t.Errorf("rc: got %d, want %d", rc, ExitUsage)
 	}
-	if _, err := os.Stat(logJSONLPath(mount)); !os.IsNotExist(err) {
+	if logExists(mount) {
 		t.Error("log file should not be created on invalid JSON")
 	}
 }
@@ -177,7 +213,7 @@ func TestLogInvalidStdinJSON(t *testing.T) {
 	if rc != ExitUsage {
 		t.Errorf("rc: got %d, want %d", rc, ExitUsage)
 	}
-	if _, err := os.Stat(logJSONLPath(mount)); !os.IsNotExist(err) {
+	if logExists(mount) {
 		t.Error("log file should not be created on invalid stdin JSON")
 	}
 }
@@ -199,10 +235,10 @@ func TestLogTwoAppendsTwoLines(t *testing.T) {
 	mount := t.TempDir()
 	id := Identity{AgentID: "a", SessionID: "s", Mount: mount}
 
-	if rc := appendLog(strings.NewReader(""), io.Discard, io.Discard, id, "first", "", "", false, fixedNow); rc != ExitOK {
+	if rc := appendActivity(io.Discard, io.Discard, id, LogEntry{Op: "first"}, fixedNow); rc != ExitOK {
 		t.Fatalf("first append failed: rc=%d", rc)
 	}
-	if rc := appendLog(strings.NewReader(""), io.Discard, io.Discard, id, "second", "", "", false, fixedNow); rc != ExitOK {
+	if rc := appendActivity(io.Discard, io.Discard, id, LogEntry{Op: "second"}, fixedNow); rc != ExitOK {
 		t.Fatalf("second append failed: rc=%d", rc)
 	}
 
@@ -218,29 +254,30 @@ func TestLogTwoAppendsTwoLines(t *testing.T) {
 	}
 
 	// Verify the raw file has exactly 2 newline-terminated lines.
-	raw, _ := os.ReadFile(logJSONLPath(mount))
+	logPath := activityLogPath(mount, "a", fixedNow)
+	raw, _ := os.ReadFile(logPath)
 	lines := strings.Split(strings.TrimRight(string(raw), "\n"), "\n")
 	if len(lines) != 2 {
 		t.Errorf("raw file should have 2 lines, got %d", len(lines))
 	}
 }
 
-func TestLogDotMyceliumDirAutoCreated(t *testing.T) {
+func TestLogActivityDirAutoCreated(t *testing.T) {
 	mount := t.TempDir()
 	id := Identity{AgentID: "a", SessionID: "s", Mount: mount}
 
-	// Confirm .mycelium does not exist before the call.
-	dotDir := filepath.Join(mount, ".mycelium")
-	if _, err := os.Stat(dotDir); !os.IsNotExist(err) {
-		t.Fatal(".mycelium should not exist before first log call")
+	// Confirm _activity does not exist before the call.
+	actDir := filepath.Join(mount, "_activity")
+	if _, err := os.Stat(actDir); !os.IsNotExist(err) {
+		t.Fatal("_activity should not exist before first log call")
 	}
 
-	if rc := appendLog(strings.NewReader(""), io.Discard, io.Discard, id, "op", "", "", false, fixedNow); rc != ExitOK {
+	if rc := appendActivity(io.Discard, io.Discard, id, LogEntry{Op: "op"}, fixedNow); rc != ExitOK {
 		t.Fatalf("rc: got %d, want %d", rc, ExitOK)
 	}
 
-	if _, err := os.Stat(dotDir); err != nil {
-		t.Errorf(".mycelium dir should have been created: %v", err)
+	if _, err := os.Stat(actDir); err != nil {
+		t.Errorf("_activity dir should have been created: %v", err)
 	}
 }
 
@@ -248,7 +285,7 @@ func TestLogTimestampParsesAsRFC3339Nano(t *testing.T) {
 	mount := t.TempDir()
 	id := Identity{AgentID: "a", SessionID: "s", Mount: mount}
 
-	if rc := appendLog(strings.NewReader(""), io.Discard, io.Discard, id, "op", "", "", false, fixedNow); rc != ExitOK {
+	if rc := appendActivity(io.Discard, io.Discard, id, LogEntry{Op: "op"}, fixedNow); rc != ExitOK {
 		t.Fatalf("rc: got %d, want %d", rc, ExitOK)
 	}
 
@@ -297,6 +334,9 @@ func TestLogE2EHappyPath(t *testing.T) {
 	if e.SessionID != "e2e-session" {
 		t.Errorf("session_id: got %q", e.SessionID)
 	}
+	if e.SignalPath == "" {
+		t.Error("signal_path should be set when payload provided")
+	}
 }
 
 func TestLogE2EStdin(t *testing.T) {
@@ -315,8 +355,13 @@ func TestLogE2EStdin(t *testing.T) {
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 entry, got %d", len(entries))
 	}
+	if entries[0].SignalPath == "" {
+		t.Error("signal_path should be set for stdin payload")
+	}
+	payloadFile := filepath.Join(mount, filepath.FromSlash(entries[0].SignalPath))
+	data, _ := os.ReadFile(payloadFile)
 	var got map[string]interface{}
-	if err := json.Unmarshal(entries[0].Payload, &got); err != nil {
+	if err := json.Unmarshal(data, &got); err != nil {
 		t.Fatalf("payload: %v", err)
 	}
 	if got["y"] != float64(2) {
@@ -332,5 +377,275 @@ func TestLogE2EMountUnset(t *testing.T) {
 	}
 	if !strings.Contains(errOut, "MYCELIUM_MOUNT") {
 		t.Errorf("stderr should mention MYCELIUM_MOUNT, got %q", errOut)
+	}
+}
+
+// --- New tests for the activity log redesign ---
+
+func TestActivityLogPathIsDateBucketed(t *testing.T) {
+	mount := t.TempDir()
+	t.Setenv("MYCELIUM_MOUNT", mount)
+	t.Setenv("MYCELIUM_AGENT_ID", "test-agent")
+
+	_, _, rc := runDispatchWithStdin(t, "hello", "write", "foo.md")
+	if rc != ExitOK {
+		t.Fatalf("write rc: got %d", rc)
+	}
+
+	matches, _ := filepath.Glob(filepath.Join(mount, "_activity", "*", "*", "*", "*.jsonl"))
+	if len(matches) != 1 {
+		t.Fatalf("expected exactly 1 _activity file, got %d: %v", len(matches), matches)
+	}
+	// Verify the path matches _activity/YYYY/MM/DD/test-agent.jsonl.
+	rel, _ := filepath.Rel(filepath.Join(mount, "_activity"), matches[0])
+	parts := strings.Split(rel, string(filepath.Separator))
+	if len(parts) != 4 {
+		t.Fatalf("expected 4 path segments (YYYY/MM/DD/file), got %v", parts)
+	}
+	if parts[3] != "test-agent.jsonl" {
+		t.Errorf("filename: got %q, want %q", parts[3], "test-agent.jsonl")
+	}
+}
+
+func TestActivityLogUnspecifiedAgentIDFallback(t *testing.T) {
+	mount := t.TempDir()
+	id := Identity{AgentID: "", SessionID: "s", Mount: mount}
+
+	rc := appendActivity(io.Discard, io.Discard, id, LogEntry{Op: "op"}, fixedNow)
+	if rc != ExitOK {
+		t.Fatalf("rc: got %d, want %d", rc, ExitOK)
+	}
+
+	logPath := activityLogPath(mount, "", fixedNow)
+	if !strings.HasSuffix(logPath, "unspecified.jsonl") {
+		t.Errorf("expected filename unspecified.jsonl, got %q", logPath)
+	}
+	if _, err := os.Stat(logPath); err != nil {
+		t.Errorf("expected file to exist at %q: %v", logPath, err)
+	}
+}
+
+func TestActivityLogSchemaFlatForWrite(t *testing.T) {
+	mount := t.TempDir()
+	t.Setenv("MYCELIUM_MOUNT", mount)
+
+	content := "hello\n"
+	_, errOut, rc := runDispatchWithStdin(t, content, "write", "notes.md")
+	if rc != ExitOK {
+		t.Fatalf("rc: got %d (stderr=%q)", rc, errOut)
+	}
+
+	entries := readLogLines(t, mount)
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+	e := entries[0]
+	if e.Version == "" {
+		t.Error("version should be set for write entry")
+	}
+	if !strings.HasPrefix(e.Version, "sha256:") {
+		t.Errorf("version should start with sha256:, got %q", e.Version)
+	}
+	wantVersion := sha256Hex(content)
+	if e.Version != wantVersion {
+		t.Errorf("version: got %q, want %q", e.Version, wantVersion)
+	}
+	if e.PriorVersion != "" {
+		t.Errorf("prior_version should be absent for write, got %q", e.PriorVersion)
+	}
+	if e.From != "" {
+		t.Errorf("from should be absent for write, got %q", e.From)
+	}
+	if e.SignalPath != "" {
+		t.Errorf("signal_path should be absent for mutation entries, got %q", e.SignalPath)
+	}
+}
+
+func TestActivityLogSchemaFlatForRm(t *testing.T) {
+	mount := t.TempDir()
+	t.Setenv("MYCELIUM_MOUNT", mount)
+	content := "to remove\n"
+	writeTestFile(t, mount, "target.md", content)
+
+	_, errOut, rc := runDispatchWithStdin(t, "", "rm", "target.md")
+	if rc != ExitOK {
+		t.Fatalf("rc: got %d (stderr=%q)", rc, errOut)
+	}
+
+	entries := readLogLines(t, mount)
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+	e := entries[0]
+	if e.PriorVersion == "" {
+		t.Error("prior_version should be set for rm entry")
+	}
+	if !strings.HasPrefix(e.PriorVersion, "sha256:") {
+		t.Errorf("prior_version should start with sha256:, got %q", e.PriorVersion)
+	}
+	wantVersion := sha256Hex(content)
+	if e.PriorVersion != wantVersion {
+		t.Errorf("prior_version: got %q, want %q", e.PriorVersion, wantVersion)
+	}
+	if e.Version != "" {
+		t.Errorf("version should be absent for rm, got %q", e.Version)
+	}
+}
+
+func TestActivityLogSchemaFlatForMv(t *testing.T) {
+	mount := t.TempDir()
+	t.Setenv("MYCELIUM_MOUNT", mount)
+	content := "move me\n"
+	writeTestFile(t, mount, "src.md", content)
+
+	_, errOut, rc := runDispatchWithStdin(t, "", "mv", "src.md", "dst.md")
+	if rc != ExitOK {
+		t.Fatalf("rc: got %d (stderr=%q)", rc, errOut)
+	}
+
+	entries := readLogLines(t, mount)
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+	e := entries[0]
+	if e.Op != "mv" {
+		t.Errorf("op: got %q, want mv", e.Op)
+	}
+	if e.Path != "dst.md" {
+		t.Errorf("path should be dst, got %q", e.Path)
+	}
+	if e.From != "src.md" {
+		t.Errorf("from should be src, got %q", e.From)
+	}
+	if e.Version == "" {
+		t.Error("version should be set for mv entry")
+	}
+	wantVersion := sha256Hex(content)
+	if e.Version != wantVersion {
+		t.Errorf("version: got %q, want %q", e.Version, wantVersion)
+	}
+	if e.PriorVersion != "" {
+		t.Errorf("prior_version should be absent for mv, got %q", e.PriorVersion)
+	}
+}
+
+func TestLogPayloadGoesToLogsDir(t *testing.T) {
+	mount := t.TempDir()
+	t.Setenv("MYCELIUM_MOUNT", mount)
+	t.Setenv("MYCELIUM_AGENT_ID", "pi-agent")
+
+	payload := `{"x":42}`
+	_, errOut, rc := runDispatch(t, "log", "context_signal", "--payload-json", payload)
+	if rc != ExitOK {
+		t.Fatalf("rc: got %d (stderr=%q)", rc, errOut)
+	}
+
+	// Verify payload file is under logs/ and contains the payload.
+	matches, _ := filepath.Glob(filepath.Join(mount, "logs", "*", "*", "*", "*", "*.json"))
+	if len(matches) != 1 {
+		t.Fatalf("expected 1 payload file, got %d: %v", len(matches), matches)
+	}
+	data, err := os.ReadFile(matches[0])
+	if err != nil {
+		t.Fatalf("read payload: %v", err)
+	}
+	if string(data) != payload {
+		t.Errorf("payload content: got %q, want %q", string(data), payload)
+	}
+}
+
+func TestLogActivityHasSignalPath(t *testing.T) {
+	mount := t.TempDir()
+	t.Setenv("MYCELIUM_MOUNT", mount)
+	t.Setenv("MYCELIUM_AGENT_ID", "pi-agent")
+
+	_, errOut, rc := runDispatch(t, "log", "context_signal", "--payload-json", `{"x":1}`)
+	if rc != ExitOK {
+		t.Fatalf("rc: got %d (stderr=%q)", rc, errOut)
+	}
+
+	entries := readLogLines(t, mount)
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+	sp := entries[0].SignalPath
+	if sp == "" {
+		t.Fatal("signal_path should be set")
+	}
+	// Verify it references an actual file.
+	payloadFile := filepath.Join(mount, filepath.FromSlash(sp))
+	if _, err := os.Stat(payloadFile); err != nil {
+		t.Errorf("signal_path %q does not point to existing file: %v", sp, err)
+	}
+}
+
+func TestLogNoPayloadNoSignalPath(t *testing.T) {
+	mount := t.TempDir()
+	t.Setenv("MYCELIUM_MOUNT", mount)
+
+	_, errOut, rc := runDispatch(t, "log", "foo")
+	if rc != ExitOK {
+		t.Fatalf("rc: got %d (stderr=%q)", rc, errOut)
+	}
+
+	entries := readLogLines(t, mount)
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+	if entries[0].SignalPath != "" {
+		t.Errorf("signal_path should be absent when no payload, got %q", entries[0].SignalPath)
+	}
+
+	// No logs/ file should exist.
+	matches, _ := filepath.Glob(filepath.Join(mount, "logs", "*", "*", "*", "*", "*.json"))
+	if len(matches) != 0 {
+		t.Errorf("no logs/ files expected when no payload, got %v", matches)
+	}
+}
+
+func TestLogSignalPathFormat(t *testing.T) {
+	mount := t.TempDir()
+	t.Setenv("MYCELIUM_MOUNT", mount)
+	t.Setenv("MYCELIUM_AGENT_ID", "pi-agent")
+
+	now := time.Date(2026, 4, 29, 15, 30, 22, 123456789, time.UTC)
+	id := Identity{AgentID: "pi-agent", Mount: mount, SessionID: "s"}
+
+	rc := appendLog(strings.NewReader(""), io.Discard, io.Discard, id, "context_signal", "", `{"a":1}`, false, now)
+	if rc != ExitOK {
+		t.Fatalf("rc: got %d", rc)
+	}
+
+	entries := readLogLines(t, mount)
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+	sp := entries[0].SignalPath
+	// Expected: logs/2026/04/29/pi-agent/153022.123456789-context_signal.json
+	wantPrefix := "logs/2026/04/29/pi-agent/"
+	if !strings.HasPrefix(sp, wantPrefix) {
+		t.Errorf("signal_path %q should start with %q", sp, wantPrefix)
+	}
+	if !strings.HasSuffix(sp, "-context_signal.json") {
+		t.Errorf("signal_path %q should end with -context_signal.json", sp)
+	}
+	// Verify HHMMSS.nanos portion.
+	base := strings.TrimPrefix(sp, wantPrefix)
+	timePart := strings.SplitN(base, "-", 2)[0]
+	if timePart != "153022.123456789" {
+		t.Errorf("time part: got %q, want %q", timePart, "153022.123456789")
+	}
+}
+
+func TestLogOpWithSlashRejected(t *testing.T) {
+	mount := t.TempDir()
+	t.Setenv("MYCELIUM_MOUNT", mount)
+
+	_, errOut, rc := runDispatch(t, "log", "a/b")
+	if rc != ExitUsage {
+		t.Errorf("rc: got %d, want %d", rc, ExitUsage)
+	}
+	if !strings.Contains(errOut, "path-unsafe") {
+		t.Errorf("stderr should mention path-unsafe, got %q", errOut)
 	}
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -77,12 +78,20 @@ func runWrite(in io.Reader, out, errOut io.Writer, args []string) int {
 		return ExitUsage
 	}
 	id := ReadIdentity()
+	// Check _-prefix reservation before calling writeFile.
+	if _, resErr := resolveAgentWritable(id.Mount, positional[0]); resErr != nil {
+		if errors.Is(resErr, ErrReservedPath) {
+			fmt.Fprintf(errOut, "mycelium write: %s: writes to '_'-prefixed paths are reserved\n", positional[0])
+			return ExitReservedPrefix
+		}
+		// Other path errors are handled inside writeFile; fall through.
+	}
 	version, rc := writeFile(in, errOut, id.Mount, positional[0], *expectedVersion)
 	if rc != ExitOK {
 		return rc
 	}
-	fmt.Fprintf(out, `{"version":%q,"log_status":"ok"}`+"\n", version)
-	logMutation(errOut, id, "write", positional[0], version)
+	status := logMutation(errOut, id, MutationLog{Op: "write", Path: positional[0], Version: version})
+	fmt.Fprintf(out, `{"version":%q,"log_status":%q}`+"\n", version, status)
 	return ExitOK
 }
 
@@ -105,12 +114,19 @@ func runEdit(_ io.Reader, out, errOut io.Writer, args []string) int {
 		return ExitUsage
 	}
 	id := ReadIdentity()
+	// Check _-prefix reservation before calling editFile.
+	if _, resErr := resolveAgentWritable(id.Mount, positional[0]); resErr != nil {
+		if errors.Is(resErr, ErrReservedPath) {
+			fmt.Fprintf(errOut, "mycelium edit: %s: writes to '_'-prefixed paths are reserved\n", positional[0])
+			return ExitReservedPrefix
+		}
+	}
 	version, rc := editFile(errOut, id.Mount, positional[0], *oldStr, *newStr, *expectedVersion)
 	if rc != ExitOK {
 		return rc
 	}
-	fmt.Fprintf(out, `{"version":%q,"log_status":"ok"}`+"\n", version)
-	logMutation(errOut, id, "edit", positional[0], version)
+	status := logMutation(errOut, id, MutationLog{Op: "edit", Path: positional[0], Version: version})
+	fmt.Fprintf(out, `{"version":%q,"log_status":%q}`+"\n", version, status)
 	return ExitOK
 }
 
@@ -138,26 +154,51 @@ func runGlob(_ io.Reader, out, errOut io.Writer, args []string) int {
 	return globAndPrint(out, errOut, ReadIdentity().Mount, positional[0])
 }
 
-func runGrep(_ io.Reader, _, errOut io.Writer, args []string) int {
+func runGrep(_ io.Reader, out, errOut io.Writer, args []string) int {
 	fs := flag.NewFlagSet("grep", flag.ContinueOnError)
 	fs.SetOutput(errOut)
-	fs.String("pattern", "", "search pattern")
-	fs.String("path", "", "path to search under")
-	fs.Bool("regex", false, "treat pattern as regex")
-	fs.String("file-type", "", "limit by file type")
-	fs.String("format", "text", "output format: text|json")
-	fs.Int("limit", 1000, "max matches")
-	fs.String("cursor", "", "pagination cursor")
+	pattern := fs.String("pattern", "", "search pattern")
+	pathScope := fs.String("path", "", "path to search under")
+	useRegex := fs.Bool("regex", false, "treat pattern as regex")
+	fileType := fs.String("file-type", "", "limit by file type")
+	format := fs.String("format", "text", "output format: text|json")
+	limit := fs.Int("limit", 1000, "max matches")
+	// TODO: --cursor pagination is deferred to a later phase. The flag is
+	// accepted for forward compatibility but currently has no effect.
+	// See mycelium-phases.md.
+	fs.String("cursor", "", "pagination cursor (not yet implemented)")
 	if _, err := parseInterspersed(fs, args); err != nil {
 		return ExitUsage
 	}
-	return stubGrep()
+
+	if *pattern == "" {
+		fmt.Fprintln(errOut, "mycelium grep: --pattern is required")
+		return ExitUsage
+	}
+	if *format != "text" && *format != "json" {
+		fmt.Fprintln(errOut, "mycelium grep: --format must be text or json")
+		return ExitUsage
+	}
+	if *limit <= 0 {
+		fmt.Fprintln(errOut, "mycelium grep: --limit must be positive")
+		return ExitUsage
+	}
+
+	opts := GrepOptions{
+		Pattern:   *pattern,
+		PathScope: *pathScope,
+		Regex:     *useRegex,
+		FileType:  *fileType,
+		Format:    *format,
+		Limit:     *limit,
+	}
+	return grepFiles(out, errOut, ReadIdentity().Mount, opts)
 }
 
 func runRm(_ io.Reader, out, errOut io.Writer, args []string) int {
 	fs := flag.NewFlagSet("rm", flag.ContinueOnError)
 	fs.SetOutput(errOut)
-	fs.String("expected-version", "", "current version token for CAS")
+	expectedVersion := fs.String("expected-version", "", "current version token for CAS")
 	positional, err := parseInterspersed(fs, args)
 	if err != nil {
 		return ExitUsage
@@ -166,13 +207,27 @@ func runRm(_ io.Reader, out, errOut io.Writer, args []string) int {
 		fmt.Fprintln(errOut, "mycelium rm: PATH required")
 		return ExitUsage
 	}
-	return stubLogOrRemove(out)
+	id := ReadIdentity()
+	// Check _-prefix reservation before calling removeFile.
+	if _, resErr := resolveAgentWritable(id.Mount, positional[0]); resErr != nil {
+		if errors.Is(resErr, ErrReservedPath) {
+			fmt.Fprintf(errOut, "mycelium rm: %s: writes to '_'-prefixed paths are reserved\n", positional[0])
+			return ExitReservedPrefix
+		}
+	}
+	priorVersion, rc := removeFile(errOut, id.Mount, positional[0], *expectedVersion)
+	if rc != ExitOK {
+		return rc
+	}
+	status := logMutation(errOut, id, MutationLog{Op: "rm", Path: positional[0], PriorVersion: priorVersion})
+	fmt.Fprintf(out, `{"log_status":%q}`+"\n", status)
+	return ExitOK
 }
 
 func runMv(_ io.Reader, out, errOut io.Writer, args []string) int {
 	fs := flag.NewFlagSet("mv", flag.ContinueOnError)
 	fs.SetOutput(errOut)
-	fs.String("expected-version", "", "current version token for CAS")
+	expectedVersion := fs.String("expected-version", "", "current version token for CAS")
 	positional, err := parseInterspersed(fs, args)
 	if err != nil {
 		return ExitUsage
@@ -181,7 +236,28 @@ func runMv(_ io.Reader, out, errOut io.Writer, args []string) int {
 		fmt.Fprintln(errOut, "mycelium mv: SRC and DST required")
 		return ExitUsage
 	}
-	return stubLogOrRemove(out)
+	id := ReadIdentity()
+	src, dst := positional[0], positional[1]
+	// Check _-prefix reservation for both src and dst.
+	if _, resErr := resolveAgentWritable(id.Mount, src); resErr != nil {
+		if errors.Is(resErr, ErrReservedPath) {
+			fmt.Fprintf(errOut, "mycelium mv: %s: writes to '_'-prefixed paths are reserved\n", src)
+			return ExitReservedPrefix
+		}
+	}
+	if _, resErr := resolveAgentWritable(id.Mount, dst); resErr != nil {
+		if errors.Is(resErr, ErrReservedPath) {
+			fmt.Fprintf(errOut, "mycelium mv: %s: writes to '_'-prefixed paths are reserved\n", dst)
+			return ExitReservedPrefix
+		}
+	}
+	version, rc := moveFile(errOut, id.Mount, src, dst, *expectedVersion)
+	if rc != ExitOK {
+		return rc
+	}
+	status := logMutation(errOut, id, MutationLog{Op: "mv", Path: dst, From: src, Version: version})
+	fmt.Fprintf(out, `{"log_status":%q}`+"\n", status)
+	return ExitOK
 }
 
 func runLog(in io.Reader, out, errOut io.Writer, args []string) int {
