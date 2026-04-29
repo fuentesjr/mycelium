@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Mycelium stub for parallel pi extension development.
+# Returns canned successful responses; performs no actual storage.
+
+case "$1" in
+  read)        echo "stub content for $2" ;;
+  write|edit)  echo '{"version":"sha256:stubbed","log_status":"ok"}' ;;
+  ls|glob)     echo "MYCELIUM_MEMORY.md" ;;
+  grep)        : ;;
+  rm|mv|log)   echo '{"log_status":"ok"}' ;;
+  *)           echo "stub: unknown subcommand: $1" >&2; exit 2 ;;
+esac
+exit 0

@@ -1,0 +1,11 @@
+{
+  "name": "@mycelium/pi-extension",
+  "version": "0.0.1",
+  "description": "Pi.dev extension for Mycelium agent memory",
+  "type": "module",
+  "main": "src/index.ts",
+  "files": ["src", "README.md"],
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": "*"
+  }
+}
