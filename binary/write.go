@@ -14,47 +14,46 @@ import (
 
 const versionPrefix = "sha256:"
 
-func writeFile(in io.Reader, out, errOut io.Writer, mount, requested, expectedVersion string) int {
+func writeFile(in io.Reader, errOut io.Writer, mount, requested, expectedVersion string) (version string, rc int) {
 	abs, err := resolveUnderMount(mount, requested)
 	if err != nil {
 		fmt.Fprintf(errOut, "mycelium write: %v\n", err)
 		if errors.Is(err, ErrMountUnset) {
-			return ExitGenericError
+			return "", ExitGenericError
 		}
-		return ExitUsage
+		return "", ExitUsage
 	}
 	content, err := io.ReadAll(in)
 	if err != nil {
 		fmt.Fprintf(errOut, "mycelium write: read stdin: %v\n", err)
-		return ExitGenericError
+		return "", ExitGenericError
 	}
 	if expectedVersion != "" {
-		if rc := checkExpectedVersion(errOut, abs, expectedVersion); rc != ExitOK {
-			return rc
+		if rc := checkExpectedVersion(errOut, "write", abs, expectedVersion); rc != ExitOK {
+			return "", rc
 		}
 	}
 	if err := atomicWrite(abs, content); err != nil {
 		fmt.Fprintf(errOut, "mycelium write: %v\n", err)
-		return ExitGenericError
+		return "", ExitGenericError
 	}
 	sum := sha256.Sum256(content)
-	version := versionPrefix + hex.EncodeToString(sum[:])
-	fmt.Fprintf(out, `{"version":%q,"log_status":"ok"}`+"\n", version)
-	return ExitOK
+	ver := versionPrefix + hex.EncodeToString(sum[:])
+	return ver, ExitOK
 }
 
-func checkExpectedVersion(errOut io.Writer, abs, expected string) int {
+func checkExpectedVersion(errOut io.Writer, op, abs, expected string) int {
 	if !strings.HasPrefix(expected, versionPrefix) {
-		fmt.Fprintf(errOut, "mycelium write: expected-version must start with %q\n", versionPrefix)
+		fmt.Fprintf(errOut, "mycelium %s: expected-version must start with %q\n", op, versionPrefix)
 		return ExitUsage
 	}
 	current, err := currentVersion(abs)
 	if err != nil {
-		fmt.Fprintf(errOut, "mycelium write: %v\n", err)
+		fmt.Fprintf(errOut, "mycelium %s: %v\n", op, err)
 		return ExitGenericError
 	}
 	if current != expected {
-		fmt.Fprintf(errOut, "mycelium write: version conflict: have %s, expected %s\n", current, expected)
+		fmt.Fprintf(errOut, "mycelium %s: version conflict: have %s, expected %s\n", op, current, expected)
 		return ExitConflict
 	}
 	return ExitOK

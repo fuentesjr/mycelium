@@ -113,6 +113,31 @@ func TestWriteFileMountUnset(t *testing.T) {
 	}
 }
 
+func TestWriteLogsOnSuccess(t *testing.T) {
+	mount := t.TempDir()
+	t.Setenv("MYCELIUM_MOUNT", mount)
+	content := "logged content\n"
+	_, errOut, rc := runDispatchWithStdin(t, content, "write", "notes.md")
+	if rc != ExitOK {
+		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitOK, errOut)
+	}
+	wantVersion := sha256Hex(content)
+	entries := readLogLines(t, mount)
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 log entry, got %d", len(entries))
+	}
+	e := entries[0]
+	if e.Op != "write" {
+		t.Errorf("op: got %q, want %q", e.Op, "write")
+	}
+	if e.Path != "notes.md" {
+		t.Errorf("path: got %q, want %q", e.Path, "notes.md")
+	}
+	if !strings.Contains(string(e.Payload), wantVersion) {
+		t.Errorf("payload should contain version %q, got %s", wantVersion, e.Payload)
+	}
+}
+
 func TestWriteFilePathTraversalRejected(t *testing.T) {
 	mount := t.TempDir()
 	t.Setenv("MYCELIUM_MOUNT", mount)

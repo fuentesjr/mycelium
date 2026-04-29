@@ -76,15 +76,22 @@ func runWrite(in io.Reader, out, errOut io.Writer, args []string) int {
 		fmt.Fprintln(errOut, "mycelium write: PATH required")
 		return ExitUsage
 	}
-	return writeFile(in, out, errOut, ReadIdentity().Mount, positional[0], *expectedVersion)
+	id := ReadIdentity()
+	version, rc := writeFile(in, errOut, id.Mount, positional[0], *expectedVersion)
+	if rc != ExitOK {
+		return rc
+	}
+	fmt.Fprintf(out, `{"version":%q,"log_status":"ok"}`+"\n", version)
+	logMutation(errOut, id, "write", positional[0], version)
+	return ExitOK
 }
 
 func runEdit(_ io.Reader, out, errOut io.Writer, args []string) int {
 	fs := flag.NewFlagSet("edit", flag.ContinueOnError)
 	fs.SetOutput(errOut)
-	fs.String("expected-version", "", "current version token for CAS")
-	fs.String("old", "", "string to replace")
-	fs.String("new", "", "replacement string")
+	expectedVersion := fs.String("expected-version", "", "current version token for CAS")
+	oldStr := fs.String("old", "", "string to replace")
+	newStr := fs.String("new", "", "replacement string")
 	positional, err := parseInterspersed(fs, args)
 	if err != nil {
 		return ExitUsage
@@ -93,7 +100,18 @@ func runEdit(_ io.Reader, out, errOut io.Writer, args []string) int {
 		fmt.Fprintln(errOut, "mycelium edit: PATH required")
 		return ExitUsage
 	}
-	return stubWriteOrEdit(out)
+	if *oldStr == "" {
+		fmt.Fprintln(errOut, "mycelium edit: --old is required")
+		return ExitUsage
+	}
+	id := ReadIdentity()
+	version, rc := editFile(errOut, id.Mount, positional[0], *oldStr, *newStr, *expectedVersion)
+	if rc != ExitOK {
+		return rc
+	}
+	fmt.Fprintf(out, `{"version":%q,"log_status":"ok"}`+"\n", version)
+	logMutation(errOut, id, "edit", positional[0], version)
+	return ExitOK
 }
 
 func runLs(_ io.Reader, out, errOut io.Writer, args []string) int {

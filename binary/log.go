@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -17,6 +19,24 @@ type LogEntry struct {
 	Op        string          `json:"op"`
 	Path      string          `json:"path,omitempty"`
 	Payload   json.RawMessage `json:"payload,omitempty"`
+}
+
+// logMutation appends a log entry recording a successful mutation. Logging
+// failure is reported as a stderr warning ("mycelium <op>: log entry write
+// failed: <err>") but does not propagate — mutations have already happened.
+func logMutation(errOut io.Writer, id Identity, op, path, version string) {
+	type versionPayload struct {
+		Version string `json:"version"`
+	}
+	payloadBytes, _ := json.Marshal(versionPayload{Version: version})
+	payloadJSON := string(payloadBytes)
+
+	var capErr bytes.Buffer
+	rc := appendLog(strings.NewReader(""), io.Discard, &capErr, id, op, path, payloadJSON, false, time.Now())
+	if rc != ExitOK {
+		msg := capErr.String()
+		fmt.Fprintf(errOut, "mycelium %s: log entry write failed: %s", op, msg)
+	}
 }
 
 // appendLog writes one JSON line to <mount>/.mycelium/log.jsonl and prints
