@@ -9,18 +9,19 @@ export interface MyceliumConfig {
   mountPath: string;
 }
 
-const GLOBAL_EXT_ROOT = path.join(os.homedir(), ".pi", "agent", "extensions");
+export const GLOBAL_EXT_ROOT = path.join(os.homedir(), ".pi", "agent", "extensions");
 
-function detectScope(): Scope {
-  const here = fileURLToPath(import.meta.url);
-  return here.startsWith(GLOBAL_EXT_ROOT + path.sep) ? "global" : "project";
+export function detectScopeFromPath(filePath: string): Scope {
+  return filePath.startsWith(GLOBAL_EXT_ROOT + path.sep) ? "global" : "project";
+}
+
+export function mountPathFor(scope: Scope, cwd: string): string {
+  return scope === "global"
+    ? path.join(os.homedir(), ".pi", "mycelium", "store")
+    : path.join(cwd, ".pi", "mycelium", "store");
 }
 
 export function resolveConfig(cwd: string): MyceliumConfig {
-  const scope = detectScope();
-  const mountPath =
-    scope === "global"
-      ? path.join(os.homedir(), ".pi", "mycelium", "store")
-      : path.join(cwd, ".pi", "mycelium", "store");
-  return { scope, mountPath };
+  const scope = detectScopeFromPath(fileURLToPath(import.meta.url));
+  return { scope, mountPath: mountPathFor(scope, cwd) };
 }

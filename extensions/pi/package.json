@@ -5,7 +5,15 @@
   "type": "module",
   "main": "src/index.ts",
   "files": ["src", "README.md"],
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
   "peerDependencies": {
     "@mariozechner/pi-coding-agent": "*"
+  },
+  "devDependencies": {
+    "@mariozechner/pi-coding-agent": "*",
+    "vitest": "^2.0.0"
   }
 }
