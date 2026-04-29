@@ -83,7 +83,7 @@ Two layers, with the activity log inside the store as a reserved-path convention
        │  env: MYCELIUM_AGENT_ID, MYCELIUM_SESSION_ID
        ▼
   `mycelium` binary
-       read · write · edit · ls · glob · grep · rm · mv
+       read · write · edit · ls · glob · grep · rm · mv · log
        — enforces the _-prefix reservation
        — surfaces backend errors via exit codes + structured stderr
        │
@@ -105,7 +105,7 @@ The **Storage Backend** is an interface, not a service. Two reference implementa
 
 ## 4. CLI Surface
 
-A single binary, `mycelium`, invoked through the agent's shell. Eight POSIX-shaped subcommands, each justified against "could this be fewer?"
+A single binary, `mycelium`, invoked through the agent's shell. Nine POSIX-shaped subcommands, each justified against "could this be fewer?"
 
 - **`mycelium read <path> [--offset N] [--limit N]`** — print file contents. Optional offset and limit for paginated reads of large files.
 - **`mycelium write <path> [--content STR | --stdin] [--expected-version SHA]`** — create or overwrite. With `--expected-version`, conditional on the current version; otherwise unconditional. Prints the new version on success.
@@ -115,6 +115,7 @@ A single binary, `mycelium`, invoked through the agent's shell. Eight POSIX-shap
 - **`mycelium grep <pattern> [--path PATH] [--regex] [--file-type T] [--format text|json] [--limit N] [--cursor C]`** — print matching lines with paths and line numbers. `--format=text` is `path:line:text`; `--format=json` returns `{matches: [{path, line, text}, ...], truncated, next_cursor?}`. `--limit` caps results (default 1000, hard ceiling); `--cursor` paginates. Backend prefers ripgrep, falls back to grep, then to scan. *Earns its complexity:* JSON and type filter make the activity log usable through general tools; the `--limit` cap keeps log-reflection from overflowing context.
 - **`mycelium rm <path> [--expected-version SHA]`** — remove. *Earns its complexity:* not expressible as `write` — empty content creates an empty file, not a deletion.
 - **`mycelium mv <src> <dst>`** — atomic rename within the store. *Earns its complexity:* read+write+delete is not atomic; emulating rename loses the guarantee.
+- **`mycelium log <op> [--path PATH] [--payload-json STR | --stdin]`** — append a JSONL signal entry to `_activity/YYYY/MM/DD/{agent_id}.jsonl` without mutating content. The system fills `ts`, `agent_id`, `session_id`, and the destination path; the caller supplies `op` (a non-mutation tag like `context_signal`, `compaction`, or an agent annotation), optional `path` recorded as metadata on the entry, and an optional payload via either `--payload-json` (inline JSON string, for harness-side callers without easy stdin access) or `--stdin` (for agent-side bash pipelines). Entries hard-capped at 4KB per section 8. Returns `{"log_status":"ok"}`. *Earns its complexity:* harness observations, compaction markers, and agent intent annotations all need to land in the same JSONL stream as mutations so existing reads (`grep --format=json`) work without specializing on signal type.
 
 **Failure modes:**
 
@@ -127,13 +128,13 @@ A successful mutation prints `{"version":"sha256:...","log_status":"ok"}` on std
 
 What's *not* here:
 
-- **No specialized log subcommand.** The activity log is JSONL at `_activity/YYYY/MM/DD/{agent_id}.jsonl`. Read with `mycelium read` (or `cat`), scope time windows with `mycelium glob` (or `ls`), filter with `mycelium grep --format=json` (or `rg --json`). Same output either path. (See section 8.)
+- **No specialized log query DSL.** Reading the activity log uses the same tools as reading any file: `mycelium read` (or `cat`), `mycelium glob` (or `ls`) for time windows, `mycelium grep --format=json` (or `rg --json`) for filtering. Writes go through `mycelium log` (above) for explicit signals, or happen automatically as a side effect of content mutations. (See section 8.)
 - **No `summarize`, `index`, `embed`, `tag`, `pin`, `archive`, `recall`.** If the agent wants any of those, it implements them by writing files.
 - **No `exists` subcommand.** `mycelium read` exits non-zero with a typed not-found message.
 
 Three contract notes:
 
-**Conditional writes are first-class.** Every mutating subcommand accepts optional `--expected-version`. This is how concurrency surfaces (section 6); a single-agent store can ignore it and the system behaves like a regular filesystem.
+**Conditional writes are first-class.** Every content-mutating subcommand (`write`, `edit`, `rm`, `mv`) accepts optional `--expected-version`. This is how concurrency surfaces (section 6); a single-agent store can ignore it and the system behaves like a regular filesystem. `mycelium log` appends to the agent's daily log file unconditionally — concurrent appends are safe under POSIX `O_APPEND` (section 8).
 
 **The `_` prefix is reserved at the store root.** `mycelium` rejects `write`, `edit`, `rm`, and `mv` whose target is under any path beginning with `_`. Currently `_activity/`; future system paths (`_schema/`, `_config/`) inherit the same protection without binary changes.
 
@@ -279,7 +280,7 @@ Observability is plain JSONL files at a reserved path. No sidecar service, no au
 
 ### The activity log
 
-Every *mutating* subcommand — `write`, `edit`, `rm`, `mv` — produces a JSON entry appended to `_activity/YYYY/MM/DD/{agent_id}.jsonl`. Reads (`read`, `ls`, `glob`, `grep`) aren't logged; the log records what changed, not what was looked at. Skipping reads keeps the log small enough to grep, and the failure modes that matter (duplicate creation, write-without-consolidate, never-revising-conventions) are detectable from writes alone.
+Two paths produce entries in `_activity/YYYY/MM/DD/{agent_id}.jsonl`: every content-mutating subcommand (`write`, `edit`, `rm`, `mv`) appends automatically on success, and `mycelium log` appends explicit signal entries (harness observations like a pi.dev `context` event, compaction markers, agent intent annotations). Reads (`read`, `ls`, `glob`, `grep`) aren't logged; the log records what changed and what was observed, not what was looked at. Skipping reads keeps the log small enough to grep, and the failure modes that matter (duplicate creation, write-without-consolidate, never-revising-conventions) are detectable from the recorded entries alone.
 
 ```json
 {
@@ -301,7 +302,7 @@ Every *mutating* subcommand — `write`, `edit`, `rm`, `mv` — produces a JSON 
 
 - **The agent** reads the log with `mycelium glob` / `mycelium grep --format=json` / `mycelium read` — or raw `ls` / `rg --json` / `cat`. Both run against the same files. This is the substrate self-evolution runs on.
 - **Operators** tail the same files with whatever they like — `tail -f`, `aws s3 sync`, Vector or Filebeat to Splunk or Datadog. Plain JSONL; standard tools work without Mycelium-specific config.
-- **The system** is the only writer. `mycelium` rejects agent writes under `_`-prefixed paths (section 4). Writes happen as a side effect of every successful mutation, ordered consistently with them.
+- **The system** is the only writer. `mycelium` rejects agent writes under `_`-prefixed paths (section 4). Entries land via two paths — as a side effect of every successful content mutation, ordered consistently with them, or as explicit signal entries via `mycelium log` — both stamped with the same identity.
 
 ### Native git/jj support
 
