@@ -26,8 +26,6 @@ func TestStubbedSubcommandShapeParity(t *testing.T) {
 		wantRC  int
 	}{
 		{"edit", []string{"edit", "foo", "--old", "a", "--new", "b"}, `{"version":"sha256:stubbed","log_status":"ok"}` + "\n", ExitOK},
-		{"ls", []string{"ls"}, "MYCELIUM_MEMORY.md\n", ExitOK},
-		{"glob", []string{"glob", "*.md"}, "MYCELIUM_MEMORY.md\n", ExitOK},
 		{"grep", []string{"grep", "--pattern", "foo"}, "", ExitOK},
 		{"rm", []string{"rm", "foo"}, `{"log_status":"ok"}` + "\n", ExitOK},
 		{"mv", []string{"mv", "a", "b"}, `{"log_status":"ok"}` + "\n", ExitOK},

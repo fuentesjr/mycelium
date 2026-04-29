@@ -15,11 +15,6 @@ func stubWriteOrEdit(out io.Writer) int {
 	return ExitOK
 }
 
-func stubListing(out io.Writer) int {
-	fmt.Fprintln(out, "MYCELIUM_MEMORY.md")
-	return ExitOK
-}
-
 func stubGrep() int {
 	return ExitOK
 }

@@ -99,11 +99,11 @@ func runEdit(_ io.Reader, out, errOut io.Writer, args []string) int {
 func runLs(_ io.Reader, out, errOut io.Writer, args []string) int {
 	fs := flag.NewFlagSet("ls", flag.ContinueOnError)
 	fs.SetOutput(errOut)
-	fs.Bool("recursive", false, "recurse into subdirectories")
+	recursive := fs.Bool("recursive", false, "recurse into subdirectories")
 	if _, err := parseInterspersed(fs, args); err != nil {
 		return ExitUsage
 	}
-	return stubListing(out)
+	return listFilesAndPrint(out, errOut, ReadIdentity().Mount, *recursive)
 }
 
 func runGlob(_ io.Reader, out, errOut io.Writer, args []string) int {
@@ -117,7 +117,7 @@ func runGlob(_ io.Reader, out, errOut io.Writer, args []string) int {
 		fmt.Fprintln(errOut, "mycelium glob: PATTERN required")
 		return ExitUsage
 	}
-	return stubListing(out)
+	return globAndPrint(out, errOut, ReadIdentity().Mount, positional[0])
 }
 
 func runGrep(_ io.Reader, _, errOut io.Writer, args []string) int {
