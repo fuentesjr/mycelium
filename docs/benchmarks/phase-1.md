@@ -1,6 +1,6 @@
 # Phase 1 Benchmark Rubric
 
-**Status:** Draft
+**Status:** Active. Release-decoupled — `v0.1.0` ships on binary-side criteria; T1/T2 model runs land here as they complete.
 **Owns:** Acceptance criteria 1, 4, and 5 from `mycelium-phases.md`.
 
 This rubric operationalizes the three Phase 1 criteria that depend on real model runs:
@@ -100,8 +100,14 @@ Performance, long-running stores, cost ceilings, and non-pi.dev harnesses (Herme
 
 ---
 
+## Release decoupling
+
+Binary-side acceptance criteria (#2 multi-agent concurrency, #5 failure-mode observability, #6 activity-log integrity, #7 backend correctness, #8 store readability) are met by tests in `cmd/mycelium/` and ship with `v0.1.0`. Model-run criteria (#1 multi-session synthesis, #3 conflict recovery on real models, #4 self-evolution) are open and validate against the released artifact rather than gating release. Results land here as runs complete.
+
+Rationale: model-run validation does not change the artifact, only the public claim about it. Shipping early-access lets real users exercise the multi-session and concurrent-agent paths that the synthetic suite covers; waiting for full validation costs months of zero-feedback delay. Release framing is "early access, validation in progress" until both target models pass #1 and #4.
+
 ## Open issues
 
-T3 is executable: detectors implemented in `binary/detect.go`, fixtures under `binary/testdata/trajectories/`, harness at `docs/benchmarks/tasks/T3-failure-detectors/harness.md`. Run via `go test -run TestDetectors`.
+T3 is executable: detectors implemented in `cmd/mycelium/detect.go`, fixtures under `cmd/mycelium/testdata/trajectories/`, harness at `docs/benchmarks/tasks/T3-failure-detectors/harness.md`. Run via `go test -run TestDetectors`.
 
-T1 and T2 still need per-task content under `docs/benchmarks/tasks/T<n>-<slug>/` (`task.md`, `harness.md`, `held-out.md`, plus T2 `seed/`). Until those exist, T1 and T2 are approved-in-principle but not executable.
+T1 and T2 still need per-task content under `docs/benchmarks/tasks/T<n>-<slug>/` (`task.md`, `harness.md`, `held-out.md`, plus T2 `seed/`). T1's topic is also up for revision — the current "post-quantum cryptography in cloud KMS / healthcare" framing is overcooked for an MVP synthesis test; pick a simpler stable topic (e.g. comparing PostgreSQL connection poolers) before drafting.
