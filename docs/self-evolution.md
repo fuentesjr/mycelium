@@ -49,7 +49,7 @@ mycelium glob '_activity/2026/04/*/researcher-7.jsonl'
 mycelium grep --pattern '"op":"write"' --path _activity --format json --limit 200
 ```
 
-The `json` format returns `{matches: [{path, line, text}, ...], truncated, next_cursor}`. Each match's `text` is one JSONL entry containing `ts`, `op`, `path`, `version`, `prior_version`, `agent_id`, `session_id`. Group by `path` to spot files mutated repeatedly with similar but not identical paths.
+The `json` format returns `{matches: [{path, line, text}, ...], truncated, next_cursor}`. Each match's `text` is a JSONL entry; payloads from `mycelium log` are inlined on the entry as a `payload` field. The entry contains `ts`, `op`, `path`, `version`, `prior_version`, `agent_id`, `session_id`. Group by `path` to spot files mutated repeatedly with similar but not identical paths.
 
 Once a pattern is identified, the agent edits the convention file:
 
@@ -79,7 +79,7 @@ If the agent has been logging searches, the trail is greppable:
 mycelium grep --pattern '"op":"search_signal"' --path _activity --format json --limit 500
 ```
 
-Each match's `text` is a JSONL entry with `signal_path` pointing to the payload under `logs/`. If `glp1`, `pipeline`, and `followup` show up repeatedly, the agent writes an index that resolves the common queries:
+Each match's `text` is a JSONL entry with the payload inlined as the `payload` field. If `glp1`, `pipeline`, and `followup` show up repeatedly, the agent writes an index that resolves the common queries:
 
 ```
 mycelium write notes/_index/glp1.md
@@ -136,7 +136,7 @@ These boundaries exist because crossing them would re-introduce the capability c
 
 - **No reflection step between turns.** The system runs no analysis on the agent's behalf. If the agent doesn't grep the log, no patterns are surfaced.
 - **No drift detection.** "This convention was added two sessions ago and has been violated three times" is a query the agent can run; it is not a notification the system sends.
-- **No automatic convention updates.** `MYCELIUM_MEMORY.md` is edited only by the agent. The binary writes only to `_activity/` and `logs/`, and only as a side effect of operations the agent initiated.
+- **No automatic convention updates.** `MYCELIUM_MEMORY.md` is edited only by the agent. The binary writes only to `_activity/`, and only as a side effect of operations the agent initiated.
 - **No enforced read-before-write.** The reservation rule (`_`-prefix) is the *only* enforced policy. Conventions are not enforced; if the agent ignores its own rules, the binary never knows.
 
 The system makes self-evolution **possible**. The agent **does it**.
@@ -150,7 +150,7 @@ Two formats serve different purposes:
 - **`mycelium grep --format text`** (default) — human-friendly, one match per line, suitable for an operator inspecting a tarball.
 - **`mycelium grep --format json`** (recommended for the agent) — `{matches: [{path, line, text}], truncated, next_cursor}`. Each match's `text` is a full JSONL line that the agent can re-parse to extract `op`, `path`, `version`, `prior_version`, `agent_id`, `session_id`. The `truncated` flag and the hard `--limit 1000` cap exist specifically to prevent log-reflection from blowing the agent's context window.
 
-The log is at `_activity/YYYY/MM/DD/{agent_id}.jsonl`. Agent-supplied payloads from `mycelium log <op> --stdin` live separately at `logs/YYYY/MM/DD/{agent_id}/<HHMMSS>.<nanos>-<op>.json`, referenced from the activity entry via `signal_path`. Both are agent-readable; only `_activity/` is reserved.
+The log is at `_activity/YYYY/MM/DD/{agent_id}.jsonl`. Agent-supplied payloads from `mycelium log <op> --stdin` are inlined on the activity entry as a `payload` field. Only `_activity/` is reserved.
 
 ---
 

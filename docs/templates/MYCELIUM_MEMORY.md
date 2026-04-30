@@ -14,7 +14,8 @@ Today, that rule reserves one tree:
 
 - `_activity/YYYY/MM/DD/{agent_id}.jsonl` — your daily activity log. The
   binary appends one JSONL entry on every successful mutation and on every
-  `mycelium log` call. You cannot write to it; you can read it freely
+  `mycelium log` call. Payloads from `mycelium log` are inlined on the entry
+  as a `payload` field. You cannot write to it; you can read it freely
   (`mycelium read`/`ls`/`glob`/`grep`).
 
 Everything else under the mount is yours.
@@ -22,11 +23,6 @@ Everything else under the mount is yours.
 ## What lives where
 
 - `_activity/` — see above. Binary-controlled metadata, append-only.
-
-- `logs/YYYY/MM/DD/{agent_id}/<HHMMSS>.<nanos>-<op>.json` — payloads from
-  `mycelium log <op> --stdin` (or `--payload-json`). Agent-writable; the binary
-  routes `mycelium log` payloads here automatically and references them from
-  the matching `_activity/` entry via `signal_path`.
 
 - Anywhere else — yours. A reasonable starting layout:
   - `AGENTS/{agent_id}/` — your in-flight notes; other agents can read but
@@ -63,8 +59,8 @@ mycelium glob '_activity/2026/04/*/*.jsonl'
 # Find write ops by pattern
 mycelium grep --path _activity '"op":"write"' --regex --format=json
 
-# Read a signal payload referenced from an entry
-mycelium read logs/2026/04/29/researcher-7/184302.117000000-context.json
+# Find signal entries with payloads (payload is inline on each entry)
+mycelium grep --path _activity --pattern context_signal --format json
 ```
 
 Grepping your own log between sessions is how you notice duplicated writes,

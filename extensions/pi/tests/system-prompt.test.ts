@@ -35,10 +35,11 @@ describe("systemPromptAvailable", () => {
     expect(block).toContain("--include-current-content");
   });
 
-  it("describes the reserved _ prefix and split log layout", () => {
+  it("describes the reserved _ prefix and inline payload layout", () => {
     expect(block).toContain("Reserved paths");
     expect(block).toContain("_activity/YYYY/MM/DD/test-agent.jsonl");
-    expect(block).toContain("logs/YYYY/MM/DD/test-agent/");
+    expect(block).not.toContain("logs/YYYY/MM/DD");
+    expect(block).toContain("payload");
   });
 
   it("guides explicit log usage", () => {

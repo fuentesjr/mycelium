@@ -48,9 +48,8 @@ with \`_\`. Today this means:
 - \`_activity/YYYY/MM/DD/${c.agentId}.jsonl\` — auto-generated metadata for every
   mutation you perform. Read-only to you, but greppable: try
   \`mycelium grep --path _activity --format json <pattern>\` to look back across
-  sessions.
-- \`logs/YYYY/MM/DD/${c.agentId}/<HHMMSS>.<nanos>-<op>.json\` — payloads from
-  \`mycelium log --stdin\`. Yours to read, write via \`log\` only.
+  sessions. Payloads from \`mycelium log\` are inlined on each entry as a \`payload\`
+  field — no separate file to look up.
 
 When to log explicitly: this extension already records context boundaries
 automatically, so use \`mycelium log <op> --stdin\` only for signals you'd want
