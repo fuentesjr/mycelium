@@ -88,8 +88,8 @@ func TestLogHappyPathNoPathNoPayload(t *testing.T) {
 	if e.Path != "" {
 		t.Errorf("path should be absent, got %q", e.Path)
 	}
-	if e.SignalPath != "" {
-		t.Errorf("signal_path should be absent, got %q", e.SignalPath)
+	if len(e.Payload) != 0 {
+		t.Errorf("payload should be absent, got %q", e.Payload)
 	}
 }
 
@@ -120,30 +120,23 @@ func TestLogWithPayloadJSON(t *testing.T) {
 		t.Fatalf("rc: got %d, want %d", rc, ExitOK)
 	}
 
-	// _activity entry should exist with signal_path set.
 	entries := readLogLines(t, mount)
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 activity entry, got %d", len(entries))
 	}
-	if entries[0].SignalPath == "" {
-		t.Error("signal_path should be set when payload is provided")
-	}
-	if !strings.HasPrefix(entries[0].SignalPath, "logs/") {
-		t.Errorf("signal_path should start with logs/, got %q", entries[0].SignalPath)
-	}
-
-	// logs/ payload file should exist with correct content.
-	payloadFile := filepath.Join(mount, filepath.FromSlash(entries[0].SignalPath))
-	data, err := os.ReadFile(payloadFile)
-	if err != nil {
-		t.Fatalf("read payload file %s: %v", payloadFile, err)
-	}
+	// Payload should be inlined on the entry.
 	var got map[string]interface{}
-	if err := json.Unmarshal(data, &got); err != nil {
+	if err := json.Unmarshal(entries[0].Payload, &got); err != nil {
 		t.Fatalf("payload not valid JSON: %v", err)
 	}
 	if got["x"] != float64(1) {
 		t.Errorf("payload x: got %v, want 1", got["x"])
+	}
+
+	// No logs/ directory should be created.
+	logsDir := filepath.Join(mount, "logs")
+	if _, err := os.Stat(logsDir); !os.IsNotExist(err) {
+		t.Error("logs/ directory must not be created")
 	}
 }
 
@@ -160,17 +153,18 @@ func TestLogWithStdin(t *testing.T) {
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 entry, got %d", len(entries))
 	}
-	if entries[0].SignalPath == "" {
-		t.Error("signal_path should be set when stdin payload provided")
-	}
-	payloadFile := filepath.Join(mount, filepath.FromSlash(entries[0].SignalPath))
-	data, _ := os.ReadFile(payloadFile)
 	var got map[string]interface{}
-	if err := json.Unmarshal(data, &got); err != nil {
+	if err := json.Unmarshal(entries[0].Payload, &got); err != nil {
 		t.Fatalf("payload not valid JSON: %v", err)
 	}
 	if got["y"] != float64(2) {
 		t.Errorf("payload y: got %v, want 2", got["y"])
+	}
+
+	// No logs/ directory should be created.
+	logsDir := filepath.Join(mount, "logs")
+	if _, err := os.Stat(logsDir); !os.IsNotExist(err) {
+		t.Error("logs/ directory must not be created")
 	}
 }
 
@@ -334,8 +328,13 @@ func TestLogE2EHappyPath(t *testing.T) {
 	if e.SessionID != "e2e-session" {
 		t.Errorf("session_id: got %q", e.SessionID)
 	}
-	if e.SignalPath == "" {
-		t.Error("signal_path should be set when payload provided")
+	// Payload should be inlined.
+	var got map[string]interface{}
+	if err := json.Unmarshal(e.Payload, &got); err != nil {
+		t.Fatalf("payload not valid JSON: %v", err)
+	}
+	if got["key"] != "val" {
+		t.Errorf("payload key: got %v, want val", got["key"])
 	}
 }
 
@@ -355,17 +354,18 @@ func TestLogE2EStdin(t *testing.T) {
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 entry, got %d", len(entries))
 	}
-	if entries[0].SignalPath == "" {
-		t.Error("signal_path should be set for stdin payload")
-	}
-	payloadFile := filepath.Join(mount, filepath.FromSlash(entries[0].SignalPath))
-	data, _ := os.ReadFile(payloadFile)
 	var got map[string]interface{}
-	if err := json.Unmarshal(data, &got); err != nil {
+	if err := json.Unmarshal(entries[0].Payload, &got); err != nil {
 		t.Fatalf("payload: %v", err)
 	}
 	if got["y"] != float64(2) {
 		t.Errorf("payload y: got %v, want 2", got["y"])
+	}
+
+	// No logs/ directory should be created.
+	logsDir := filepath.Join(mount, "logs")
+	if _, err := os.Stat(logsDir); !os.IsNotExist(err) {
+		t.Error("logs/ directory must not be created")
 	}
 }
 
@@ -380,7 +380,83 @@ func TestLogE2EMountUnset(t *testing.T) {
 	}
 }
 
-// --- New tests for the activity log redesign ---
+// --- New contract tests for inline-payload design ---
+
+func TestLogNoPayloadNoPayloadField(t *testing.T) {
+	mount := t.TempDir()
+	t.Setenv("MYCELIUM_MOUNT", mount)
+
+	_, errOut, rc := runDispatch(t, "log", "foo")
+	if rc != ExitOK {
+		t.Fatalf("rc: got %d (stderr=%q)", rc, errOut)
+	}
+
+	entries := readLogLines(t, mount)
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+	if len(entries[0].Payload) != 0 {
+		t.Errorf("payload should be absent when no payload given, got %q", entries[0].Payload)
+	}
+
+	// Verify the raw JSON also has no "payload" key.
+	logPath := activityLogPath(mount, "", fixedNow)
+	// Use glob to find the actual file since we don't control the timestamp.
+	matches, _ := filepath.Glob(filepath.Join(mount, "_activity", "*", "*", "*", "*.jsonl"))
+	if len(matches) == 0 {
+		t.Fatal("no activity file found")
+	}
+	_ = logPath
+	raw, _ := os.ReadFile(matches[0])
+	if strings.Contains(string(raw), `"payload"`) {
+		t.Errorf("raw JSONL should not contain payload key, got: %s", raw)
+	}
+}
+
+func TestLogNeverCreatesLogsDir(t *testing.T) {
+	mount := t.TempDir()
+	t.Setenv("MYCELIUM_MOUNT", mount)
+
+	// With payload-json.
+	runDispatch(t, "log", "sig", "--payload-json", `{"a":1}`)
+	// With stdin.
+	runDispatchWithStdin(t, `{"b":2}`, "log", "sig2", "--stdin")
+	// Without payload.
+	runDispatch(t, "log", "sig3")
+
+	logsDir := filepath.Join(mount, "logs")
+	if _, err := os.Stat(logsDir); !os.IsNotExist(err) {
+		t.Errorf("logs/ must not be created by mycelium log, but it exists at %s", logsDir)
+	}
+}
+
+func TestLogInvalidPayloadJSONViaDispatch(t *testing.T) {
+	mount := t.TempDir()
+	t.Setenv("MYCELIUM_MOUNT", mount)
+
+	_, _, rc := runDispatch(t, "log", "op", "--payload-json", "not-json")
+	if rc != ExitUsage {
+		t.Errorf("rc: got %d, want ExitUsage", rc)
+	}
+	if logExists(mount) {
+		t.Error("no entry should be written on invalid JSON")
+	}
+}
+
+func TestLogInvalidStdinJSONViaDispatch(t *testing.T) {
+	mount := t.TempDir()
+	t.Setenv("MYCELIUM_MOUNT", mount)
+
+	_, _, rc := runDispatchWithStdin(t, "not-json", "log", "op", "--stdin")
+	if rc != ExitUsage {
+		t.Errorf("rc: got %d, want ExitUsage", rc)
+	}
+	if logExists(mount) {
+		t.Error("no entry should be written on invalid stdin JSON")
+	}
+}
+
+// --- New activity log design tests ---
 
 func TestActivityLogPathIsDateBucketed(t *testing.T) {
 	mount := t.TempDir()
@@ -456,8 +532,9 @@ func TestActivityLogSchemaFlatForWrite(t *testing.T) {
 	if e.From != "" {
 		t.Errorf("from should be absent for write, got %q", e.From)
 	}
-	if e.SignalPath != "" {
-		t.Errorf("signal_path should be absent for mutation entries, got %q", e.SignalPath)
+	// Mutation entries must not have a payload field.
+	if len(e.Payload) != 0 {
+		t.Errorf("payload should be absent for mutation entries, got %q", e.Payload)
 	}
 }
 
@@ -529,7 +606,7 @@ func TestActivityLogSchemaFlatForMv(t *testing.T) {
 	}
 }
 
-func TestLogPayloadGoesToLogsDir(t *testing.T) {
+func TestLogPayloadInlinedOnEntry(t *testing.T) {
 	mount := t.TempDir()
 	t.Setenv("MYCELIUM_MOUNT", mount)
 	t.Setenv("MYCELIUM_AGENT_ID", "pi-agent")
@@ -540,46 +617,25 @@ func TestLogPayloadGoesToLogsDir(t *testing.T) {
 		t.Fatalf("rc: got %d (stderr=%q)", rc, errOut)
 	}
 
-	// Verify payload file is under logs/ and contains the payload.
-	matches, _ := filepath.Glob(filepath.Join(mount, "logs", "*", "*", "*", "*", "*.json"))
-	if len(matches) != 1 {
-		t.Fatalf("expected 1 payload file, got %d: %v", len(matches), matches)
-	}
-	data, err := os.ReadFile(matches[0])
-	if err != nil {
-		t.Fatalf("read payload: %v", err)
-	}
-	if string(data) != payload {
-		t.Errorf("payload content: got %q, want %q", string(data), payload)
-	}
-}
-
-func TestLogActivityHasSignalPath(t *testing.T) {
-	mount := t.TempDir()
-	t.Setenv("MYCELIUM_MOUNT", mount)
-	t.Setenv("MYCELIUM_AGENT_ID", "pi-agent")
-
-	_, errOut, rc := runDispatch(t, "log", "context_signal", "--payload-json", `{"x":1}`)
-	if rc != ExitOK {
-		t.Fatalf("rc: got %d (stderr=%q)", rc, errOut)
-	}
-
 	entries := readLogLines(t, mount)
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 entry, got %d", len(entries))
 	}
-	sp := entries[0].SignalPath
-	if sp == "" {
-		t.Fatal("signal_path should be set")
+	var got map[string]interface{}
+	if err := json.Unmarshal(entries[0].Payload, &got); err != nil {
+		t.Fatalf("payload not valid JSON: %v", err)
 	}
-	// Verify it references an actual file.
-	payloadFile := filepath.Join(mount, filepath.FromSlash(sp))
-	if _, err := os.Stat(payloadFile); err != nil {
-		t.Errorf("signal_path %q does not point to existing file: %v", sp, err)
+	if got["x"] != float64(42) {
+		t.Errorf("payload x: got %v, want 42", got["x"])
+	}
+
+	// Confirm no logs/ directory was created.
+	if _, err := os.Stat(filepath.Join(mount, "logs")); !os.IsNotExist(err) {
+		t.Error("logs/ directory must not exist")
 	}
 }
 
-func TestLogNoPayloadNoSignalPath(t *testing.T) {
+func TestLogNoPayloadAbsentOnEntry(t *testing.T) {
 	mount := t.TempDir()
 	t.Setenv("MYCELIUM_MOUNT", mount)
 
@@ -592,60 +648,7 @@ func TestLogNoPayloadNoSignalPath(t *testing.T) {
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 entry, got %d", len(entries))
 	}
-	if entries[0].SignalPath != "" {
-		t.Errorf("signal_path should be absent when no payload, got %q", entries[0].SignalPath)
-	}
-
-	// No logs/ file should exist.
-	matches, _ := filepath.Glob(filepath.Join(mount, "logs", "*", "*", "*", "*", "*.json"))
-	if len(matches) != 0 {
-		t.Errorf("no logs/ files expected when no payload, got %v", matches)
-	}
-}
-
-func TestLogSignalPathFormat(t *testing.T) {
-	mount := t.TempDir()
-	t.Setenv("MYCELIUM_MOUNT", mount)
-	t.Setenv("MYCELIUM_AGENT_ID", "pi-agent")
-
-	now := time.Date(2026, 4, 29, 15, 30, 22, 123456789, time.UTC)
-	id := Identity{AgentID: "pi-agent", Mount: mount, SessionID: "s"}
-
-	rc := appendLog(strings.NewReader(""), io.Discard, io.Discard, id, "context_signal", "", `{"a":1}`, false, now)
-	if rc != ExitOK {
-		t.Fatalf("rc: got %d", rc)
-	}
-
-	entries := readLogLines(t, mount)
-	if len(entries) != 1 {
-		t.Fatalf("expected 1 entry, got %d", len(entries))
-	}
-	sp := entries[0].SignalPath
-	// Expected: logs/2026/04/29/pi-agent/153022.123456789-context_signal.json
-	wantPrefix := "logs/2026/04/29/pi-agent/"
-	if !strings.HasPrefix(sp, wantPrefix) {
-		t.Errorf("signal_path %q should start with %q", sp, wantPrefix)
-	}
-	if !strings.HasSuffix(sp, "-context_signal.json") {
-		t.Errorf("signal_path %q should end with -context_signal.json", sp)
-	}
-	// Verify HHMMSS.nanos portion.
-	base := strings.TrimPrefix(sp, wantPrefix)
-	timePart := strings.SplitN(base, "-", 2)[0]
-	if timePart != "153022.123456789" {
-		t.Errorf("time part: got %q, want %q", timePart, "153022.123456789")
-	}
-}
-
-func TestLogOpWithSlashRejected(t *testing.T) {
-	mount := t.TempDir()
-	t.Setenv("MYCELIUM_MOUNT", mount)
-
-	_, errOut, rc := runDispatch(t, "log", "a/b")
-	if rc != ExitUsage {
-		t.Errorf("rc: got %d, want %d", rc, ExitUsage)
-	}
-	if !strings.Contains(errOut, "path-unsafe") {
-		t.Errorf("stderr should mention path-unsafe, got %q", errOut)
+	if len(entries[0].Payload) != 0 {
+		t.Errorf("payload should be absent when no payload given, got %q", entries[0].Payload)
 	}
 }

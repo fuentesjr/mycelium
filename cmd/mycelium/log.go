@@ -7,21 +7,20 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 )
 
 // LogEntry is the on-disk record appended to _activity/YYYY/MM/DD/<agent_id>.jsonl.
 type LogEntry struct {
-	TS           string `json:"ts"`
-	AgentID      string `json:"agent_id,omitempty"`
-	SessionID    string `json:"session_id,omitempty"`
-	Op           string `json:"op"`
-	Path         string `json:"path,omitempty"`
-	Version      string `json:"version,omitempty"`
-	PriorVersion string `json:"prior_version,omitempty"`
-	From         string `json:"from,omitempty"`
-	SignalPath   string `json:"signal_path,omitempty"`
+	TS           string          `json:"ts"`
+	AgentID      string          `json:"agent_id,omitempty"`
+	SessionID    string          `json:"session_id,omitempty"`
+	Op           string          `json:"op"`
+	Path         string          `json:"path,omitempty"`
+	Version      string          `json:"version,omitempty"`
+	PriorVersion string          `json:"prior_version,omitempty"`
+	From         string          `json:"from,omitempty"`
+	Payload      json.RawMessage `json:"payload,omitempty"`
 }
 
 // MutationLog carries the typed fields for a mutation log entry.
@@ -117,43 +116,8 @@ func appendActivity(out, errOut io.Writer, id Identity, entry LogEntry, now time
 	return ExitOK
 }
 
-// logsPayloadPath returns the path for storing an agent-supplied payload.
-// Format: <mount>/logs/YYYY/MM/DD/<agent_id>/<HHMMSS>.<nanos>-<op>.json
-func logsPayloadPath(mount string, agentID string, op string, now time.Time) string {
-	agent := agentID
-	if agent == "" {
-		agent = "unspecified"
-	}
-	utc := now.UTC()
-	filename := fmt.Sprintf(
-		"%02d%02d%02d.%09d-%s.json",
-		utc.Hour(), utc.Minute(), utc.Second(),
-		utc.Nanosecond(),
-		op,
-	)
-	return filepath.Join(
-		mount,
-		"logs",
-		fmt.Sprintf("%04d", utc.Year()),
-		fmt.Sprintf("%02d", int(utc.Month())),
-		fmt.Sprintf("%02d", utc.Day()),
-		agent,
-		filename,
-	)
-}
-
-// relForwardSlash converts an absolute payload path to a forward-slash
-// relative path from the mount root.
-func relForwardSlash(mount, abs string) string {
-	rel, err := filepath.Rel(mount, abs)
-	if err != nil {
-		return abs
-	}
-	return strings.ReplaceAll(rel, string(filepath.Separator), "/")
-}
-
-// appendLog handles `mycelium log <op>`. It routes agent-supplied payloads
-// to logs/ and writes metadata to _activity/. now is injected for testability.
+// appendLog handles `mycelium log <op>`. It inlines agent-supplied payloads
+// directly on the activity entry as the `payload` field. now is injected for testability.
 func appendLog(
 	in io.Reader,
 	out, errOut io.Writer,
@@ -167,22 +131,14 @@ func appendLog(
 		return ExitGenericError
 	}
 
-	// Reject op values containing path-unsafe characters.
-	if strings.ContainsAny(op, "/\\") {
-		fmt.Fprintf(errOut, "mycelium log: op %q contains path-unsafe characters\n", op)
-		return ExitUsage
-	}
-
 	// Resolve payload bytes.
 	var payloadBytes []byte
-	hasPayload := false
 	if payloadJSON != "" {
 		if !json.Valid([]byte(payloadJSON)) {
 			fmt.Fprintln(errOut, "mycelium log: --payload-json is not valid JSON")
 			return ExitUsage
 		}
 		payloadBytes = []byte(payloadJSON)
-		hasPayload = true
 	} else if fromStdin {
 		raw, err := io.ReadAll(in)
 		if err != nil {
@@ -194,38 +150,13 @@ func appendLog(
 			return ExitUsage
 		}
 		payloadBytes = raw
-		hasPayload = true
 	}
 
-	var signalPath string
-
-	if hasPayload {
-		// Write payload to logs/ tree.
-		payloadDest := logsPayloadPath(id.Mount, id.AgentID, op, now)
-		if err := atomicWrite(payloadDest, payloadBytes); err != nil {
-			fmt.Fprintf(errOut, "mycelium log: write payload: %v\n", err)
-			return ExitGenericError
-		}
-		signalPath = relForwardSlash(id.Mount, payloadDest)
-	}
-
-	// Write metadata entry to _activity/.
+	// Build entry with payload inlined.
 	entry := LogEntry{
-		Op:         op,
-		Path:       path,
-		SignalPath: signalPath,
+		Op:      op,
+		Path:    path,
+		Payload: json.RawMessage(payloadBytes),
 	}
-	rc := appendActivity(io.Discard, errOut, id, entry, now)
-	if rc != ExitOK {
-		if hasPayload {
-			// Payload is preserved; only index entry is missing.
-			fmt.Fprint(out, `{"log_status":"missing"}`+"\n")
-			return ExitOK
-		}
-		// No payload — the whole point was to log; treat as failure.
-		return rc
-	}
-
-	fmt.Fprint(out, stubLogResponse)
-	return ExitOK
+	return appendActivity(out, errOut, id, entry, now)
 }

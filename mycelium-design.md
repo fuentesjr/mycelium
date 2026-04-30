@@ -38,15 +38,19 @@ Mycelium targets **Frontier-class production models** — top-of-class capabilit
 
 ## 2. Design Principles
 
+### As simple as possible, but not simpler
+
+> "Everything should be made as simple as possible, but not simpler." — Einstein (apocryphal)
+
+This is the project's first principle and the one every other principle answers to. Every tool, parameter, backend method, and on-disk structure earns its complexity against "could this be expressed in terms of something already here?" — and is removed when the answer turns out to be yes. When in doubt, fewer. The activity log was once a special tool; it's now ordinary files at a reserved path the agent reads like any other.
+
+The "but not simpler" half is load-bearing. A system that fakes simplicity by hiding necessary complexity behind opaque abstractions, or that drops a guarantee the bet depends on, has failed this principle as surely as one that piles on unnecessary layers. Atomicity, conflict visibility, and the reserved-prefix protection cannot be removed without breaking the bet — they're as simple as the bet allows, and no simpler. Every other decision in this document is the application of this principle to a specific question.
+
 ### General tools scale with intelligence; specialized infrastructure caps it
 
 A specialized memory API encodes assumptions: what gets saved, how it's indexed, what counts as "relevant," when to summarize. As models improve, those heuristics become drag — the system forces the agent into compression and ranking policies the model could now beat unaided.
 
 General tools (read, write, list, edit, glob, grep) have no such ceiling. The agent invokes them through its existing shell — `mycelium read` sits in the same Bash tool as `git log` and `rg` — and `mycelium` is the smallest adapter that earns its keep: atomic conditional writes, an automatic activity log, no policy about what to save, how to name, or what's relevant. A Frontier model uses them with judgment indistinguishable from a thoughtful engineer keeping a working notebook, and the same surface gets *more* useful — not less — as the next generation arrives. This is the central bet, and every other decision is downstream of it.
-
-### Simplicity is a virtue. Every primitive must earn its complexity.
-
-Every tool, parameter, and backend method has been checked against "could this be expressed in terms of something already here?" The survivors are the ones that genuinely couldn't, or whose ergonomics, atomicity, or token economy made consolidation worse than duplication. When in doubt, fewer. The activity log was once a special tool; it's now ordinary files at a reserved path the agent reads like any other.
 
 ### Files are the unit. Directories are the structure. The agent owns both.
 
@@ -115,7 +119,7 @@ A single binary, `mycelium`, invoked through the agent's shell. Nine POSIX-shape
 - **`mycelium grep <pattern> [--path PATH] [--regex] [--file-type T] [--format text|json] [--limit N] [--cursor C]`** — print matching lines with paths and line numbers. `--format=text` is `path:line:text`; `--format=json` returns `{matches: [{path, line, text}, ...], truncated, next_cursor?}`. `--limit` caps results (default 1000, hard ceiling); `--cursor` paginates. Backend prefers ripgrep, falls back to grep, then to scan. *Earns its complexity:* JSON and type filter make the activity log usable through general tools; the `--limit` cap keeps log-reflection from overflowing context.
 - **`mycelium rm <path> [--expected-version SHA]`** — remove. *Earns its complexity:* not expressible as `write` — empty content creates an empty file, not a deletion.
 - **`mycelium mv <src> <dst>`** — atomic rename within the store. *Earns its complexity:* read+write+delete is not atomic; emulating rename loses the guarantee.
-- **`mycelium log <op> [--path PATH] [--payload-json STR | --stdin]`** — record a non-mutation signal. Without a payload, appends a JSONL metadata entry to `_activity/YYYY/MM/DD/{agent_id}.jsonl`. With a payload, writes the payload bytes to `logs/YYYY/MM/DD/{agent_id}/<HHMMSS>.<nanos>-<op>.json` and appends a metadata entry to `_activity/...` referencing it via `signal_path`. The system fills `ts`, `agent_id`, `session_id`; the caller supplies `op` (a non-mutation tag like `context_signal`, `compaction`, or an agent annotation), optional `--path` recorded as metadata on the entry, and an optional payload via either `--payload-json` (inline JSON string, for harness-side callers without easy stdin access) or `--stdin` (for agent-side bash pipelines). Returns `{"log_status":"ok"}` on success, or `{"log_status":"missing"}` when the payload was stored but the metadata write failed. *Earns its complexity:* harness observations, compaction markers, and agent intent annotations all need to land in the same JSONL stream as mutations so existing reads (`grep --format=json`) work without specializing on signal type. Splitting payloads into `logs/` keeps `_activity/` strictly binary-controlled metadata; the agent reads (and may groom) its own signal files like any other content.
+- **`mycelium log <op> [--path PATH] [--payload-json STR | --stdin]`** — append a non-mutation signal entry to `_activity/YYYY/MM/DD/{agent_id}.jsonl`. The system fills `ts`, `agent_id`, `session_id`; the caller supplies `op` (a non-mutation tag like `context_signal`, `compaction`, or an agent annotation), an optional `--path` recorded on the entry, and an optional payload via either `--payload-json` (inline JSON, for callers without easy stdin access) or `--stdin` (for bash pipelines). The payload, if present, lands inline as the entry's `payload` field. Returns `{"log_status":"ok"}` on success. *Earns its complexity:* harness observations, compaction markers, and agent intent annotations all need to land in the same JSONL stream as mutations so existing reads (`grep --format=json`) work without specializing on signal type. Recommendation: keep payloads small (under 4 KB) so entries stay within POSIX `O_APPEND` atomicity; for larger signals, write a regular file via `mycelium write` and reference it via `--path`.
 
 **Failure modes:**
 
@@ -296,19 +300,19 @@ A mutation entry (`write`, `edit`, `rm`, `mv`):
 }
 ```
 
-A `mycelium log` entry, where the agent supplied a payload:
+A `mycelium log` entry with an inline payload:
 
 ```json
 {
   "ts": "2026-04-26T18:43:02.117Z",
   "agent_id": "researcher-7",
   "session_id": "sess-9b2f",
-  "op": "context",
-  "signal_path": "logs/2026/04/26/researcher-7/184302.117000000-context.json"
+  "op": "context_signal",
+  "payload": {"message_count": 42, "last_role": "assistant"}
 }
 ```
 
-**Path layout: `_activity/YYYY/MM/DD/{agent_id}.jsonl`.** Each agent writes its own daily file; cross-agent concurrency is handled by file isolation, not coordinated appends. Time-windowed queries collapse to glob: `_activity/2026/04/*/*.jsonl` (this month, all agents); `_activity/2026/04/26/*.jsonl` (today, all agents); `_activity/2026/04/26/glp1-research.jsonl` (today, one agent). Daily granularity is the default; deployments needing finer can configure hourly. Total order across agents is `ts`-sorted. Entries are intentionally metadata-only — agent-supplied payloads from `mycelium log` live in `logs/YYYY/MM/DD/{agent_id}/<HHMMSS>.<nanos>-<op>.json` and are referenced by `signal_path`. Keeping activity entries small lets them fit inside POSIX `O_APPEND` atomicity (`PIPE_BUF`, typically 4KB) without an explicit per-line cap, and keeps the log greppable.
+**Path layout: `_activity/YYYY/MM/DD/{agent_id}.jsonl`.** Each agent writes its own daily file; cross-agent concurrency is handled by file isolation, not coordinated appends. Time-windowed queries collapse to glob: `_activity/2026/04/*/*.jsonl` (this month, all agents); `_activity/2026/04/26/*.jsonl` (today, all agents); `_activity/2026/04/26/glp1-research.jsonl` (today, one agent). Daily granularity is the default; deployments needing finer can configure hourly. Total order across agents is `ts`-sorted. Payloads from `mycelium log` are inlined on the entry — keeping all signal data in one file means agents reflect on the log with `mycelium grep --format=json` against a single stream rather than dispatching across schemas. Recommended payload size is under 4 KB so entries stay within POSIX `O_APPEND` atomicity (`PIPE_BUF`); larger signals belong in a regular file referenced via `--path`.
 
 **Same shell, two callers, one writer:**
 

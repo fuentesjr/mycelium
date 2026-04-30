@@ -38,6 +38,16 @@ func resolveUnderMount(mount, requested string) (string, error) {
 	return cleaned, nil
 }
 
+// relForwardSlash converts an absolute path to a forward-slash relative path
+// from the mount root. Used to produce the relative log paths stored in entries.
+func relForwardSlash(mount, abs string) string {
+	rel, err := filepath.Rel(mount, abs)
+	if err != nil {
+		return abs
+	}
+	return strings.ReplaceAll(rel, string(filepath.Separator), "/")
+}
+
 // resolveAgentWritable resolves requested under mount and rejects any path
 // whose first segment starts with '_'. Used by all agent-facing write paths.
 // Internal binary writes (auto-log, mycelium log routing) use resolveUnderMount.
