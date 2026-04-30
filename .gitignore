@@ -5,4 +5,4 @@ coverage/
 *.log
 
 # Built Go binary
-/binary/mycelium
+/cmd/mycelium/mycelium
