@@ -115,7 +115,7 @@ A single binary, `mycelium`, invoked through the agent's shell. Nine POSIX-shape
 - **`mycelium grep <pattern> [--path PATH] [--regex] [--file-type T] [--format text|json] [--limit N] [--cursor C]`** — print matching lines with paths and line numbers. `--format=text` is `path:line:text`; `--format=json` returns `{matches: [{path, line, text}, ...], truncated, next_cursor?}`. `--limit` caps results (default 1000, hard ceiling); `--cursor` paginates. Backend prefers ripgrep, falls back to grep, then to scan. *Earns its complexity:* JSON and type filter make the activity log usable through general tools; the `--limit` cap keeps log-reflection from overflowing context.
 - **`mycelium rm <path> [--expected-version SHA]`** — remove. *Earns its complexity:* not expressible as `write` — empty content creates an empty file, not a deletion.
 - **`mycelium mv <src> <dst>`** — atomic rename within the store. *Earns its complexity:* read+write+delete is not atomic; emulating rename loses the guarantee.
-- **`mycelium log <op> [--path PATH] [--payload-json STR | --stdin]`** — append a JSONL signal entry to `_activity/YYYY/MM/DD/{agent_id}.jsonl` without mutating content. The system fills `ts`, `agent_id`, `session_id`, and the destination path; the caller supplies `op` (a non-mutation tag like `context_signal`, `compaction`, or an agent annotation), optional `path` recorded as metadata on the entry, and an optional payload via either `--payload-json` (inline JSON string, for harness-side callers without easy stdin access) or `--stdin` (for agent-side bash pipelines). Entries hard-capped at 4KB per section 8. Returns `{"log_status":"ok"}`. *Earns its complexity:* harness observations, compaction markers, and agent intent annotations all need to land in the same JSONL stream as mutations so existing reads (`grep --format=json`) work without specializing on signal type.
+- **`mycelium log <op> [--path PATH] [--payload-json STR | --stdin]`** — record a non-mutation signal. Without a payload, appends a JSONL metadata entry to `_activity/YYYY/MM/DD/{agent_id}.jsonl`. With a payload, writes the payload bytes to `logs/YYYY/MM/DD/{agent_id}/<HHMMSS>.<nanos>-<op>.json` and appends a metadata entry to `_activity/...` referencing it via `signal_path`. The system fills `ts`, `agent_id`, `session_id`; the caller supplies `op` (a non-mutation tag like `context_signal`, `compaction`, or an agent annotation), optional `--path` recorded as metadata on the entry, and an optional payload via either `--payload-json` (inline JSON string, for harness-side callers without easy stdin access) or `--stdin` (for agent-side bash pipelines). Returns `{"log_status":"ok"}` on success, or `{"log_status":"missing"}` when the payload was stored but the metadata write failed. *Earns its complexity:* harness observations, compaction markers, and agent intent annotations all need to land in the same JSONL stream as mutations so existing reads (`grep --format=json`) work without specializing on signal type. Splitting payloads into `logs/` keeps `_activity/` strictly binary-controlled metadata; the agent reads (and may groom) its own signal files like any other content.
 
 **Failure modes:**
 
@@ -198,7 +198,7 @@ Every backend appends to `_activity/YYYY/MM/DD/{agent_id}.jsonl` on every succes
 
 A mutation has succeeded only when both content change and log entry are durable. If either fails, the operation is reported as failed and partial state is rolled back.
 
-**LocalFS** orders writes through the filesystem. For `write`: write content to `path.{nonce}.tmp` and `fsync`; append the log entry (with the post-rename `after_version`) to the agent's daily file (`O_APPEND`), then `fsync`; atomically rename. A crash between append and rename leaves an entry whose `after_version` doesn't match any current file content; on startup, the backend scans recent entries against current hashes and either replays the rename (if the temp file survived) or appends `result: "aborted"`. Crashes earlier leave only the temp file; startup cleanup removes it. Multi-process LocalFS relies on `O_APPEND` atomicity for log entries ≤4KB (enforced by `mycelium`; section 8) and on the per-agent daily path to avoid contention.
+**LocalFS** orders writes through the filesystem. For `write`: write content to `path.{nonce}.tmp` and `fsync`; append the log entry (with the post-rename `version`) to the agent's daily file (`O_APPEND`), then `fsync`; atomically rename. A crash between append and rename leaves an entry whose `version` doesn't match any current file content; on startup, the backend scans recent entries against current hashes and either replays the rename (if the temp file survived) or appends a follow-up entry marking the original aborted. Crashes earlier leave only the temp file; startup cleanup removes it. Multi-process LocalFS relies on `O_APPEND` atomicity for activity entries; metadata-only entries fit naturally inside POSIX `PIPE_BUF` (section 8), and the per-agent daily path keeps contention low.
 
 **LocalFS portability.** Assumes a local POSIX filesystem with working `flock` and `O_APPEND` atomicity (Linux, macOS, BSD on local disk). NFS, SMB, FUSE not supported in MVP; distributed deployments use S3.
 
@@ -282,6 +282,8 @@ Observability is plain JSONL files at a reserved path. No sidecar service, no au
 
 Two paths produce entries in `_activity/YYYY/MM/DD/{agent_id}.jsonl`: every content-mutating subcommand (`write`, `edit`, `rm`, `mv`) appends automatically on success, and `mycelium log` appends explicit signal entries (harness observations like a pi.dev `context` event, compaction markers, agent intent annotations). Reads (`read`, `ls`, `glob`, `grep`) aren't logged; the log records what changed and what was observed, not what was looked at. Skipping reads keeps the log small enough to grep, and the failure modes that matter (duplicate creation, write-without-consolidate, never-revising-conventions) are detectable from the recorded entries alone.
 
+A mutation entry (`write`, `edit`, `rm`, `mv`):
+
 ```json
 {
   "ts": "2026-04-26T18:42:11.034Z",
@@ -289,14 +291,24 @@ Two paths produce entries in `_activity/YYYY/MM/DD/{agent_id}.jsonl`: every cont
   "session_id": "sess-9b2f",
   "op": "write",
   "path": "learnings/glp1-pipeline.md",
-  "before_version": "sha256:1f2a...",
-  "after_version": "sha256:8c4d...",
-  "bytes": 4127,
-  "result": "ok"
+  "version": "sha256:8c4d...",
+  "prior_version": "sha256:1f2a..."
 }
 ```
 
-**Path layout: `_activity/YYYY/MM/DD/{agent_id}.jsonl`.** Each agent writes its own daily file; cross-agent concurrency is handled by file isolation, not coordinated appends. Time-windowed queries collapse to glob: `_activity/2026/04/*/*.jsonl` (this month, all agents); `_activity/2026/04/26/*.jsonl` (today, all agents); `_activity/2026/04/26/glp1-research.jsonl` (today, one agent). Daily granularity is the default; deployments needing finer can configure hourly. Total order across agents is `ts`-sorted. Entries are bounded at 4KB per line (large content is referenced by version, not embedded), which keeps `O_APPEND` atomicity guarantees honest on POSIX (section 5) and the log greppable.
+A `mycelium log` entry, where the agent supplied a payload:
+
+```json
+{
+  "ts": "2026-04-26T18:43:02.117Z",
+  "agent_id": "researcher-7",
+  "session_id": "sess-9b2f",
+  "op": "context",
+  "signal_path": "logs/2026/04/26/researcher-7/184302.117000000-context.json"
+}
+```
+
+**Path layout: `_activity/YYYY/MM/DD/{agent_id}.jsonl`.** Each agent writes its own daily file; cross-agent concurrency is handled by file isolation, not coordinated appends. Time-windowed queries collapse to glob: `_activity/2026/04/*/*.jsonl` (this month, all agents); `_activity/2026/04/26/*.jsonl` (today, all agents); `_activity/2026/04/26/glp1-research.jsonl` (today, one agent). Daily granularity is the default; deployments needing finer can configure hourly. Total order across agents is `ts`-sorted. Entries are intentionally metadata-only — agent-supplied payloads from `mycelium log` live in `logs/YYYY/MM/DD/{agent_id}/<HHMMSS>.<nanos>-<op>.json` and are referenced by `signal_path`. Keeping activity entries small lets them fit inside POSIX `O_APPEND` atomicity (`PIPE_BUF`, typically 4KB) without an explicit per-line cap, and keeps the log greppable.
 
 **Same shell, two callers, one writer:**
 
