@@ -14,7 +14,7 @@ import (
 // editFile reads the file at requested (resolved under mount), replaces exactly
 // one occurrence of oldStr with newStr, writes the result atomically, and
 // returns the new version string.
-func editFile(errOut io.Writer, mount, requested, oldStr, newStr, expectedVersion string) (version string, rc int) {
+func editFile(errOut io.Writer, mount, requested, oldStr, newStr, expectedVersion string, includeContent bool) (version string, rc int) {
 	abs, err := resolveUnderMount(mount, requested)
 	if err != nil {
 		fmt.Fprintf(errOut, "mycelium edit: %v\n", err)
@@ -46,7 +46,8 @@ func editFile(errOut io.Writer, mount, requested, oldStr, newStr, expectedVersio
 	}
 
 	if expectedVersion != "" {
-		if rc := checkExpectedVersion(errOut, "edit", abs, expectedVersion); rc != ExitOK {
+		mountRel := relForwardSlash(mount, abs)
+		if rc := checkExpectedVersion(errOut, "edit", mountRel, abs, expectedVersion, includeContent); rc != ExitOK {
 			return "", rc
 		}
 	}

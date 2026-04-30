@@ -12,7 +12,7 @@ import (
 // non-empty, captures the prior sha256, deletes the file, and returns the
 // prior version string. On failure it writes a diagnostic to errOut and
 // returns a non-zero exit code.
-func removeFile(errOut io.Writer, mount, requested, expectedVersion string) (priorVersion string, rc int) {
+func removeFile(errOut io.Writer, mount, requested, expectedVersion string, includeContent bool) (priorVersion string, rc int) {
 	abs, err := resolveUnderMount(mount, requested)
 	if err != nil {
 		fmt.Fprintf(errOut, "mycelium rm: %v\n", err)
@@ -35,7 +35,8 @@ func removeFile(errOut io.Writer, mount, requested, expectedVersion string) (pri
 	}
 
 	if expectedVersion != "" {
-		if rc := checkExpectedVersion(errOut, "rm", abs, expectedVersion); rc != ExitOK {
+		mountRel := relForwardSlash(mount, abs)
+		if rc := checkExpectedVersion(errOut, "rm", mountRel, abs, expectedVersion, includeContent); rc != ExitOK {
 			return "", rc
 		}
 	}

@@ -7,6 +7,7 @@ import (
 	"testing"
 )
 
+
 // writeTestFile is a helper that creates a file with the given content under mount.
 func writeTestFile(t *testing.T, mount, name, content string) {
 	t.Helper()
@@ -159,8 +160,18 @@ func TestEditCASMismatch(t *testing.T) {
 	if rc != ExitConflict {
 		t.Errorf("rc: got %d, want %d (stderr=%q)", rc, ExitConflict, errOut)
 	}
-	if !strings.Contains(errOut, "conflict") {
-		t.Errorf("stderr should mention conflict, got %q", errOut)
+	env := parseConflictEnvelope(t, errOut)
+	if env.Op != "edit" {
+		t.Errorf("envelope op: got %q, want %q", env.Op, "edit")
+	}
+	if env.Path != "f.md" {
+		t.Errorf("envelope path: got %q, want %q", env.Path, "f.md")
+	}
+	if env.CurrentVersion != sha256Hex(initial) {
+		t.Errorf("envelope current_version: got %q, want %q", env.CurrentVersion, sha256Hex(initial))
+	}
+	if env.CurrentContent != nil {
+		t.Errorf("current_content should be absent without flag, got %q", *env.CurrentContent)
 	}
 
 	// File must be untouched.
@@ -230,6 +241,67 @@ func TestEditLogEntryWrittenOnSuccess(t *testing.T) {
 	if e.Version != wantVersion {
 		t.Errorf("version: got %q, want %q", e.Version, wantVersion)
 	}
+}
+
+func TestEditIncludeCurrentContentUTF8(t *testing.T) {
+	mount := t.TempDir()
+	t.Setenv("MYCELIUM_MOUNT", mount)
+	content := "alpha beta gamma\n"
+	writeTestFile(t, mount, "g.md", content)
+
+	_, errOut, rc := runDispatchWithStdin(t, "", "edit", "g.md",
+		"--old", "beta", "--new", "BETA",
+		"--expected-version", "sha256:deadbeef",
+		"--include-current-content")
+	if rc != ExitConflict {
+		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitConflict, errOut)
+	}
+	env := parseConflictEnvelope(t, errOut)
+	if env.CurrentContent == nil {
+		t.Fatal("current_content should be present for UTF-8 file")
+	}
+	if *env.CurrentContent != content {
+		t.Errorf("current_content: got %q, want %q", *env.CurrentContent, content)
+	}
+}
+
+func TestEditIncludeCurrentContentBinary(t *testing.T) {
+	mount := t.TempDir()
+	t.Setenv("MYCELIUM_MOUNT", mount)
+	abs := filepath.Join(mount, "bin.dat")
+	if err := os.WriteFile(abs, []byte{0xff, 0xfe, 0x00}, 0o644); err != nil {
+		t.Fatalf("write binary file: %v", err)
+	}
+
+	_, errOut, rc := runDispatchWithStdin(t, "", "edit", "bin.dat",
+		"--old", "x", "--new", "y",
+		"--expected-version", "sha256:deadbeef",
+		"--include-current-content")
+	// edit will fail with not-found for "x" in binary file OR conflict; either way not ExitOK
+	_ = rc
+	// If conflict, envelope should have no current_content.
+	if rc == ExitConflict {
+		env := parseConflictEnvelope(t, errOut)
+		if env.CurrentContent != nil {
+			t.Errorf("current_content should be absent for binary file, got %q", *env.CurrentContent)
+		}
+	}
+}
+
+func TestEditIncludeCurrentContentAbsent(t *testing.T) {
+	mount := t.TempDir()
+	t.Setenv("MYCELIUM_MOUNT", mount)
+
+	_, errOut, rc := runDispatchWithStdin(t, "", "edit", "missing.md",
+		"--old", "x", "--new", "y",
+		"--expected-version", "sha256:deadbeef",
+		"--include-current-content")
+	// edit returns ExitGenericError when file doesn't exist (not found before CAS check).
+	if rc != ExitGenericError {
+		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitGenericError, errOut)
+	}
+	// No conflict envelope in this case — file-not-found is caught before CAS.
+	_ = errOut
 }
 
 func TestEditLogEntryNotWrittenOnFailure(t *testing.T) {

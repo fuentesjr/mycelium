@@ -69,6 +69,7 @@ func runWrite(in io.Reader, out, errOut io.Writer, args []string) int {
 	fs := flag.NewFlagSet("write", flag.ContinueOnError)
 	fs.SetOutput(errOut)
 	expectedVersion := fs.String("expected-version", "", "current version token for CAS")
+	includeContent := fs.Bool("include-current-content", false, "include current file content in conflict envelope")
 	positional, err := parseInterspersed(fs, args)
 	if err != nil {
 		return ExitUsage
@@ -86,7 +87,7 @@ func runWrite(in io.Reader, out, errOut io.Writer, args []string) int {
 		}
 		// Other path errors are handled inside writeFile; fall through.
 	}
-	version, rc := writeFile(in, errOut, id.Mount, positional[0], *expectedVersion)
+	version, rc := writeFile(in, errOut, id.Mount, positional[0], *expectedVersion, *includeContent)
 	if rc != ExitOK {
 		return rc
 	}
@@ -99,6 +100,7 @@ func runEdit(_ io.Reader, out, errOut io.Writer, args []string) int {
 	fs := flag.NewFlagSet("edit", flag.ContinueOnError)
 	fs.SetOutput(errOut)
 	expectedVersion := fs.String("expected-version", "", "current version token for CAS")
+	includeContent := fs.Bool("include-current-content", false, "include current file content in conflict envelope")
 	oldStr := fs.String("old", "", "string to replace")
 	newStr := fs.String("new", "", "replacement string")
 	positional, err := parseInterspersed(fs, args)
@@ -121,7 +123,7 @@ func runEdit(_ io.Reader, out, errOut io.Writer, args []string) int {
 			return ExitReservedPrefix
 		}
 	}
-	version, rc := editFile(errOut, id.Mount, positional[0], *oldStr, *newStr, *expectedVersion)
+	version, rc := editFile(errOut, id.Mount, positional[0], *oldStr, *newStr, *expectedVersion, *includeContent)
 	if rc != ExitOK {
 		return rc
 	}
@@ -199,6 +201,7 @@ func runRm(_ io.Reader, out, errOut io.Writer, args []string) int {
 	fs := flag.NewFlagSet("rm", flag.ContinueOnError)
 	fs.SetOutput(errOut)
 	expectedVersion := fs.String("expected-version", "", "current version token for CAS")
+	includeContent := fs.Bool("include-current-content", false, "include current file content in conflict envelope")
 	positional, err := parseInterspersed(fs, args)
 	if err != nil {
 		return ExitUsage
@@ -215,7 +218,7 @@ func runRm(_ io.Reader, out, errOut io.Writer, args []string) int {
 			return ExitReservedPrefix
 		}
 	}
-	priorVersion, rc := removeFile(errOut, id.Mount, positional[0], *expectedVersion)
+	priorVersion, rc := removeFile(errOut, id.Mount, positional[0], *expectedVersion, *includeContent)
 	if rc != ExitOK {
 		return rc
 	}
@@ -228,6 +231,7 @@ func runMv(_ io.Reader, out, errOut io.Writer, args []string) int {
 	fs := flag.NewFlagSet("mv", flag.ContinueOnError)
 	fs.SetOutput(errOut)
 	expectedVersion := fs.String("expected-version", "", "current version token for CAS")
+	includeContent := fs.Bool("include-current-content", false, "include current file content in conflict envelope")
 	positional, err := parseInterspersed(fs, args)
 	if err != nil {
 		return ExitUsage
@@ -251,7 +255,7 @@ func runMv(_ io.Reader, out, errOut io.Writer, args []string) int {
 			return ExitReservedPrefix
 		}
 	}
-	version, rc := moveFile(errOut, id.Mount, src, dst, *expectedVersion)
+	version, rc := moveFile(errOut, id.Mount, src, dst, *expectedVersion, *includeContent)
 	if rc != ExitOK {
 		return rc
 	}

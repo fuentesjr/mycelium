@@ -2,9 +2,39 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"strings"
 	"testing"
 )
+
+// conflictResult is the parsed form of the structured JSON conflict envelope.
+type conflictResult struct {
+	Error           string `json:"error"`
+	Op              string `json:"op"`
+	Path            string `json:"path"`
+	CurrentVersion  string `json:"current_version"`
+	ExpectedVersion string `json:"expected_version"`
+	CurrentContent  *string `json:"current_content"`
+}
+
+// parseConflictEnvelope parses the first line of stderr as a conflict envelope.
+// It fatals if the line is not valid JSON or the "error" field is not "conflict".
+func parseConflictEnvelope(t *testing.T, stderr string) conflictResult {
+	t.Helper()
+	line := strings.TrimRight(stderr, "\n")
+	// Take only the first line in case there are extra diagnostics.
+	if idx := strings.Index(line, "\n"); idx >= 0 {
+		line = line[:idx]
+	}
+	var env conflictResult
+	if err := json.Unmarshal([]byte(line), &env); err != nil {
+		t.Fatalf("parseConflictEnvelope: stderr is not valid JSON: %v\nstderr was: %q", err, stderr)
+	}
+	if env.Error != "conflict" {
+		t.Errorf("envelope error field: got %q, want %q", env.Error, "conflict")
+	}
+	return env
+}
 
 func runDispatch(t *testing.T, args ...string) (string, string, int) {
 	t.Helper()

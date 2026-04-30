@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -51,14 +52,28 @@ func TestMvDstExistsIsConflict(t *testing.T) {
 	mount := t.TempDir()
 	t.Setenv("MYCELIUM_MOUNT", mount)
 	writeTestFile(t, mount, "src.md", "source\n")
-	writeTestFile(t, mount, "dst.md", "original dst\n")
+	dstContent := "original dst\n"
+	writeTestFile(t, mount, "dst.md", dstContent)
 
 	_, errOut, rc := runDispatchWithStdin(t, "", "mv", "src.md", "dst.md")
 	if rc != ExitConflict {
 		t.Errorf("rc: got %d, want %d (stderr=%q)", rc, ExitConflict, errOut)
 	}
-	if !strings.Contains(errOut, "destination exists") {
-		t.Errorf("stderr should mention destination exists, got %q", errOut)
+	env := parseDstExistsEnvelope(t, errOut)
+	if env.Op != "mv" {
+		t.Errorf("envelope op: got %q, want %q", env.Op, "mv")
+	}
+	if env.Path != "dst.md" {
+		t.Errorf("envelope path: got %q, want %q", env.Path, "dst.md")
+	}
+	if env.CurrentVersion != sha256Hex(dstContent) {
+		t.Errorf("envelope current_version: got %q, want %q", env.CurrentVersion, sha256Hex(dstContent))
+	}
+	if env.CurrentContent != nil {
+		t.Errorf("current_content should be absent without flag, got %q", *env.CurrentContent)
+	}
+	if env.ExpectedVersion != "" {
+		t.Errorf("expected_version should be absent, got %q", env.ExpectedVersion)
 	}
 	// Both files must be untouched.
 	srcDisk, _ := os.ReadFile(filepath.Join(mount, "src.md"))
@@ -66,9 +81,97 @@ func TestMvDstExistsIsConflict(t *testing.T) {
 		t.Errorf("src should be untouched, got %q", srcDisk)
 	}
 	dstDisk, _ := os.ReadFile(filepath.Join(mount, "dst.md"))
-	if string(dstDisk) != "original dst\n" {
+	if string(dstDisk) != dstContent {
 		t.Errorf("dst should be untouched, got %q", dstDisk)
 	}
+}
+
+func TestMvDstExistsEnvelopeFields(t *testing.T) {
+	mount := t.TempDir()
+	t.Setenv("MYCELIUM_MOUNT", mount)
+	writeTestFile(t, mount, "src.md", "source\n")
+	dstContent := "existing dst\n"
+	writeTestFile(t, mount, "dst.md", dstContent)
+
+	_, errOut, rc := runDispatchWithStdin(t, "", "mv", "src.md", "dst.md")
+	if rc != ExitConflict {
+		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitConflict, errOut)
+	}
+	env := parseDstExistsEnvelope(t, errOut)
+	if env.Error != "destination_exists" {
+		t.Errorf("error field: got %q, want %q", env.Error, "destination_exists")
+	}
+	if env.Op != "mv" {
+		t.Errorf("op: got %q, want %q", env.Op, "mv")
+	}
+	if env.Path != "dst.md" {
+		t.Errorf("path: got %q, want %q", env.Path, "dst.md")
+	}
+	if env.CurrentVersion != sha256Hex(dstContent) {
+		t.Errorf("current_version: got %q, want %q", env.CurrentVersion, sha256Hex(dstContent))
+	}
+	if env.CurrentContent != nil {
+		t.Errorf("current_content should be absent without flag")
+	}
+	if env.ExpectedVersion != "" {
+		t.Errorf("expected_version should be absent, got %q", env.ExpectedVersion)
+	}
+}
+
+func TestMvDstExistsIncludeContentUTF8(t *testing.T) {
+	mount := t.TempDir()
+	t.Setenv("MYCELIUM_MOUNT", mount)
+	writeTestFile(t, mount, "src.md", "source\n")
+	dstContent := "existing utf8 dst\n"
+	writeTestFile(t, mount, "dst.md", dstContent)
+
+	_, errOut, rc := runDispatchWithStdin(t, "", "mv", "src.md", "dst.md", "--include-current-content")
+	if rc != ExitConflict {
+		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitConflict, errOut)
+	}
+	env := parseDstExistsEnvelope(t, errOut)
+	if env.CurrentContent == nil {
+		t.Fatal("current_content should be present for UTF-8 dst")
+	}
+	if *env.CurrentContent != dstContent {
+		t.Errorf("current_content: got %q, want %q", *env.CurrentContent, dstContent)
+	}
+}
+
+func TestMvDstExistsIncludeContentBinary(t *testing.T) {
+	mount := t.TempDir()
+	t.Setenv("MYCELIUM_MOUNT", mount)
+	writeTestFile(t, mount, "src.md", "source\n")
+	dstAbs := filepath.Join(mount, "dst.bin")
+	if err := os.WriteFile(dstAbs, []byte{0xff, 0xfe, 0x00}, 0o644); err != nil {
+		t.Fatalf("write binary dst: %v", err)
+	}
+
+	_, errOut, rc := runDispatchWithStdin(t, "", "mv", "src.md", "dst.bin", "--include-current-content")
+	if rc != ExitConflict {
+		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitConflict, errOut)
+	}
+	env := parseDstExistsEnvelope(t, errOut)
+	if env.CurrentContent != nil {
+		t.Errorf("current_content should be absent for binary dst, got %q", *env.CurrentContent)
+	}
+}
+
+// parseDstExistsEnvelope parses the first line of stderr as a destination_exists envelope.
+func parseDstExistsEnvelope(t *testing.T, stderr string) conflictResult {
+	t.Helper()
+	line := strings.TrimRight(stderr, "\n")
+	if idx := strings.Index(line, "\n"); idx >= 0 {
+		line = line[:idx]
+	}
+	var env conflictResult
+	if err := json.Unmarshal([]byte(line), &env); err != nil {
+		t.Fatalf("parseDstExistsEnvelope: stderr is not valid JSON: %v\nstderr was: %q", err, stderr)
+	}
+	if env.Error != "destination_exists" {
+		t.Errorf("envelope error field: got %q, want %q", env.Error, "destination_exists")
+	}
+	return env
 }
 
 func TestMvSrcEqualsDst(t *testing.T) {
@@ -115,6 +218,19 @@ func TestMvCASMismatch(t *testing.T) {
 	_, errOut, rc := runDispatchWithStdin(t, "", "mv", "src.md", "dst.md", "--expected-version", "sha256:deadbeef")
 	if rc != ExitConflict {
 		t.Errorf("rc: got %d, want %d (stderr=%q)", rc, ExitConflict, errOut)
+	}
+	env := parseConflictEnvelope(t, errOut)
+	if env.Op != "mv" {
+		t.Errorf("envelope op: got %q, want %q", env.Op, "mv")
+	}
+	if env.Path != "src.md" {
+		t.Errorf("envelope path: got %q, want %q (must be src, not dst)", env.Path, "src.md")
+	}
+	if env.CurrentVersion != sha256Hex(content) {
+		t.Errorf("envelope current_version: got %q, want %q", env.CurrentVersion, sha256Hex(content))
+	}
+	if env.CurrentContent != nil {
+		t.Errorf("current_content should be absent without flag, got %q", *env.CurrentContent)
 	}
 	// src must be untouched.
 	disk, _ := os.ReadFile(filepath.Join(mount, "src.md"))
@@ -241,7 +357,7 @@ func TestMvDirectHelper(t *testing.T) {
 	writeTestFile(t, mount, "a.md", "hello\n")
 
 	var errBuf strings.Builder
-	ver, rc := moveFile(&errBuf, mount, "a.md", "b.md", "")
+	ver, rc := moveFile(&errBuf, mount, "a.md", "b.md", "", false)
 	if rc != ExitOK {
 		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitOK, errBuf.String())
 	}
@@ -255,4 +371,60 @@ func TestMvDirectHelper(t *testing.T) {
 	if string(disk) != "hello\n" {
 		t.Errorf("dst content: got %q", disk)
 	}
+}
+
+func TestMvIncludeCurrentContentUTF8(t *testing.T) {
+	mount := t.TempDir()
+	t.Setenv("MYCELIUM_MOUNT", mount)
+	content := "source content\n"
+	writeTestFile(t, mount, "src.md", content)
+
+	_, errOut, rc := runDispatchWithStdin(t, "", "mv", "src.md", "dst.md",
+		"--expected-version", "sha256:deadbeef",
+		"--include-current-content")
+	if rc != ExitConflict {
+		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitConflict, errOut)
+	}
+	env := parseConflictEnvelope(t, errOut)
+	if env.CurrentContent == nil {
+		t.Fatal("current_content should be present for UTF-8 src")
+	}
+	if *env.CurrentContent != content {
+		t.Errorf("current_content: got %q, want %q", *env.CurrentContent, content)
+	}
+}
+
+func TestMvIncludeCurrentContentBinary(t *testing.T) {
+	mount := t.TempDir()
+	t.Setenv("MYCELIUM_MOUNT", mount)
+	abs := filepath.Join(mount, "bin.dat")
+	if err := os.WriteFile(abs, []byte{0xff, 0xfe, 0x00}, 0o644); err != nil {
+		t.Fatalf("write binary file: %v", err)
+	}
+
+	_, errOut, rc := runDispatchWithStdin(t, "", "mv", "bin.dat", "dst.dat",
+		"--expected-version", "sha256:deadbeef",
+		"--include-current-content")
+	if rc != ExitConflict {
+		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitConflict, errOut)
+	}
+	env := parseConflictEnvelope(t, errOut)
+	if env.CurrentContent != nil {
+		t.Errorf("current_content should be absent for binary src, got %q", *env.CurrentContent)
+	}
+}
+
+func TestMvIncludeCurrentContentAbsent(t *testing.T) {
+	// mv returns ExitGenericError when src is missing (checked before CAS).
+	// There is no conflict envelope in this case.
+	mount := t.TempDir()
+	t.Setenv("MYCELIUM_MOUNT", mount)
+
+	_, errOut, rc := runDispatchWithStdin(t, "", "mv", "missing.md", "dst.md",
+		"--expected-version", "sha256:deadbeef",
+		"--include-current-content")
+	if rc != ExitGenericError {
+		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitGenericError, errOut)
+	}
+	_ = errOut
 }

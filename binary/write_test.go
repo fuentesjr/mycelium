@@ -82,8 +82,21 @@ func TestWriteFileCASMismatch(t *testing.T) {
 	if string(disk) != "v1" {
 		t.Errorf("file should not have been overwritten on conflict, got %q", disk)
 	}
-	if !strings.Contains(errOut, "conflict") {
-		t.Errorf("stderr should mention conflict, got %q", errOut)
+	env := parseConflictEnvelope(t, errOut)
+	if env.Op != "write" {
+		t.Errorf("envelope op: got %q, want %q", env.Op, "write")
+	}
+	if env.Path != "m.md" {
+		t.Errorf("envelope path: got %q, want %q", env.Path, "m.md")
+	}
+	if env.CurrentVersion != sha256Hex("v1") {
+		t.Errorf("envelope current_version: got %q, want %q", env.CurrentVersion, sha256Hex("v1"))
+	}
+	if env.ExpectedVersion != "sha256:deadbeef" {
+		t.Errorf("envelope expected_version: got %q, want %q", env.ExpectedVersion, "sha256:deadbeef")
+	}
+	if env.CurrentContent != nil {
+		t.Errorf("current_content should be absent without flag, got %q", *env.CurrentContent)
 	}
 }
 
@@ -93,6 +106,10 @@ func TestWriteFileCASOnAbsentFileConflicts(t *testing.T) {
 	_, errOut, rc := runDispatchWithStdin(t, "x", "write", "new.md", "--expected-version", "sha256:deadbeef")
 	if rc != ExitConflict {
 		t.Errorf("rc: got %d, want %d (stderr=%q)", rc, ExitConflict, errOut)
+	}
+	env := parseConflictEnvelope(t, errOut)
+	if env.CurrentVersion != "sha256:absent" {
+		t.Errorf("envelope current_version: got %q, want sha256:absent", env.CurrentVersion)
 	}
 }
 
@@ -135,6 +152,70 @@ func TestWriteLogsOnSuccess(t *testing.T) {
 	}
 	if e.Version != wantVersion {
 		t.Errorf("version: got %q, want %q", e.Version, wantVersion)
+	}
+}
+
+func TestWriteIncludeCurrentContentUTF8(t *testing.T) {
+	mount := t.TempDir()
+	t.Setenv("MYCELIUM_MOUNT", mount)
+	content := "hello, world\n"
+	writeTestFile(t, mount, "f.md", content)
+
+	_, errOut, rc := runDispatchWithStdin(t, "new content", "write", "f.md",
+		"--expected-version", "sha256:deadbeef",
+		"--include-current-content")
+	if rc != ExitConflict {
+		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitConflict, errOut)
+	}
+	env := parseConflictEnvelope(t, errOut)
+	if env.CurrentContent == nil {
+		t.Fatal("current_content should be present for UTF-8 file")
+	}
+	if *env.CurrentContent != content {
+		t.Errorf("current_content: got %q, want %q", *env.CurrentContent, content)
+	}
+}
+
+func TestWriteIncludeCurrentContentBinary(t *testing.T) {
+	mount := t.TempDir()
+	t.Setenv("MYCELIUM_MOUNT", mount)
+	abs := filepath.Join(mount, "bin.dat")
+	if err := os.WriteFile(abs, []byte{0xff, 0xfe, 0x00}, 0o644); err != nil {
+		t.Fatalf("write binary file: %v", err)
+	}
+	binVer := sha256Hex(string([]byte{0xff, 0xfe, 0x00}))
+
+	_, errOut, rc := runDispatchWithStdin(t, "x", "write", "bin.dat",
+		"--expected-version", "sha256:deadbeef",
+		"--include-current-content")
+	if rc != ExitConflict {
+		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitConflict, errOut)
+	}
+	env := parseConflictEnvelope(t, errOut)
+	if env.CurrentContent != nil {
+		t.Errorf("current_content should be absent for binary file, got %q", *env.CurrentContent)
+	}
+	if env.CurrentVersion != binVer {
+		t.Errorf("current_version: got %q, want %q", env.CurrentVersion, binVer)
+	}
+}
+
+func TestWriteIncludeCurrentContentAbsent(t *testing.T) {
+	mount := t.TempDir()
+	t.Setenv("MYCELIUM_MOUNT", mount)
+
+	_, errOut, rc := runDispatchWithStdin(t, "x", "write", "missing.md",
+		"--expected-version", "sha256:deadbeef",
+		"--include-current-content")
+	if rc != ExitConflict {
+		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitConflict, errOut)
+	}
+	env := parseConflictEnvelope(t, errOut)
+	if env.CurrentVersion != "sha256:absent" {
+		t.Errorf("current_version: got %q, want sha256:absent", env.CurrentVersion)
+	}
+	if env.CurrentContent != nil {
+		t.Errorf("current_content should be absent when file doesn't exist, got %q", *env.CurrentContent)
 	}
 }
 

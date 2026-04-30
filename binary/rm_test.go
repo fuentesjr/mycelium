@@ -64,6 +64,19 @@ func TestRmCASMismatch(t *testing.T) {
 	if rc != ExitConflict {
 		t.Errorf("rc: got %d, want %d (stderr=%q)", rc, ExitConflict, errOut)
 	}
+	env := parseConflictEnvelope(t, errOut)
+	if env.Op != "rm" {
+		t.Errorf("envelope op: got %q, want %q", env.Op, "rm")
+	}
+	if env.Path != "f.md" {
+		t.Errorf("envelope path: got %q, want %q", env.Path, "f.md")
+	}
+	if env.CurrentVersion != sha256Hex(content) {
+		t.Errorf("envelope current_version: got %q, want %q", env.CurrentVersion, sha256Hex(content))
+	}
+	if env.CurrentContent != nil {
+		t.Errorf("current_content should be absent without flag, got %q", *env.CurrentContent)
+	}
 	// File must be untouched.
 	disk, _ := os.ReadFile(filepath.Join(mount, "f.md"))
 	if string(disk) != content {
@@ -149,13 +162,68 @@ func TestRmLogEntryNotWrittenOnFailure(t *testing.T) {
 	}
 }
 
+func TestRmIncludeCurrentContentUTF8(t *testing.T) {
+	mount := t.TempDir()
+	t.Setenv("MYCELIUM_MOUNT", mount)
+	content := "to be removed\n"
+	writeTestFile(t, mount, "f.md", content)
+
+	_, errOut, rc := runDispatchWithStdin(t, "", "rm", "f.md",
+		"--expected-version", "sha256:deadbeef",
+		"--include-current-content")
+	if rc != ExitConflict {
+		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitConflict, errOut)
+	}
+	env := parseConflictEnvelope(t, errOut)
+	if env.CurrentContent == nil {
+		t.Fatal("current_content should be present for UTF-8 file")
+	}
+	if *env.CurrentContent != content {
+		t.Errorf("current_content: got %q, want %q", *env.CurrentContent, content)
+	}
+}
+
+func TestRmIncludeCurrentContentBinary(t *testing.T) {
+	mount := t.TempDir()
+	t.Setenv("MYCELIUM_MOUNT", mount)
+	abs := filepath.Join(mount, "bin.dat")
+	if err := os.WriteFile(abs, []byte{0xff, 0xfe, 0x00}, 0o644); err != nil {
+		t.Fatalf("write binary file: %v", err)
+	}
+
+	_, errOut, rc := runDispatchWithStdin(t, "", "rm", "bin.dat",
+		"--expected-version", "sha256:deadbeef",
+		"--include-current-content")
+	if rc != ExitConflict {
+		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitConflict, errOut)
+	}
+	env := parseConflictEnvelope(t, errOut)
+	if env.CurrentContent != nil {
+		t.Errorf("current_content should be absent for binary file, got %q", *env.CurrentContent)
+	}
+}
+
+func TestRmIncludeCurrentContentAbsent(t *testing.T) {
+	mount := t.TempDir()
+	t.Setenv("MYCELIUM_MOUNT", mount)
+
+	_, errOut, rc := runDispatchWithStdin(t, "", "rm", "missing.md",
+		"--expected-version", "sha256:deadbeef",
+		"--include-current-content")
+	// rm returns ExitGenericError when file doesn't exist (not found before CAS check).
+	if rc != ExitGenericError {
+		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitGenericError, errOut)
+	}
+	_ = errOut
+}
+
 // TestRmDirectHelper exercises removeFile directly for coverage of the helper.
 func TestRmDirectHelper(t *testing.T) {
 	mount := t.TempDir()
 	writeTestFile(t, mount, "h.md", "hello\n")
 
 	var errBuf strings.Builder
-	ver, rc := removeFile(&errBuf, mount, "h.md", "")
+	ver, rc := removeFile(&errBuf, mount, "h.md", "", false)
 	if rc != ExitOK {
 		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitOK, errBuf.String())
 	}
