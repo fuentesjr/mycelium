@@ -32,7 +32,7 @@ A persistent memory substrate for autonomous agents, on the bet that **a real fi
 
 ### Target model tier
 
-Mycelium targets **Frontier-class production models** — top-of-class capability defined by the behaviors the rest of this design assumes: self-organizing a filesystem store from empty, reflecting on its own activity log, revising its own conventions without operator scaffolding (Claude Opus 4.x, GPT-5, and equivalent successors). Models below Frontier are out of scope; baking in compensating logic for tiers below the floor would mask, with infrastructure heuristics, exactly the self-evolution behavior this design exists to capture.
+Mycelium targets **Frontier-class production models** — top-of-class capability defined by the behaviors the rest of this design assumes: self-organizing a filesystem store from empty, reflecting on its own activity log, revising its own conventions without operator scaffolding (Claude Opus 4.7, GPT-5.5, and equivalent successors). Models below Frontier are out of scope; baking in compensating logic for tiers below the floor would mask, with infrastructure heuristics, exactly the self-evolution behavior this design exists to capture.
 
 ---
 

@@ -17,8 +17,8 @@ Criteria 2, 3, 6, 7, 8 are validated by the binary's property tests, concurrent-
 
 Phase 1 targets one Anthropic model and one OpenAI model:
 
-- **Anthropic:** Claude Opus 4.x
-- **OpenAI:** GPT-5
+- **Anthropic:** Claude Opus 4.7
+- **OpenAI:** GPT-5.5
 
 Both must pass the model-dependent criteria (#1 and #4) for the "model-agnostic" claim to hold. Single-provider passes don't count.
 
@@ -72,11 +72,11 @@ Why seeded: self-evolution requires something to evolve in response to. A clean 
 
 **Detectors** operate on activity-log content alone:
 
-1. **Writes-without-reads ratio.** `op=write` + `op=edit` counts divided by explicit `op=read_signal` counts (since reads aren't auto-logged). Threshold: ratio >0.7 for ≥3 consecutive sessions = unhealthy.
+1. **Writes-without-reads ratio.** `op=write` + `op=edit` counts divided by explicit `op=read_signal` counts (since reads aren't auto-logged). Threshold: ratio >0.7 for ≥3 consecutive sessions = unhealthy. Sessions with mutations and zero read signals count as +∞ ratio.
 2. **Near-duplicate path count.** Levenshtein-1 path collisions per session across `op=write` entries. Threshold: ≥3 in a single session = unhealthy.
-3. **Log entries per session.** Median across the run. <5 = agent isn't using the store; >50 = thrashing. Either tail is unhealthy.
+3. **Thrashing.** Activity-log entries per session. Threshold: ≥50 in a single session = unhealthy. (The "too few entries" tail is deferred — hard to disambiguate from a quick-lookup session in practice.)
 
-**Validation.** Hand-craft 4 trajectories — 2 healthy, 2 unhealthy (one per failure mode). The detectors must classify all 4 correctly. The 30-trajectory human-judgment validation is deferred to Phase 2 once we have real run data to calibrate against.
+**Validation.** Hand-craft 4 trajectories — 1 healthy, 3 unhealthy (one per detector). The detectors must classify all 4 correctly. The 30-trajectory human-judgment validation is deferred to Phase 2 once we have real run data to calibrate against.
 
 **Pass.** Detectors classify the 4 hand-crafted trajectories correctly. Model-independent.
 
@@ -90,7 +90,7 @@ A *run* executes T1–T3 against one model. Per-task scoring is binary (pass/fai
 - **Acceptance #4** passes for a model if T2 passes.
 - **Acceptance #5** passes when T3's detectors classify the 4 hand-crafted trajectories correctly. Model-independent.
 
-The **model-agnostic claim passes** when both Anthropic (Claude Opus 4.x) and OpenAI (GPT-5) clear #1 and #4. Acceptance #3 (conflict recovery) is verified by the binary's property tests.
+The **model-agnostic claim passes** when both Claude Opus 4.7 and GPT-5.5 clear #1 and #4. Acceptance #3 (conflict recovery) is verified by the binary's property tests.
 
 ---
 
@@ -102,4 +102,6 @@ Performance, long-running stores, cost ceilings, and non-pi.dev harnesses (Herme
 
 ## Open issues
 
-The per-task files at `docs/benchmarks/tasks/T<n>-<slug>/` (`task.md`, `harness.md`, `held-out.md`, T2 seed) are not yet drafted. Until they exist this rubric is approved-in-principle but not executable.
+T3 is executable: detectors implemented in `binary/detect.go`, fixtures under `binary/testdata/trajectories/`, harness at `docs/benchmarks/tasks/T3-failure-detectors/harness.md`. Run via `go test -run TestDetectors`.
+
+T1 and T2 still need per-task content under `docs/benchmarks/tasks/T<n>-<slug>/` (`task.md`, `harness.md`, `held-out.md`, plus T2 `seed/`). Until those exist, T1 and T2 are approved-in-principle but not executable.
