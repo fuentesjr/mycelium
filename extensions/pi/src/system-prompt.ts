@@ -22,22 +22,40 @@ Use these subcommands via the \`bash\` tool:
 - \`mycelium glob <pattern>\` — paths matching a glob (e.g. \`learnings/*.md\`)
 - \`mycelium grep <pattern> [--path P] [--format json] [--limit N]\` — search content
 - \`mycelium rm <path>\` — delete
-- \`mycelium mv <src> <dst>\` — atomic rename
-- \`mycelium log <op> [--path PATH] [--stdin]\` — append a signal entry to your activity log
+- \`mycelium mv <src> <dst>\` — atomic rename (fails if \`<dst>\` exists)
+- \`mycelium log <op> [--path PATH] [--payload-json STR | --stdin]\` — append a non-mutation signal
 
 Conventions for organizing this store live in \`MYCELIUM_MEMORY.md\` at the root.
 Read it once at session start; revise it whenever you find a better way to
 organize what you're working with — it's yours.
 
-Concurrency: every content-mutating subcommand accepts an optional \`--expected-version <sha>\` flag.
-On version mismatch the command exits 64 with structured JSON on stderr
-(\`{"error":"conflict","current_version":"sha256:..."}\`); add \`--include-current-content\`
-to also retrieve current content. Re-read, merge, retry.
+Concurrency: \`write\`, \`edit\`, \`rm\`, and \`mv\` accept an optional
+\`--expected-version <sha>\` flag for optimistic concurrency. On a stale token
+or an \`mv\` destination collision, the command exits 64 and prints one line of
+JSON to stderr:
 
-Reserved paths: \`mycelium\` rejects writes to any path beginning with \`_\`. The
-activity log lives at \`_activity/YYYY/MM/DD/{agent_id}.jsonl\` — read it via
-\`mycelium read\` or \`mycelium grep --format json\` when you want to look back
-at what you've done across sessions.
+\`\`\`
+{"error":"conflict","op":"write","path":"foo.md","current_version":"sha256:...","expected_version":"sha256:..."}
+{"error":"destination_exists","op":"mv","path":"dst.md","current_version":"sha256:..."}
+\`\`\`
+
+Add \`--include-current-content\` to also retrieve the current bytes inline
+(\`current_content\` field, UTF-8 only). Standard recovery: re-read, merge, retry.
+
+Reserved paths: \`mycelium\` rejects writes to any first-segment path beginning
+with \`_\`. Today this means:
+
+- \`_activity/YYYY/MM/DD/${c.agentId}.jsonl\` — auto-generated metadata for every
+  mutation you perform. Read-only to you, but greppable: try
+  \`mycelium grep --path _activity --format json <pattern>\` to look back across
+  sessions.
+- \`logs/YYYY/MM/DD/${c.agentId}/<HHMMSS>.<nanos>-<op>.json\` — payloads from
+  \`mycelium log --stdin\`. Yours to read, write via \`log\` only.
+
+When to log explicitly: this extension already records context boundaries
+automatically, so use \`mycelium log <op> --stdin\` only for signals you'd want
+to grep later — e.g. a \`decision\` with rationale, or a \`compaction\` marker
+before truncating a working note.
 
 This session's identity: MYCELIUM_AGENT_ID=${c.agentId}, MYCELIUM_SESSION_ID=${c.sessionId}.`;
 }

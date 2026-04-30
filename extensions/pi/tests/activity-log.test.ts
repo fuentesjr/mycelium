@@ -1,6 +1,13 @@
 import { describe, it, expect, vi } from "vitest";
-import type { ContextEvent, ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { recordContextSignal } from "../src/activity-log.js";
+import type {
+  ContextEvent,
+  ExtensionAPI,
+  SessionStartEvent,
+} from "@mariozechner/pi-coding-agent";
+import {
+  recordContextSignal,
+  recordSessionBoundary,
+} from "../src/activity-log.js";
 import { execResult } from "./helpers.js";
 
 function makeContextEvent(messages: ContextEvent["messages"]): ContextEvent {
@@ -64,4 +71,27 @@ describe("recordContextSignal", () => {
       JSON.stringify({ messageCount: 0 }),
     ]);
   });
+});
+
+describe("recordSessionBoundary", () => {
+  const cases: ReadonlyArray<[SessionStartEvent["reason"], string | null]> = [
+    ["new", "session_new"],
+    ["resume", "session_resume"],
+    ["fork", "session_fork"],
+    ["startup", null],
+    ["reload", null],
+  ];
+
+  for (const [reason, expectedOp] of cases) {
+    it(`${expectedOp ? "logs" : "skips"} for reason=${reason}`, async () => {
+      const exec = vi.fn(async () => execResult(0));
+      const pi = { exec } as unknown as ExtensionAPI;
+      await recordSessionBoundary(pi, reason);
+      if (expectedOp) {
+        expect(exec).toHaveBeenCalledWith("mycelium", ["log", expectedOp]);
+      } else {
+        expect(exec).not.toHaveBeenCalled();
+      }
+    });
+  }
 });

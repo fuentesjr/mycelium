@@ -7,6 +7,7 @@ import type {
   ExecResult,
   ExtensionAPI,
   ExtensionContext,
+  SessionStartEvent,
 } from "@mariozechner/pi-coding-agent";
 import register from "../src/index.js";
 import { execResult } from "./helpers.js";
@@ -28,6 +29,12 @@ const ctx = {
   cwd: "/test/cwd",
   sessionManager: { getLeafId: () => "test-leaf" },
 } as unknown as ExtensionContext;
+
+function makeSessionStartEvent(
+  reason: SessionStartEvent["reason"] = "startup",
+): SessionStartEvent {
+  return { type: "session_start", reason };
+}
 
 function makeBeforeAgentStartEvent(systemPrompt: string): BeforeAgentStartEvent {
   return {
@@ -64,7 +71,7 @@ describe("pi extension factory", () => {
 
   it("chains before_agent_start systemPrompt off the incoming event", async () => {
     const { handlers } = makeRegistration(async () => execResult(0));
-    await handlers.get("session_start")!(undefined, ctx);
+    await handlers.get("session_start")!(makeSessionStartEvent(), ctx);
     const result = (await handlers.get("before_agent_start")!(
       makeBeforeAgentStartEvent("EXISTING-CONTENT"),
       ctx,
@@ -75,7 +82,7 @@ describe("pi extension factory", () => {
 
   it("emits the UNAVAILABLE block when binary is missing", async () => {
     const { handlers } = makeRegistration(async () => execResult(1));
-    await handlers.get("session_start")!(undefined, ctx);
+    await handlers.get("session_start")!(makeSessionStartEvent(), ctx);
     const result = (await handlers.get("before_agent_start")!(
       makeBeforeAgentStartEvent(""),
       ctx,
@@ -85,7 +92,7 @@ describe("pi extension factory", () => {
 
   it("context handler calls mycelium log and returns undefined", async () => {
     const { exec, handlers } = makeRegistration(async () => execResult(0));
-    await handlers.get("session_start")!(undefined, ctx);
+    await handlers.get("session_start")!(makeSessionStartEvent(), ctx);
     exec.mockClear();
     const result = await handlers.get("context")!(
       makeContextEvent([
@@ -122,7 +129,7 @@ describe("pi extension factory", () => {
 
   it("context handler is a no-op when binary is missing", async () => {
     const { exec, handlers } = makeRegistration(async () => execResult(1));
-    await handlers.get("session_start")!(undefined, ctx);
+    await handlers.get("session_start")!(makeSessionStartEvent(), ctx);
     exec.mockClear();
     const result = await handlers.get("context")!(
       makeContextEvent([{ role: "user", content: "", timestamp: 0 }]),
@@ -130,5 +137,29 @@ describe("pi extension factory", () => {
     );
     expect(result).toBeUndefined();
     expect(exec).not.toHaveBeenCalled();
+  });
+
+  it("logs session_new for reason=new when binary is available", async () => {
+    const { exec, handlers } = makeRegistration(async () => execResult(0));
+    await handlers.get("session_start")!(makeSessionStartEvent("new"), ctx);
+    expect(exec).toHaveBeenCalledWith("mycelium", ["log", "session_new"]);
+  });
+
+  it("does not log a boundary for reason=startup", async () => {
+    const { exec, handlers } = makeRegistration(async () => execResult(0));
+    await handlers.get("session_start")!(makeSessionStartEvent("startup"), ctx);
+    const boundaryCalls = exec.mock.calls.filter(
+      ([, args]) => Array.isArray(args) && args[0] === "log" && typeof args[1] === "string" && args[1].startsWith("session_"),
+    );
+    expect(boundaryCalls).toHaveLength(0);
+  });
+
+  it("does not log a boundary when binary is missing", async () => {
+    const { exec, handlers } = makeRegistration(async () => execResult(1));
+    await handlers.get("session_start")!(makeSessionStartEvent("fork"), ctx);
+    const boundaryCalls = exec.mock.calls.filter(
+      ([, args]) => Array.isArray(args) && args[0] === "log",
+    );
+    expect(boundaryCalls).toHaveLength(0);
   });
 });

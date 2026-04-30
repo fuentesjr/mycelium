@@ -1,4 +1,8 @@
-import type { ContextEvent, ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type {
+  ContextEvent,
+  ExtensionAPI,
+  SessionStartEvent,
+} from "@mariozechner/pi-coding-agent";
 
 export async function recordContextSignal(
   pi: ExtensionAPI,
@@ -16,4 +20,18 @@ export async function recordContextSignal(
     "--payload-json",
     JSON.stringify(payload),
   ]);
+}
+
+const BOUNDARY_REASONS: ReadonlySet<SessionStartEvent["reason"]> = new Set([
+  "new",
+  "resume",
+  "fork",
+]);
+
+export async function recordSessionBoundary(
+  pi: ExtensionAPI,
+  reason: SessionStartEvent["reason"],
+): Promise<void> {
+  if (!BOUNDARY_REASONS.has(reason)) return;
+  await pi.exec("mycelium", ["log", `session_${reason}`]);
 }

@@ -2,18 +2,19 @@ import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { resolveConfig } from "./config.js";
 import { isBinaryAvailable, setupEnv } from "./env.js";
 import { systemPromptAvailable, systemPromptUnavailable } from "./system-prompt.js";
-import { recordContextSignal } from "./activity-log.js";
+import { recordContextSignal, recordSessionBoundary } from "./activity-log.js";
 
 export default function (pi: ExtensionAPI) {
   let binaryAvailable = false;
   let mountPath = "";
 
-  pi.on("session_start", async (_event, ctx) => {
+  pi.on("session_start", async (event, ctx) => {
     const cfg = resolveConfig(ctx.cwd);
     mountPath = cfg.mountPath;
     binaryAvailable = await isBinaryAvailable(pi);
     if (binaryAvailable) {
       setupEnv(cfg, ctx.sessionManager.getLeafId());
+      await recordSessionBoundary(pi, event.reason);
     }
   });
 

@@ -26,12 +26,23 @@ describe("systemPromptAvailable", () => {
   it("describes the conflict-recovery contract", () => {
     expect(block).toContain("--expected-version");
     expect(block).toContain("exits 64");
-    expect(block).toContain("Re-read");
+    expect(block).toContain("re-read");
   });
 
-  it("describes the reserved _ prefix and activity log path", () => {
+  it("documents both conflict envelope variants", () => {
+    expect(block).toContain('"error":"conflict"');
+    expect(block).toContain('"error":"destination_exists"');
+    expect(block).toContain("--include-current-content");
+  });
+
+  it("describes the reserved _ prefix and split log layout", () => {
     expect(block).toContain("Reserved paths");
-    expect(block).toContain("_activity/");
+    expect(block).toContain("_activity/YYYY/MM/DD/test-agent.jsonl");
+    expect(block).toContain("logs/YYYY/MM/DD/test-agent/");
+  });
+
+  it("guides explicit log usage", () => {
+    expect(block).toContain("When to log explicitly");
   });
 });
 
