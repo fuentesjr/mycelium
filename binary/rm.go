@@ -22,6 +22,13 @@ func removeFile(errOut io.Writer, mount, requested, expectedVersion string, incl
 		return "", ExitUsage
 	}
 
+	release, err := acquireMountLock(mount)
+	if err != nil {
+		fmt.Fprintf(errOut, "mycelium rm: %v\n", err)
+		return "", ExitGenericError
+	}
+	defer release()
+
 	// Capture the current version (sha256) before touching anything.
 	ver, err := currentVersion(abs)
 	if err != nil {

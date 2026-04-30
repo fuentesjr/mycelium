@@ -24,6 +24,13 @@ func editFile(errOut io.Writer, mount, requested, oldStr, newStr, expectedVersio
 		return "", ExitUsage
 	}
 
+	release, err := acquireMountLock(mount)
+	if err != nil {
+		fmt.Fprintf(errOut, "mycelium edit: %v\n", err)
+		return "", ExitGenericError
+	}
+	defer release()
+
 	data, err := os.ReadFile(abs)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {

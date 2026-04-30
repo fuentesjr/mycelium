@@ -39,6 +39,13 @@ func moveFile(errOut io.Writer, mount, src, dst, expectedVersion string, include
 		return "", ExitGenericError
 	}
 
+	release, err := acquireMountLock(mount)
+	if err != nil {
+		fmt.Fprintf(errOut, "mycelium mv: %v\n", err)
+		return "", ExitGenericError
+	}
+	defer release()
+
 	// Check that src exists and capture its version.
 	ver, err := currentVersion(srcAbs)
 	if err != nil {

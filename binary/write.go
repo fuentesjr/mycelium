@@ -30,6 +30,12 @@ func writeFile(in io.Reader, errOut io.Writer, mount, requested, expectedVersion
 		fmt.Fprintf(errOut, "mycelium write: read stdin: %v\n", err)
 		return "", ExitGenericError
 	}
+	release, err := acquireMountLock(mount)
+	if err != nil {
+		fmt.Fprintf(errOut, "mycelium write: %v\n", err)
+		return "", ExitGenericError
+	}
+	defer release()
 	if expectedVersion != "" {
 		mountRel := relForwardSlash(mount, abs)
 		if rc := checkExpectedVersion(errOut, "write", mountRel, abs, expectedVersion, includeContent); rc != ExitOK {
