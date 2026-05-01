@@ -306,7 +306,7 @@ A `mycelium log` entry with an inline payload:
 }
 ```
 
-**Path layout: `_activity/YYYY/MM/DD/{agent_id}.jsonl`.** Each agent writes its own daily file; cross-agent concurrency is handled by file isolation, not coordinated appends. Time-windowed queries collapse to glob: `_activity/2026/04/*/*.jsonl` (this month, all agents); `_activity/2026/04/26/*.jsonl` (today, all agents); `_activity/2026/04/26/glp1-research.jsonl` (today, one agent). Daily granularity is the default; deployments needing finer can configure hourly. Total order across agents is `ts`-sorted. Payloads from `mycelium log` are inlined on the entry — keeping all signal data in one file means agents reflect on the log with `mycelium grep --format=json` against a single stream rather than dispatching across schemas. Recommended payload size is under 4 KB so entries stay within POSIX `O_APPEND` atomicity (`PIPE_BUF`); larger signals belong in a regular file referenced via `--path`.
+**Path layout: `_activity/YYYY/MM/DD/{agent_id}.jsonl`.** Each agent writes its own daily file; cross-agent concurrency is handled by file isolation, not coordinated appends. Time-windowed queries collapse to glob: `_activity/2026/04/*/*.jsonl` (this month, all agents); `_activity/2026/04/26/*.jsonl` (today, all agents); `_activity/2026/04/26/glp1-research.jsonl` (today, one agent). Daily granularity is the default; deployments needing finer can configure hourly. Total order across agents is `ts`-sorted. Payloads from `mycelium log` are inlined on the entry — keeping all signal data in one file means agents reflect on the log with `mycelium grep --format=json` against a single stream rather than dispatching across schemas. Recommended payload size is under 4 KB so entries stay within POSIX `O_APPEND` atomicity (`PIPE_BUF`); larger signals belong in a regular file referenced via `--path`. The entry schema gets a versioned `_activity/SCHEMA.md` in Phase 2; until then, downstream tooling should treat the current shape as v0 and not assume forward compatibility.
 
 **Same shell, two callers, one writer:**
 
@@ -314,17 +314,9 @@ A `mycelium log` entry with an inline payload:
 - **Operators** tail the same files with whatever they like — `tail -f`, `aws s3 sync`, Vector or Filebeat to Splunk or Datadog. Plain JSONL; standard tools work without Mycelium-specific config.
 - **The system** is the only writer. `mycelium` rejects agent writes under `_`-prefixed paths (section 4). Entries land via two paths — as a side effect of every successful content mutation, ordered consistently with them, or as explicit signal entries via `mycelium log` — both stamped with the same identity.
 
-### Native git/jj support
-
-A LocalFS backend can be initialized inside a git or jj repo, and every operation can optionally produce a commit. This gives `git log`, `git diff`, `git blame` over the agent's memory for free, and makes the store a normal artifact in version-controlled workflows. The activity log is committed alongside content: git history and the log are two views of the same truth — log faster to grep, history richer for diffs.
-
 ### Export
 
 Export is `tar` (or `aws s3 sync`, or `cp -r`). No proprietary format; a directory of UTF-8 files is the export format. The log comes along automatically.
-
-### Diff and share
-
-Two stores diff with `diff -r`. A team shares a knowledge directory by handing each other a tarball or a read-only S3 prefix. No impedance mismatch between "agent memory" and "files an engineer would email a colleague."
 
 ---
 
@@ -336,20 +328,4 @@ Two clarifications worth naming. Vector retrieval against an *external* knowledg
 
 ---
 
-## 10. Open Questions
-
-Each is unresolved or deferred, flagged because it might tempt a future maintainer to violate Section 2.
-
-**Activity log retention.** Files accumulate forever without trimming. Leaning toward hybrid: system trims at a generous default, ops can override; a `_activity/RETENTION.md` declares the policy and oldest available date so the agent knows its horizon. Phase 3.
-
-**Garbage collection of content files.** Stores grow unbounded. Per design principle: the agent prunes when prompted. Unsatisfying in long-running deployments where no one is prompting cleanup. A documented "housekeeping prompt" is the likely answer — a prompt, not a job.
-
-**Token budget enforcement on `mycelium read`.** A read of a 10 MB file blows the context window. `--offset` / `--limit` exist; `mycelium grep` already enforces a hard `--limit` (section 4). Whether `read` should similarly enforce a max-bytes-per-read with explicit override is deferred until benchmarking shows it as a real failure mode. Phase 2 if surfaced.
-
-**Activity log format versioning.** First line of each daily file (or `_activity/SCHEMA.md`) declares format version. Needed before downstream tooling or the agent builds rigid expectations. Phase 2 deliverable.
-
-**External activity log sink for backend-level isolation.** Current design co-locates the log with content. A backend-level failure (S3 bucket corruption, prefix deletion, regional outage) takes content and audit history down together. Standard S3 practices (versioning, replication, separate prefix policies on `_activity/`) cover most of the gap. If a high-assurance deployment surfaces a need, the path is optional log mirroring: continue writing to `_activity/` *and* tee to an external sink. About a hundred lines and a small mount config.
-
----
-
-*End of draft. Feedback welcome — particularly on section 4 (the simplification pass and the one principled enforcement exception), section 6 (concurrency primitives), and the activity-log retention question in section 10.*
+*End of draft. Open roadmap items — log retention, content-GC, format versioning, external log sinks — live in `mycelium-phases.md` rather than here.*
