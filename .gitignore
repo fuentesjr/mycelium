@@ -6,3 +6,7 @@ coverage/
 
 # Built Go binary
 /cmd/mycelium/mycelium
+
+# Override any global ignore of `notes/` so seeded benchmark fixtures are tracked
+!/docs/benchmarks/tasks/*/seed/notes/
+!/docs/benchmarks/tasks/*/seed/notes/**

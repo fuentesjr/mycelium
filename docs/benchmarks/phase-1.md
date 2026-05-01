@@ -53,18 +53,18 @@ Three sessions, not two: two sessions test "did the agent re-read its notes"; th
 
 ### T2 — Seeded self-evolution scenario (acceptance #4)
 
-**Seed.** A pre-populated store containing a recognizable failure pattern:
+**Seed.** A pre-populated store under `docs/benchmarks/tasks/T2-seeded-self-evolution/seed/` containing a recognizable failure pattern:
 
-- `notes/` with 6 files on related-but-overlapping topics with subtly inconsistent paths (e.g. `notes/glp1-pipeline.md`, `notes/glp-1-pipeline.md`, `notes/glp1_followup.md`).
-- Activity log preloaded with ~30 entries showing prior writes-without-reads and one near-duplicate the seed-agent created.
-- Starter `MYCELIUM_MEMORY.md` *without* a search-before-writing rule.
+- `notes/` with 6 files on a GLP-1 prescription-analytics theme, with subtly inconsistent paths: `glp1-pipeline.md`, `glp-1-pipeline.md` (hyphen drift), and `glp1_followup.md` (underscore drift) coexist alongside `semaglutide.md`, `tirzepatide-overview.md`, and `glp1-side-effects.md`.
+- Activity log preloaded with 30 entries across three days (2026-04-15, -16, -18) showing prior writes-without-reads — zero `read_signal` entries, and one near-duplicate the seed-agent created at `2026-04-16T14:33Z` (`glp-1-pipeline.md` written when `glp1-pipeline.md` already existed).
+- Starter `MYCELIUM_MEMORY.md` describing the store contents without a search-before-writing rule, naming-convention guidance, or any anti-duplication advice.
 
-**Two sessions.**
+**Two sessions.** Per `docs/benchmarks/tasks/T2-seeded-self-evolution/task.md`:
 
-1. "Investigate [topic adjacent to seeded notes]. Add what you learn."
+1. The agent is told it is `glp1-researcher` continuing prior work, and asked to extend the analytics into cardiovascular outcomes for the same patient cohort.
 2. "Continue. Take a moment first to look at how the store is shaped."
 
-**Pass.** After session 2, the rubric grader judges that the agent recognized the seeded pattern and responded with at least one convention edit, index file, or grep-before-write behavior. Single human/grader judgment; no signal-counting threshold. **Run 5 instances per model; pass requires majority.**
+**Pass.** After session 2, the rubric grader judges that the agent recognized the seeded pattern and responded with at least one convention edit, index file, or grep-before-write behavior visible in the post-run store or activity log. Single grader judgment; no signal-counting threshold. Per `harness.md`: run 5 instances per model; pass requires majority (≥3/5).
 
 Why seeded: self-evolution requires something to evolve in response to. A clean store has nothing for the agent to notice.
 
@@ -112,4 +112,4 @@ T3 is executable: detectors implemented in `cmd/mycelium/detect.go`, fixtures un
 
 T1 is drafted: `task.md`, `harness.md`, `held-out.md` under `docs/benchmarks/tasks/T1-multi-session-research/`. Awaiting first runs against Opus 4.7 and GPT-5.5.
 
-T2 still needs content under `docs/benchmarks/tasks/T2-<slug>/` (`task.md`, `harness.md`, `held-out.md`, plus `seed/`).
+T2 is drafted: `task.md`, `harness.md`, `grading.md`, plus `seed/` (6 notes, weakened `MYCELIUM_MEMORY.md`, 30-entry activity log) under `docs/benchmarks/tasks/T2-seeded-self-evolution/`. Awaiting first runs against Opus 4.7 and GPT-5.5.
