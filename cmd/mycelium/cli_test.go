@@ -100,9 +100,8 @@ func TestLogSubcommandShapeParity(t *testing.T) {
 	if rc != ExitOK {
 		t.Fatalf("exit code: got %d, want %d (stderr=%q)", rc, ExitOK, errOut)
 	}
-	want := `{"log_status":"ok"}` + "\n"
-	if out != want {
-		t.Errorf("stdout: got %q, want %q", out, want)
+	if out != "" {
+		t.Errorf("stdout: got %q, want empty", out)
 	}
 }
 

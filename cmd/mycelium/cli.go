@@ -91,8 +91,8 @@ func runWrite(in io.Reader, out, errOut io.Writer, args []string) int {
 	if rc != ExitOK {
 		return rc
 	}
-	status := logMutation(errOut, id, MutationLog{Op: "write", Path: positional[0], Version: version})
-	fmt.Fprintf(out, `{"version":%q,"log_status":%q}`+"\n", version, status)
+	logMutation(errOut, id, MutationLog{Op: "write", Path: positional[0], Version: version})
+	fmt.Fprintf(out, `{"version":%q}`+"\n", version)
 	return ExitOK
 }
 
@@ -127,8 +127,8 @@ func runEdit(_ io.Reader, out, errOut io.Writer, args []string) int {
 	if rc != ExitOK {
 		return rc
 	}
-	status := logMutation(errOut, id, MutationLog{Op: "edit", Path: positional[0], Version: version})
-	fmt.Fprintf(out, `{"version":%q,"log_status":%q}`+"\n", version, status)
+	logMutation(errOut, id, MutationLog{Op: "edit", Path: positional[0], Version: version})
+	fmt.Fprintf(out, `{"version":%q}`+"\n", version)
 	return ExitOK
 }
 
@@ -222,8 +222,7 @@ func runRm(_ io.Reader, out, errOut io.Writer, args []string) int {
 	if rc != ExitOK {
 		return rc
 	}
-	status := logMutation(errOut, id, MutationLog{Op: "rm", Path: positional[0], PriorVersion: priorVersion})
-	fmt.Fprintf(out, `{"log_status":%q}`+"\n", status)
+	logMutation(errOut, id, MutationLog{Op: "rm", Path: positional[0], PriorVersion: priorVersion})
 	return ExitOK
 }
 
@@ -259,12 +258,11 @@ func runMv(_ io.Reader, out, errOut io.Writer, args []string) int {
 	if rc != ExitOK {
 		return rc
 	}
-	status := logMutation(errOut, id, MutationLog{Op: "mv", Path: dst, From: src, Version: version})
-	fmt.Fprintf(out, `{"log_status":%q}`+"\n", status)
+	logMutation(errOut, id, MutationLog{Op: "mv", Path: dst, From: src, Version: version})
 	return ExitOK
 }
 
-func runLog(in io.Reader, out, errOut io.Writer, args []string) int {
+func runLog(in io.Reader, _ io.Writer, errOut io.Writer, args []string) int {
 	fs := flag.NewFlagSet("log", flag.ContinueOnError)
 	fs.SetOutput(errOut)
 	pathFlag := fs.String("path", "", "path to record on the entry")
@@ -283,5 +281,5 @@ func runLog(in io.Reader, out, errOut io.Writer, args []string) int {
 		return ExitUsage
 	}
 	op := positional[0]
-	return appendLog(in, out, errOut, ReadIdentity(), op, *pathFlag, *payloadJSON, *fromStdin, time.Now())
+	return appendLog(in, errOut, ReadIdentity(), op, *pathFlag, *payloadJSON, *fromStdin, time.Now())
 }

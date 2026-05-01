@@ -18,8 +18,8 @@ func TestMvHappyPath(t *testing.T) {
 	if rc != ExitOK {
 		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitOK, errOut)
 	}
-	if out != `{"log_status":"ok"}`+"\n" {
-		t.Errorf("stdout: got %q, want log_status ok", out)
+	if out != "" {
+		t.Errorf("stdout: got %q, want empty", out)
 	}
 	// src should be gone.
 	if _, err := os.Stat(filepath.Join(mount, "src.md")); !os.IsNotExist(err) {

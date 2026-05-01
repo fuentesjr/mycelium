@@ -43,8 +43,8 @@ func TestEditHappyPath(t *testing.T) {
 	if !strings.Contains(out, wantVersion) {
 		t.Errorf("stdout should contain version %q, got %q", wantVersion, out)
 	}
-	if !strings.Contains(out, `"log_status":"ok"`) {
-		t.Errorf("stdout missing log_status, got %q", out)
+	if !strings.Contains(out, `"version":"sha256:`) {
+		t.Errorf("stdout missing version field, got %q", out)
 	}
 }
 

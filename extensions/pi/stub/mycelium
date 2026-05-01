@@ -4,10 +4,10 @@
 
 case "$1" in
   read)        echo "stub content for $2" ;;
-  write|edit)  echo '{"version":"sha256:stubbed","log_status":"ok"}' ;;
+  write|edit)  echo '{"version":"sha256:stubbed"}' ;;
   ls|glob)     echo "MYCELIUM_MEMORY.md" ;;
   grep)        : ;;
-  rm|mv|log)   echo '{"log_status":"ok"}' ;;
+  rm|mv|log)   : ;;
   *)           echo "stub: unknown subcommand: $1" >&2; exit 2 ;;
 esac
 exit 0

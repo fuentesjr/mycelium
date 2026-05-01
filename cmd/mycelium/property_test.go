@@ -72,8 +72,7 @@ func genPath(r *rand.Rand, reserved bool) string {
 // ---- write stdout envelope ----
 
 type writeResult struct {
-	Version   string `json:"version"`
-	LogStatus string `json:"log_status"`
+	Version string `json:"version"`
 }
 
 // captureWriteVersion runs "write path" with stdin content and returns the

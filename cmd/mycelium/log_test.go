@@ -63,7 +63,7 @@ func TestLogHappyPathNoPathNoPayload(t *testing.T) {
 	mount := t.TempDir()
 	id := Identity{AgentID: "agent-1", SessionID: "sess-1", Mount: mount}
 
-	rc := appendActivity(io.Discard, io.Discard, id, LogEntry{Op: "context_signal"}, fixedNow)
+	rc := appendActivity(io.Discard, id, LogEntry{Op: "context_signal"}, fixedNow)
 	if rc != ExitOK {
 		t.Fatalf("rc: got %d, want %d", rc, ExitOK)
 	}
@@ -97,7 +97,7 @@ func TestLogWithPath(t *testing.T) {
 	mount := t.TempDir()
 	id := Identity{AgentID: "a", SessionID: "s", Mount: mount}
 
-	rc := appendActivity(io.Discard, io.Discard, id, LogEntry{Op: "read", Path: "memory.md"}, fixedNow)
+	rc := appendActivity(io.Discard, id, LogEntry{Op: "read", Path: "memory.md"}, fixedNow)
 	if rc != ExitOK {
 		t.Fatalf("rc: got %d, want %d", rc, ExitOK)
 	}
@@ -115,7 +115,7 @@ func TestLogWithPayloadJSON(t *testing.T) {
 	mount := t.TempDir()
 	id := Identity{AgentID: "a", SessionID: "s", Mount: mount}
 
-	rc := appendLog(strings.NewReader(""), io.Discard, io.Discard, id, "tool_call", "", `{"x":1}`, false, fixedNow)
+	rc := appendLog(strings.NewReader(""), io.Discard, id, "tool_call", "", `{"x":1}`, false, fixedNow)
 	if rc != ExitOK {
 		t.Fatalf("rc: got %d, want %d", rc, ExitOK)
 	}
@@ -144,7 +144,7 @@ func TestLogWithStdin(t *testing.T) {
 	mount := t.TempDir()
 	id := Identity{AgentID: "a", SessionID: "s", Mount: mount}
 
-	rc := appendLog(strings.NewReader(`{"y":2}`), io.Discard, io.Discard, id, "tool_call", "", "", true, fixedNow)
+	rc := appendLog(strings.NewReader(`{"y":2}`), io.Discard, id, "tool_call", "", "", true, fixedNow)
 	if rc != ExitOK {
 		t.Fatalf("rc: got %d, want %d", rc, ExitOK)
 	}
@@ -189,7 +189,7 @@ func TestLogInvalidPayloadJSON(t *testing.T) {
 	var errBuf strings.Builder
 	id := Identity{AgentID: "a", SessionID: "s", Mount: mount}
 
-	rc := appendLog(strings.NewReader(""), io.Discard, &errBuf, id, "op", "", "not-json", false, fixedNow)
+	rc := appendLog(strings.NewReader(""), &errBuf, id, "op", "", "not-json", false, fixedNow)
 	if rc != ExitUsage {
 		t.Errorf("rc: got %d, want %d", rc, ExitUsage)
 	}
@@ -203,7 +203,7 @@ func TestLogInvalidStdinJSON(t *testing.T) {
 	var errBuf strings.Builder
 	id := Identity{AgentID: "a", SessionID: "s", Mount: mount}
 
-	rc := appendLog(strings.NewReader("not-json"), io.Discard, &errBuf, id, "op", "", "", true, fixedNow)
+	rc := appendLog(strings.NewReader("not-json"), &errBuf, id, "op", "", "", true, fixedNow)
 	if rc != ExitUsage {
 		t.Errorf("rc: got %d, want %d", rc, ExitUsage)
 	}
@@ -216,7 +216,7 @@ func TestLogMountUnset(t *testing.T) {
 	var errBuf strings.Builder
 	id := Identity{AgentID: "a", SessionID: "s", Mount: ""}
 
-	rc := appendLog(strings.NewReader(""), io.Discard, &errBuf, id, "op", "", "", false, fixedNow)
+	rc := appendLog(strings.NewReader(""), &errBuf, id, "op", "", "", false, fixedNow)
 	if rc != ExitGenericError {
 		t.Errorf("rc: got %d, want %d", rc, ExitGenericError)
 	}
@@ -229,10 +229,10 @@ func TestLogTwoAppendsTwoLines(t *testing.T) {
 	mount := t.TempDir()
 	id := Identity{AgentID: "a", SessionID: "s", Mount: mount}
 
-	if rc := appendActivity(io.Discard, io.Discard, id, LogEntry{Op: "first"}, fixedNow); rc != ExitOK {
+	if rc := appendActivity(io.Discard, id, LogEntry{Op: "first"}, fixedNow); rc != ExitOK {
 		t.Fatalf("first append failed: rc=%d", rc)
 	}
-	if rc := appendActivity(io.Discard, io.Discard, id, LogEntry{Op: "second"}, fixedNow); rc != ExitOK {
+	if rc := appendActivity(io.Discard, id, LogEntry{Op: "second"}, fixedNow); rc != ExitOK {
 		t.Fatalf("second append failed: rc=%d", rc)
 	}
 
@@ -266,7 +266,7 @@ func TestLogActivityDirAutoCreated(t *testing.T) {
 		t.Fatal("_activity should not exist before first log call")
 	}
 
-	if rc := appendActivity(io.Discard, io.Discard, id, LogEntry{Op: "op"}, fixedNow); rc != ExitOK {
+	if rc := appendActivity(io.Discard, id, LogEntry{Op: "op"}, fixedNow); rc != ExitOK {
 		t.Fatalf("rc: got %d, want %d", rc, ExitOK)
 	}
 
@@ -279,7 +279,7 @@ func TestLogTimestampParsesAsRFC3339Nano(t *testing.T) {
 	mount := t.TempDir()
 	id := Identity{AgentID: "a", SessionID: "s", Mount: mount}
 
-	if rc := appendActivity(io.Discard, io.Discard, id, LogEntry{Op: "op"}, fixedNow); rc != ExitOK {
+	if rc := appendActivity(io.Discard, id, LogEntry{Op: "op"}, fixedNow); rc != ExitOK {
 		t.Fatalf("rc: got %d, want %d", rc, ExitOK)
 	}
 
@@ -306,9 +306,8 @@ func TestLogE2EHappyPath(t *testing.T) {
 	if rc != ExitOK {
 		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitOK, errOut)
 	}
-	want := `{"log_status":"ok"}` + "\n"
-	if out != want {
-		t.Errorf("stdout: got %q, want %q", out, want)
+	if out != "" {
+		t.Errorf("stdout: got %q, want empty", out)
 	}
 
 	entries := readLogLines(t, mount)
@@ -346,8 +345,8 @@ func TestLogE2EStdin(t *testing.T) {
 	if rc != ExitOK {
 		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitOK, errOut)
 	}
-	if out != `{"log_status":"ok"}`+"\n" {
-		t.Errorf("stdout: got %q", out)
+	if out != "" {
+		t.Errorf("stdout: got %q, want empty", out)
 	}
 
 	entries := readLogLines(t, mount)
@@ -487,7 +486,7 @@ func TestActivityLogUnspecifiedAgentIDFallback(t *testing.T) {
 	mount := t.TempDir()
 	id := Identity{AgentID: "", SessionID: "s", Mount: mount}
 
-	rc := appendActivity(io.Discard, io.Discard, id, LogEntry{Op: "op"}, fixedNow)
+	rc := appendActivity(io.Discard, id, LogEntry{Op: "op"}, fixedNow)
 	if rc != ExitOK {
 		t.Fatalf("rc: got %d, want %d", rc, ExitOK)
 	}

@@ -38,7 +38,7 @@ type MutationLog struct {
 // failure here is non-fatal.
 func logMutation(errOut io.Writer, id Identity, m MutationLog) string {
 	var capErr bytes.Buffer
-	rc := appendActivity(io.Discard, &capErr, id, LogEntry{
+	rc := appendActivity(&capErr, id, LogEntry{
 		Op:           m.Op,
 		Path:         m.Path,
 		Version:      m.Version,
@@ -73,7 +73,7 @@ func activityLogPath(mount string, agentID string, now time.Time) string {
 
 // appendActivity writes one JSON line to the agent's daily _activity file.
 // now is injected for testability. Returns ExitOK on success.
-func appendActivity(out, errOut io.Writer, id Identity, entry LogEntry, now time.Time) int {
+func appendActivity(errOut io.Writer, id Identity, entry LogEntry, now time.Time) int {
 	if id.Mount == "" {
 		fmt.Fprintln(errOut, "mycelium log: MYCELIUM_MOUNT is not set")
 		return ExitGenericError
@@ -110,9 +110,6 @@ func appendActivity(out, errOut io.Writer, id Identity, entry LogEntry, now time
 		return ExitGenericError
 	}
 
-	if out != nil && out != io.Discard {
-		fmt.Fprint(out, stubLogResponse)
-	}
 	return ExitOK
 }
 
@@ -120,7 +117,7 @@ func appendActivity(out, errOut io.Writer, id Identity, entry LogEntry, now time
 // directly on the activity entry as the `payload` field. now is injected for testability.
 func appendLog(
 	in io.Reader,
-	out, errOut io.Writer,
+	errOut io.Writer,
 	id Identity,
 	op, path, payloadJSON string,
 	fromStdin bool,
@@ -158,5 +155,5 @@ func appendLog(
 		Path:    path,
 		Payload: json.RawMessage(payloadBytes),
 	}
-	return appendActivity(out, errOut, id, entry, now)
+	return appendActivity(errOut, id, entry, now)
 }

@@ -17,8 +17,8 @@ func TestRmHappyPath(t *testing.T) {
 	if rc != ExitOK {
 		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitOK, errOut)
 	}
-	if out != `{"log_status":"ok"}`+"\n" {
-		t.Errorf("stdout: got %q, want log_status ok", out)
+	if out != "" {
+		t.Errorf("stdout: got %q, want empty", out)
 	}
 	if _, err := os.Stat(filepath.Join(mount, "target.md")); !os.IsNotExist(err) {
 		t.Error("file should have been deleted")
