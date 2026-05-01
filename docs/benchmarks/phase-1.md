@@ -37,19 +37,19 @@ Each task ships as a directory under `docs/benchmarks/tasks/T<n>-<slug>/`, conta
 
 ### T1 — Multi-session research synthesis (acceptance #1)
 
-**Topic.** "State of post-quantum cryptography deployment in major cloud KMS offerings. Recommend a path for a healthcare API gateway." Stable factual ground; less likely to drift between runs than a fast-moving topic.
+**Topic.** Connection-pooler selection for PostgreSQL: PgBouncer vs. Pgpool-II vs. pgcat for a small SaaS. Stable enough that training-data drift between Opus 4.7 and GPT-5.5 doesn't dominate; narrow enough that one focused engineer could finish the writeup in a few hours.
 
-**Three sessions, fresh process each, same mounted store.**
+**Three sessions, fresh process each, same mounted store.** Per-session prompts live verbatim in `docs/benchmarks/tasks/T1-multi-session-research/task.md`:
 
-1. "Investigate the topic. Build whatever notes you'll want later."
-2. "Continuing. Extend the analysis to [held-out sub-question]."
-3. "Produce a final report drawing on what you've gathered."
+1. Session 1 frames the SaaS scenario and asks the agent to investigate the three options.
+2. Session 2 extends the analysis to failover and HA behavior under load.
+3. Session 3 asks for a final recommendation with reasoning.
 
 Three sessions, not two: two sessions test "did the agent re-read its notes"; three tests "did the agent build something compositional across resumes." The latter is the bet.
 
-**Held-out questions.** A grader (a Frontier model from the other provider than the one under test) reads the final store and answers 5 questions whose answers live only in session-1 or session-2 content but should be cited in session-3 output. **Pass: 4/5 answered correctly from store contents alone.**
+**Held-out questions.** Five questions in `held-out.md` probe specific differentiators (pool modes, read/write splitting, implementation language, failover, prepared statements in transaction pooling). A grader (a Frontier model from the other provider than the one under test) reads the final store and answers each from the agent's notes. **Pass: ≥4/5 answered correctly *and* traceable to specific notes.**
 
-**Comparison run.** Same task, same model, no Mycelium mount. The grader reads only the session-3 transcript. **Pass: the Mycelium run's session-3 output is judged more substantively grounded than the no-memory run.** Run 5 instances per model; pass requires majority.
+**Comparison run.** Same task, same model, no Mycelium mount, single session with the three prompts concatenated. The grader reads the transcript only. **Pass: the Mycelium run's output is judged more substantively grounded than the no-memory run.** Per `harness.md`: run 5 instances per model; both criteria require ≥3/5 to pass.
 
 ### T2 — Seeded self-evolution scenario (acceptance #4)
 
@@ -110,4 +110,6 @@ Rationale: model-run validation does not change the artifact, only the public cl
 
 T3 is executable: detectors implemented in `cmd/mycelium/detect.go`, fixtures under `cmd/mycelium/testdata/trajectories/`, harness at `docs/benchmarks/tasks/T3-failure-detectors/harness.md`. Run via `go test -run TestDetectors`.
 
-T1 and T2 still need per-task content under `docs/benchmarks/tasks/T<n>-<slug>/` (`task.md`, `harness.md`, `held-out.md`, plus T2 `seed/`). T1's topic is also up for revision — the current "post-quantum cryptography in cloud KMS / healthcare" framing is overcooked for an MVP synthesis test; pick a simpler stable topic (e.g. comparing PostgreSQL connection poolers) before drafting.
+T1 is drafted: `task.md`, `harness.md`, `held-out.md` under `docs/benchmarks/tasks/T1-multi-session-research/`. Awaiting first runs against Opus 4.7 and GPT-5.5.
+
+T2 still needs content under `docs/benchmarks/tasks/T2-<slug>/` (`task.md`, `harness.md`, `held-out.md`, plus `seed/`).
