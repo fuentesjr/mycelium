@@ -1,10 +1,6 @@
 # Mycelium: Phased Rollout
 
-**Status:** Roadmap draft, companion to `mycelium-design.md`
-**Revisions:**
-- Multi-agent and multi-session pulled into MVP.
-- Self-evolution support pulled into MVP.
-- Simplification pass: `query_activity_log` removed; activity log lives at reserved `_activity/` path, queried via `glob` + `grep --format=json`. Ripgrep used in the backend with grep and Go-native scan as fallbacks.
+**Status:** Roadmap, companion to `mycelium-design.md`. Phase 1 binary shipped at v0.3.0.
 
 This document phases the Mycelium design into shippable units. Each phase ends in a working, useful system — not a half-built one. The cuts are made by principle, not convenience; where a phase defers a feature, the deferral is justified and the criterion for revisiting it is named.
 

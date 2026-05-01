@@ -1,6 +1,6 @@
 .PHONY: build test dist clean
 
-VERSION ?= v0.1.0
+VERSION ?= v0.3.0
 DIST    := dist
 CMD     := cmd/mycelium
 
