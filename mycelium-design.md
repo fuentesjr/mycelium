@@ -99,11 +99,7 @@ Two layers, with the activity log inside the store as a reserved-path convention
          the same with standard log tooling
 ```
 
-The **agent surface** is the shell already in its environment. There's no separate protocol layer — `mycelium` is a binary on `$PATH`. Operators reach for `cat`, `ls`, `rg`, `jq` against the same files. One surface, two callers.
-
-The **`mycelium` binary** is a thin shim. It validates arguments, translates them into backend operations, attaches identity from environment for audit, surfaces errors via exit codes and structured stderr, and enforces the reserved-path rule. It does not interpret content or make policy decisions.
-
-The **Storage Backend** is an interface, not a service. Two reference implementations ship: LocalFS and S3-compatible. Each implements the same contract, and each appends to `_activity/YYYY/MM/DD/{agent_id}.jsonl` on every mutation.
+Agents and operators share one surface — the shell — and read the same files. The binary is a thin shim over the backend, not a service; it never interprets content.
 
 ---
 
@@ -143,27 +139,6 @@ Three contract notes:
 **The `_` prefix is reserved at the store root.** `mycelium` rejects `write`, `edit`, `rm`, and `mv` whose target is under any path beginning with `_`. Currently `_activity/`; future system paths (`_schema/`, `_config/`) inherit the same protection without binary changes.
 
 **Identity travels via environment.** The harness sets `MYCELIUM_AGENT_ID` and (optionally) `MYCELIUM_SESSION_ID` once. Every invocation reads them; every log entry records them. Standard Unix request identity.
-
-Reference invocation:
-
-```bash
-$ MYCELIUM_AGENT_ID=glp1-researcher mycelium write learnings/today.md --stdin <<EOF
-Notes from this session.
-EOF
-{"version":"sha256:8c4d..."}
-```
-
-Conflicting edit:
-
-```bash
-$ mycelium edit learnings/today.md \
-    --old "Notes from this session." \
-    --new "Notes from this session.\n\nAdditional observation." \
-    --expected-version sha256:abcd... --include-current-content
-{"error":"conflict","current_version":"sha256:efgh...","current_content":"..."}
-$ echo $?
-64
-```
 
 **Agent and operator share the same surface.** There's no agent-side log API distinct from operator tooling. A future harness without shell access can wrap `mycelium` in a thin protocol adapter (section 9) — but the primary surface is shell, and the bet works without one.
 
@@ -206,8 +181,6 @@ The Backend interface deliberately omits `BeginTransaction`, `Watch`, `Snapshot`
 
 A backend can be **read-only** (flag at mount) — useful for sharing a curated knowledge directory across agents that should treat it as reference. A read-only mount has no `_activity/`.
 
-A backend can be **layered**: writable LocalFS overlay on a read-only S3 base, copy-on-write semantics, behind the same interface. This is how "common organizational memory + per-agent scratch" works without new abstractions.
-
 ---
 
 ## 6. Concurrency and Multi-Agent Semantics
@@ -224,8 +197,6 @@ No multi-file transactions. If the agent wants atomicity across files, it compos
 Locks are explicitly avoided as the primary coordination mechanism. They introduce timeouts, deadlocks, and lifecycle questions ("what if the agent crashes holding the lock?"). CAS via versioned writes degrades cleanly: a conflict is just an error to read, reason about, and handle.
 
 **Identity** travels via `MYCELIUM_AGENT_ID` and (optionally) `MYCELIUM_SESSION_ID` set once by the harness, recorded in the log, visible to any reading agent. By default, identity isn't used for access control — every mounted agent has equal permissions and the same view of the log. Per-prefix ACLs are opt-in on backends that support them; punted in v1.
-
-A small convention helps coordination without being mandatory: starter `MYCELIUM_MEMORY.md` proposes a top-level `AGENTS/` directory where each agent maintains its own subdirectory for in-flight work; shared work goes at root or in `shared/`. **Not enforced** — a hint the agent reads once and replaces as it sees fit.
 
 ---
 
@@ -261,12 +232,7 @@ Three primitives, all from section 4:
 2. **State awareness and modification via standard file tools.** Self-evolution adds no new mutation verbs; it gives the agent reasons to use existing ones differently.
 3. **Conventions-as-files.** Any scheme the agent follows lives in editable text (`MYCELIUM_MEMORY.md`, `INDEX.md`, an agent-written `ARCHIVE_POLICY.md`). The agent rewrites its own rules with the same edit primitives as everything else.
 
-Patterns that emerge — *not* features the system implements:
-
-- **Convention bootstrap.** Read `MYCELIUM_MEMORY.md` at session start and apply.
-- **Convention revision.** After observing in the log that "consolidate before creating" was violated, edit `MYCELIUM_MEMORY.md` with a stricter pre-write check, or add `INDEX.md` to make the right file findable.
-- **Self-built indexes.** Notice (by grepping the log for repeated `glob`/`grep`) that the same content is searched repeatedly; write `INDEX.md` mapping common queries to file paths.
-- **Archiving and pruning.** Use `mycelium ls --recursive` to find paths not touched in a long time, cross-reference the log to confirm staleness, consolidate or delete.
+Patterns that emerge — *not* features the system implements: convention bootstrap, convention revision, self-built indexes, archiving and pruning. Concrete `mycelium` recipes for each live in `docs/self-evolution.md`.
 
 What the system does *not* do: run a reflection step between turns; analyze patterns or detect drift for the agent; maintain or update convention files on the agent's behalf; enforce that conventions are read before acting. Doing any of these would re-introduce the capability coupling this principle exists to reject. The system makes self-evolution *possible*; the agent *does* it.
 
@@ -326,6 +292,3 @@ Frameworks in this space commonly ship features Mycelium deliberately omits: aut
 
 Two clarifications worth naming. Vector retrieval against an *external* knowledge base is a tool the agent might choose to invoke; we reject it only as the primary access path to the agent's *own* memory. Specialized agent protocols (custom REST, MCP servers, framework-specific plugin contracts) are rejected as the *primary* surface — `mycelium read foo.md` and `cat foo.md` should produce the same bytes against the same files; an "agent surface" distinct from the "operator surface" reintroduces exactly the human-uninterpretable opacity Section 2's "human-interpretable wins" rules out. A future harness without shell access can still wrap the binary in a thin protocol adapter (a hundred lines, see Section 4), but the binary is the contract.
 
----
-
-*End of draft. Open roadmap items — log retention, content-GC, format versioning, external log sinks — live in `mycelium-phases.md` rather than here.*

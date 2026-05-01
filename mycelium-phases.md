@@ -41,11 +41,11 @@ The phasing rule: **every phase's scope must independently validate or extend th
 
 **Acceptance criteria.** Phase 1 is done when:
 
-1. **Single-agent multi-session.** A Frontier model completes a defined task that spans multiple sessions — fresh process each time, same mounted store — and a human reviewer judges the resulting store as more useful than the same model running without persistent memory. The model must demonstrate re-reading prior session content before acting.
+1. **Single-agent multi-session.** T1 task in `docs/benchmarks/phase-1.md` passes on Claude Opus 4.7 and GPT-5.5.
 2. **Multi-agent concurrency.** Two agents on the same LocalFS store can update overlapping files concurrently without silent loss. A benchmark exercises this with adversarial timing (synchronized writes to the same path).
 3. **Conflict recovery on real models.** When a conditional write fails, the model receives the typed conflict error and produces sensible recovery behavior (re-read, merge, retry) given only the error and no special prompting. Verified on Claude Opus 4.7 and GPT-5.5.
-4. **Self-evolution via the activity log.** A Frontier model demonstrably revises its own organizational conventions across sessions in response to patterns observed by querying its activity log with `glob` + `grep --format=json`. Concretely: the model edits `MYCELIUM_MEMORY.md` (or another convention file it has chosen) in a way that addresses a behavior it identified by reading the log — for example, adding a "search before writing" rule after observing duplicate-creation in its own history. Verified spontaneously, with no scaffolding prompts beyond the system's standard initialization. Self-evolution is the floor behavior the supported tier is defined by; failure to produce it is a Phase 1 blocker, not a calibration signal.
-5. **Failure-mode observability.** The benchmark suite can reproducibly distinguish the "31 transcript files" failure mode from healthy use, by reading the activity log alone — no manual store inspection required. The same query the harness uses, the agent could use.
+4. **Self-evolution via the activity log.** T2 task in `docs/benchmarks/phase-1.md` passes on Claude Opus 4.7 and GPT-5.5. Self-evolution is the floor behavior the supported tier is defined by; failure here is a Phase 1 blocker, not a calibration signal.
+5. **Failure-mode observability.** T3 detectors in `docs/benchmarks/phase-1.md` distinguish dysfunctional traces (e.g., the "31 transcript files" pattern) from healthy use by reading the activity log alone.
 6. **Activity log integrity.** `mycelium` rejects every attempted agent write under any `_`-prefixed root path (write, edit, rm, mv source, mv destination). Property-based tests cover all four mutating subcommands, and the test suite includes paths under `_activity/` as well as a synthetic `_test_reserved/` to exercise the prefix rule rather than the specific path.
 7. **Backend correctness.** The LocalFS backend passes a property-based test suite covering atomicity and CAS semantics under concurrent writes from sibling processes.
 8. **Human-readability.** A second engineer can take a tarball of the store and inspect both content files and the activity log with `cat`, `grep`, and a text editor — no Mycelium-specific tooling required.
@@ -120,17 +120,7 @@ The phasing rule: **every phase's scope must independently validate or extend th
 
 ## What stays absent across all phases
 
-These are restated from the design's anti-goals because phasing pressure is exactly when they get smuggled back in:
-
-- No automatic memory extraction or summarization at session end, ever.
-- No vector retrieval over the agent's own memory store as a primary access path.
-- No tiered (working / episodic / archival) memory maintained by infrastructure.
-- No automatic deduplication, pruning, or rewriting of the agent's files.
-- No knowledge-graph extraction.
-- **No system-driven reflection or self-evolution.** The agent gets the primitives (an activity log it can grep, editable convention files) and the agent's prompt drives when reflection happens. The system never auto-triggers a reflection step, never auto-rewrites convention files, never analyzes agent patterns and pushes results into agent context.
-- **No specialized query language or API for the activity log.** It's JSONL, the agent has `grep --format=json`, that's the contract.
-
-If a phase ships any of the above, the phase is wrong and the design is broken. The right pressure-release valve when an agent is mishandling memory is **a better prompt, a stronger model, or a documented convention** — none of which are runtime features of Mycelium.
+All anti-goals from `mycelium-design.md` section 9 hold across every phase. Phasing pressure is exactly when they get smuggled back in; if a phase ships any of them, the phase is wrong.
 
 ---
 
