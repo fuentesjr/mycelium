@@ -1,16 +1,16 @@
 import os from "node:os";
 import path from "node:path";
 import { describe, it, expect } from "vitest";
-import { detectScopeFromPath, mountPathFor, GLOBAL_EXT_ROOT } from "../src/config.js";
+import { detectScopeFromPath, mountPathFor, GLOBAL_EXT_ROOT } from "../config.js";
 
 describe("detectScopeFromPath", () => {
   it("returns 'global' for paths under ~/.pi/agent/extensions/", () => {
-    const filePath = path.join(GLOBAL_EXT_ROOT, "mycelium", "src", "index.ts");
+    const filePath = path.join(GLOBAL_EXT_ROOT, "mycelium", "index.ts");
     expect(detectScopeFromPath(filePath)).toBe("global");
   });
 
   it("returns 'project' for project-local paths under <repo>/.pi/extensions/", () => {
-    const filePath = path.join("/home/dev/proj", ".pi", "extensions", "mycelium", "src", "index.ts");
+    const filePath = path.join("/home/dev/proj", ".pi", "extensions", "mycelium", "index.ts");
     expect(detectScopeFromPath(filePath)).toBe("project");
   });
 

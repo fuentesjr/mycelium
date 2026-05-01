@@ -7,7 +7,7 @@ Persistent memory for AI coding agents. A small CLI plus a daily activity log on
 ## What's here
 
 - **`cmd/mycelium/`** — Go binary. Nine subcommands (`read`, `write`, `edit`, `ls`, `glob`, `grep`, `rm`, `mv`, `log`). Mount-level `flock`-guarded CAS, SHA-256 version tokens, JSONL activity log at `<mount>/_activity/YYYY/MM/DD/<agent>.jsonl`. Reserved `_`-prefix protects backend metadata from agent writes.
-- **`extensions/pi/`** — pi.dev extension. Sets up env vars on `session_start`, contributes a system-prompt block on `before_agent_start`, records `context_signal` entries on `context`. Registers no tools — agents invoke `mycelium` through pi's built-in `bash`.
+- **`extensions/pi-mycelium/`** — pi.dev extension. Sets up env vars on `session_start`, contributes a system-prompt block on `before_agent_start`, records `context_signal` entries on `context`. Registers no tools — agents invoke `mycelium` through pi's built-in `bash`.
 - **`docs/`** — design (`mycelium-design.md`), phasing (`mycelium-phases.md`), conflict-resolution conventions, self-evolution patterns, benchmark rubric.
 
 ## Install
@@ -34,18 +34,18 @@ go install ./cmd/mycelium
 ### Pi extension
 
 ```
-cd extensions/pi
+git clone https://github.com/fuentesjr/mycelium.git
+cd mycelium/extensions/pi-mycelium
 npm install
-npm test    # 37 tests, ~1s
 
-# Project install
-ln -s "$(pwd)" <your-repo>/.pi/extensions/mycelium
+# Project install — symlink into the repo where you'll run `pi`
+ln -s "$(pwd)" <your-repo>/.pi/extensions/pi-mycelium
 
-# Global install
-ln -s "$(pwd)" ~/.pi/agent/extensions/mycelium
+# Global install — available in every pi session
+ln -s "$(pwd)" ~/.pi/agent/extensions/pi-mycelium
 ```
 
-Mount path is auto-detected from install location: project install mounts at `<cwd>/.pi/mycelium/store/`, global install at `~/.pi/mycelium/store/`. See `extensions/pi/README.md`.
+Mount path is auto-detected from install location: project install mounts at `<cwd>/.pi/mycelium/store/`, global install at `~/.pi/mycelium/store/`. The extension expects the `mycelium` binary on `PATH` (see above); if it's missing, sessions continue normally with an `UNAVAILABLE` notice in the system prompt. See `extensions/pi-mycelium/README.md` for details.
 
 ## Quick example
 
@@ -64,10 +64,11 @@ mycelium read notes/incident-2026-04-30.md
 # Search
 mycelium grep --pattern latency --format json
 
-# Concurrent-safe update via CAS
-VERSION=$(mycelium read notes/incident-2026-04-30.md | sha256sum | cut -d' ' -f1)
+# Concurrent-safe update via CAS — pass the prior version, retry on conflict (exit 64).
+# On conflict, mycelium emits a JSON envelope with current_version (and current_content
+# when --include-current-content is set) so the caller can re-merge without re-reading.
 echo "updated content" | mycelium write notes/incident-2026-04-30.md \
-  --expected-version sha256:$VERSION
+  --expected-version sha256:abc123... --include-current-content
 
 # Inspect activity log directly — plain JSONL, no tooling required
 cat $MYCELIUM_MOUNT/_activity/*/*/*/alice.jsonl
@@ -80,6 +81,7 @@ cat $MYCELIUM_MOUNT/_activity/*/*/*/alice.jsonl
 - [`docs/conflict-resolution.md`](docs/conflict-resolution.md) — multi-agent conflict-resolution conventions.
 - [`docs/self-evolution.md`](docs/self-evolution.md) — convention bootstrap, self-built indices, archiving patterns.
 - [`docs/benchmarks/phase-1.md`](docs/benchmarks/phase-1.md) — validation rubric, target models, scoring.
+- [`CHANGELOG.md`](CHANGELOG.md) — release notes.
 
 ## Development
 

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { isBinaryAvailable, setupEnv } from "../src/env.js";
-import type { MyceliumConfig } from "../src/config.js";
+import { isBinaryAvailable, setupEnv } from "../env.js";
+import type { MyceliumConfig } from "../config.js";
 import { execResult } from "./helpers.js";
 
 const cfg: MyceliumConfig = { scope: "project", mountPath: "/tmp/store" };

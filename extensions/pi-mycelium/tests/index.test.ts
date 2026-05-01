@@ -9,7 +9,7 @@ import type {
   ExtensionContext,
   SessionStartEvent,
 } from "@mariozechner/pi-coding-agent";
-import register from "../src/index.js";
+import register from "../index.js";
 import { execResult } from "./helpers.js";
 
 type AnyHandler = (event: unknown, ctx: ExtensionContext) => unknown;

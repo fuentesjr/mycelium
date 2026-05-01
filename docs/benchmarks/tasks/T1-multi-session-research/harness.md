@@ -4,7 +4,7 @@
 
 - `mycelium` binary on `$PATH` (built from this repo or installed from a release).
 - `pi` CLI installed and authenticated against the model under test.
-- `extensions/pi/` symlinked into `.pi/extensions/mycelium` (project-scoped install). Verify: `ls .pi/extensions/mycelium`.
+- `extensions/pi-mycelium/` symlinked into `.pi/extensions/pi-mycelium` (project-scoped install). Verify: `ls .pi/extensions/pi-mycelium`.
 - The pi extension's system-prompt block is the *only* scaffolding the agent gets. Do not add custom system prompts.
 
 ## Per-run setup

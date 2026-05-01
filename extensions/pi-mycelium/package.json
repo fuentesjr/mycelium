@@ -1,11 +1,11 @@
 {
-  "name": "@mycelium/pi-extension",
+  "name": "pi-mycelium",
   "version": "0.0.1",
   "description": "Pi.dev extension for Mycelium agent memory",
   "type": "module",
-  "main": "src/index.ts",
+  "main": "index.ts",
   "files": [
-    "src",
+    "*.ts",
     "README.md"
   ],
   "scripts": {

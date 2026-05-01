@@ -7,7 +7,7 @@ import type {
 import {
   recordContextSignal,
   recordSessionBoundary,
-} from "../src/activity-log.js";
+} from "../activity-log.js";
 import { execResult } from "./helpers.js";
 
 function makeContextEvent(messages: ContextEvent["messages"]): ContextEvent {

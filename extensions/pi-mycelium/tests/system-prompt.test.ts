@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { systemPromptAvailable, systemPromptUnavailable } from "../src/system-prompt.js";
+import { systemPromptAvailable, systemPromptUnavailable } from "../system-prompt.js";
 
 describe("systemPromptAvailable", () => {
   const block = systemPromptAvailable({
