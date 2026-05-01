@@ -1,6 +1,6 @@
 # Self-Evolution Patterns
 
-**Status:** Documentation only. Concrete `mycelium` recipes for the patterns described in `mycelium-design.md` § 7. The design doc carries the rationale; this doc carries the shell.
+**Status:** Documentation only. Concrete `mycelium` recipes for the patterns described in section 7 of `mycelium-design.md`. The design doc carries the rationale; this doc carries the shell.
 
 ---
 
@@ -25,7 +25,7 @@ mycelium glob '_activity/2026/04/*/researcher-7.jsonl'
 mycelium grep --pattern '"op":"write"' --path _activity --format json --limit 200
 ```
 
-The `json` envelope returns `{matches: [{path, line, text}], truncated, next_cursor}`. Each `text` is a JSONL entry with `ts`, `op`, `path`, `version`, `prior_version`, `agent_id`, `session_id`. Group by `path` to spot near-duplicates.
+The `json` envelope returns `{matches: [{path, line, text}], truncated}`. Each `text` is a JSONL entry with `ts`, `op`, `path`, `version`, `agent_id`, `session_id`. Group by `path` to spot near-duplicates.
 
 Then edit the convention file:
 
@@ -44,8 +44,8 @@ mycelium edit MYCELIUM_MEMORY.md \
 Triggered by repeated reads or repeated grep/glob with the same pattern. Reads aren't auto-logged — either notice mid-session, or log search signals explicitly:
 
 ```
-mycelium log search_signal --payload-json '{"pattern":"glp1","scope":"notes/"}'
-mycelium grep --pattern '"op":"search_signal"' --path _activity --format json --limit 500
+mycelium log read_signal --payload-json '{"pattern":"glp1","scope":"notes/"}'
+mycelium grep --pattern '"op":"read_signal"' --path _activity --format json --limit 500
 ```
 
 When the same patterns recur, write the index:

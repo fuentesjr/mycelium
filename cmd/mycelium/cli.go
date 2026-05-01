@@ -165,10 +165,6 @@ func runGrep(_ io.Reader, out, errOut io.Writer, args []string) int {
 	fileType := fs.String("file-type", "", "limit by file type")
 	format := fs.String("format", "text", "output format: text|json")
 	limit := fs.Int("limit", 1000, "max matches")
-	// TODO: --cursor pagination is deferred to a later phase. The flag is
-	// accepted for forward compatibility but currently has no effect.
-	// See mycelium-phases.md.
-	fs.String("cursor", "", "pagination cursor (not yet implemented)")
 	if _, err := parseInterspersed(fs, args); err != nil {
 		return ExitUsage
 	}

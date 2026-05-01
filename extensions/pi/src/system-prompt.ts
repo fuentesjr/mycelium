@@ -16,11 +16,11 @@ It survives sessions and may be shared with other agents mounted concurrently.
 
 Use these subcommands via the \`bash\` tool:
 - \`mycelium read <path>\` — read a file
-- \`mycelium write <path> --stdin\` — write or overwrite (content via stdin)
+- \`mycelium write <path>\` — write or overwrite (content via stdin)
 - \`mycelium edit <path> --old <str> --new <str>\` — find/replace a unique substring
 - \`mycelium ls <path> [--recursive]\` — list entries
 - \`mycelium glob <pattern>\` — paths matching a glob (e.g. \`learnings/*.md\`)
-- \`mycelium grep <pattern> [--path P] [--format json] [--limit N]\` — search content
+- \`mycelium grep --pattern <str> [--path P] [--format json] [--limit N]\` — search content
 - \`mycelium rm <path>\` — delete
 - \`mycelium mv <src> <dst>\` — atomic rename (fails if \`<dst>\` exists)
 - \`mycelium log <op> [--path PATH] [--payload-json STR | --stdin]\` — append a non-mutation signal
@@ -47,7 +47,7 @@ with \`_\`. Today this means:
 
 - \`_activity/YYYY/MM/DD/${c.agentId}.jsonl\` — auto-generated metadata for every
   mutation you perform. Read-only to you, but greppable: try
-  \`mycelium grep --path _activity --format json <pattern>\` to look back across
+  \`mycelium grep --path _activity --format json --pattern <str>\` to look back across
   sessions. Payloads from \`mycelium log\` are inlined on each entry as a \`payload\`
   field — no separate file to look up.
 

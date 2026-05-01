@@ -84,7 +84,7 @@ Two layers, with the activity log inside the store as a reserved-path convention
   Frontier-class agent
        │
        │  invokes `mycelium <sub>` via its existing shell tool
-       │  env: MYCELIUM_AGENT_ID, MYCELIUM_SESSION_ID
+       │  env: MYCELIUM_MOUNT, MYCELIUM_AGENT_ID, MYCELIUM_SESSION_ID
        ▼
   `mycelium` binary
        read · write · edit · ls · glob · grep · rm · mv · log
@@ -107,12 +107,12 @@ Agents and operators share one surface — the shell — and read the same files
 
 A single binary, `mycelium`, invoked through the agent's shell. Nine POSIX-shaped subcommands, each justified against "could this be fewer?"
 
-- **`mycelium read <path> [--offset N] [--limit N]`** — print file contents. Optional offset and limit for paginated reads of large files.
-- **`mycelium write <path> [--content STR | --stdin] [--expected-version SHA]`** — create or overwrite. With `--expected-version`, conditional on the current version; otherwise unconditional. Prints the new version on success.
+- **`mycelium read <path>`** — print file contents.
+- **`mycelium write <path> [--expected-version SHA]`** — create or overwrite from stdin. With `--expected-version`, conditional on the current version; otherwise unconditional. Prints the new version on success.
 - **`mycelium edit <path> --old STR --new STR [--expected-version SHA]`** — find-and-replace a unique substring. Fails if `--old` is absent or non-unique. *Earns its complexity:* token economy on large files, diff quality under git/jj, and the unique-substring constraint catches stale-view errors a full overwrite would silently paper over.
-- **`mycelium ls <path> [--recursive]`** — list entries with sizes and mtimes. Bounded result count; cursor pagination. *Earns its complexity:* `glob` returns paths, not metadata.
+- **`mycelium ls [--recursive]`** — list paths under the mount. *Earns its complexity:* `glob` requires a pattern; `ls` is the unprefixed survey.
 - **`mycelium glob <pattern>`** — print paths matching a glob (`**/*.md`, `notes/2025-*/*.txt`, `_activity/2026/04/*/*.jsonl`).
-- **`mycelium grep <pattern> [--path PATH] [--regex] [--file-type T] [--format text|json] [--limit N] [--cursor C]`** — print matching lines with paths and line numbers. `--format=text` is `path:line:text`; `--format=json` returns `{matches: [{path, line, text}, ...], truncated, next_cursor?}`. `--limit` caps results (default 1000, hard ceiling); `--cursor` paginates. Backend prefers ripgrep, falls back to grep, then to scan. *Earns its complexity:* JSON and type filter make the activity log usable through general tools; the `--limit` cap keeps log-reflection from overflowing context.
+- **`mycelium grep --pattern STR [--path PATH] [--regex] [--file-type T] [--format text|json] [--limit N]`** — print matching lines with paths and line numbers. `--format=text` is `path:line:text`; `--format=json` returns `{matches: [{path, line, text}, ...], truncated}`. `--limit` caps results (default 1000, hard ceiling). Backend prefers ripgrep, falls back to grep, then to scan. *Earns its complexity:* JSON and type filter make the activity log usable through general tools; the `--limit` cap keeps log-reflection from overflowing context.
 - **`mycelium rm <path> [--expected-version SHA]`** — remove. *Earns its complexity:* not expressible as `write` — empty content creates an empty file, not a deletion.
 - **`mycelium mv <src> <dst>`** — atomic rename within the store. *Earns its complexity:* read+write+delete is not atomic; emulating rename loses the guarantee.
 - **`mycelium log <op> [--path PATH] [--payload-json STR | --stdin]`** — append a non-mutation signal entry to `_activity/YYYY/MM/DD/{agent_id}.jsonl`. The system fills `ts`, `agent_id`, `session_id`; the caller supplies `op` (a non-mutation tag like `context_signal`, `compaction`, or an agent annotation), an optional `--path` recorded on the entry, and an optional payload via either `--payload-json` (inline JSON, for callers without easy stdin access) or `--stdin` (for bash pipelines). The payload, if present, lands inline as the entry's `payload` field. Silent on success. *Earns its complexity:* harness observations, compaction markers, and agent intent annotations all need to land in the same JSONL stream as mutations so existing reads (`grep --format=json`) work without specializing on signal type. Recommendation: keep payloads small (under 4 KB) so entries stay within POSIX `O_APPEND` atomicity; for larger signals, write a regular file via `mycelium write` and reference it via `--path`.
@@ -138,7 +138,7 @@ Three contract notes:
 
 **The `_` prefix is reserved at the store root.** `mycelium` rejects `write`, `edit`, `rm`, and `mv` whose target is under any path beginning with `_`. Currently `_activity/`; future system paths (`_schema/`, `_config/`) inherit the same protection without binary changes.
 
-**Identity travels via environment.** The harness sets `MYCELIUM_AGENT_ID` and (optionally) `MYCELIUM_SESSION_ID` once. Every invocation reads them; every log entry records them. Standard Unix request identity.
+**Identity travels via environment.** The harness sets `MYCELIUM_MOUNT` (the store directory), `MYCELIUM_AGENT_ID`, and (optionally) `MYCELIUM_SESSION_ID` once. Every invocation reads them; every log entry records the agent and session. Standard Unix request identity.
 
 **Agent and operator share the same surface.** There's no agent-side log API distinct from operator tooling. A future harness without shell access can wrap `mycelium` in a thin protocol adapter (section 9) — but the primary surface is shell, and the bet works without one.
 
@@ -196,7 +196,7 @@ No multi-file transactions. If the agent wants atomicity across files, it compos
 
 Locks are explicitly avoided as the primary coordination mechanism. They introduce timeouts, deadlocks, and lifecycle questions ("what if the agent crashes holding the lock?"). CAS via versioned writes degrades cleanly: a conflict is just an error to read, reason about, and handle.
 
-**Identity** travels via `MYCELIUM_AGENT_ID` and (optionally) `MYCELIUM_SESSION_ID` set once by the harness, recorded in the log, visible to any reading agent. By default, identity isn't used for access control — every mounted agent has equal permissions and the same view of the log. Per-prefix ACLs are opt-in on backends that support them; punted in v1.
+**Identity** is set once by the harness via the env vars in section 4 and recorded on every log entry. By default it isn't used for access control — every mounted agent has equal permissions and the same view of the log. Per-prefix ACLs are opt-in on backends that support them; punted in v1.
 
 ---
 
@@ -255,8 +255,7 @@ A mutation entry (`write`, `edit`, `rm`, `mv`):
   "session_id": "sess-9b2f",
   "op": "write",
   "path": "learnings/glp1-pipeline.md",
-  "version": "sha256:8c4d...",
-  "prior_version": "sha256:1f2a..."
+  "version": "sha256:8c4d..."
 }
 ```
 

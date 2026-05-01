@@ -112,8 +112,7 @@ func TestGrepJSONFormat(t *testing.T) {
 			Line int    `json:"line"`
 			Text string `json:"text"`
 		} `json:"matches"`
-		Truncated  bool   `json:"truncated"`
-		NextCursor string `json:"next_cursor"`
+		Truncated bool `json:"truncated"`
 	}
 	if err := json.Unmarshal([]byte(out), &result); err != nil {
 		t.Fatalf("json unmarshal: %v (output=%q)", err, out)
@@ -133,9 +132,6 @@ func TestGrepJSONFormat(t *testing.T) {
 	}
 	if result.Truncated {
 		t.Errorf("truncated: got true, want false")
-	}
-	if result.NextCursor != "" {
-		t.Errorf("next_cursor: got %q, want empty", result.NextCursor)
 	}
 }
 
@@ -415,27 +411,6 @@ func TestGrepTraversalRejected(t *testing.T) {
 	}
 	if !strings.Contains(errOut, "escapes") {
 		t.Errorf("stderr should mention escapes, got %q", errOut)
-	}
-}
-
-// ---- Cursor stub test ----
-
-func TestGrepCursorAccepted(t *testing.T) {
-	mount := t.TempDir()
-	mkfile(t, mount, "file.md", "hello world\n")
-	t.Setenv("MYCELIUM_MOUNT", mount)
-
-	// With cursor — should behave exactly the same as without.
-	outWithCursor, errOut, rc := runDispatch(t, "grep", "--pattern", "hello", "--cursor", "anything")
-	if rc != ExitOK {
-		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitOK, errOut)
-	}
-
-	// Without cursor.
-	outWithout, _, _ := runDispatch(t, "grep", "--pattern", "hello")
-
-	if outWithCursor != outWithout {
-		t.Errorf("cursor flag changed output:\nwith:    %q\nwithout: %q", outWithCursor, outWithout)
 	}
 }
 

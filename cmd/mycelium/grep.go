@@ -167,13 +167,11 @@ func grepFiles(out, errOut io.Writer, mount string, opts GrepOptions) int {
 		}
 	case "json":
 		result := struct {
-			Matches    []grepMatch `json:"matches"`
-			Truncated  bool        `json:"truncated"`
-			NextCursor string      `json:"next_cursor"`
+			Matches   []grepMatch `json:"matches"`
+			Truncated bool        `json:"truncated"`
 		}{
-			Matches:    matches,
-			Truncated:  truncated,
-			NextCursor: "",
+			Matches:   matches,
+			Truncated: truncated,
 		}
 		if result.Matches == nil {
 			result.Matches = []grepMatch{}

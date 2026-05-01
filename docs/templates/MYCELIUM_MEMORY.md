@@ -50,17 +50,17 @@ The activity log is plain JSONL. General tools work; `mycelium grep`/`ls`/`glob`
 work on the same files.
 
 ```sh
-# Today's entries from a specific agent
-mycelium grep --path _activity/$(date -u +%Y/%m/%d) '' --format=json
+# Today's entries (your agent)
+mycelium read _activity/$(date -u +%Y/%m/%d)/$MYCELIUM_AGENT_ID.jsonl
 
 # This month, all agents
 mycelium glob '_activity/2026/04/*/*.jsonl'
 
-# Find write ops by pattern
-mycelium grep --path _activity '"op":"write"' --regex --format=json
+# Find write ops
+mycelium grep --path _activity --pattern '"op":"write"' --format=json
 
 # Find signal entries with payloads (payload is inline on each entry)
-mycelium grep --path _activity --pattern context_signal --format json
+mycelium grep --path _activity --pattern context_signal --format=json
 ```
 
 Grepping your own log between sessions is how you notice duplicated writes,

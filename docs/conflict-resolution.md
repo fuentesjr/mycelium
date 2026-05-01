@@ -1,6 +1,6 @@
 # Conflict Resolution Conventions
 
-**Status:** Documentation only. Recovery guidance for the conflict envelope contract in `mycelium-design.md` § 6 and CLI § 4. The envelope shape and exit codes are the binary's contract; this doc records what to do with them.
+**Status:** Documentation only. Recovery guidance for the conflict envelope contract in section 6 and CLI section 4 of `mycelium-design.md`. The envelope shape and exit codes are the binary's contract; this doc records what to do with them.
 
 ---
 
@@ -50,4 +50,4 @@ Some conflicts can't be auto-recovered, and the agent should surface them rather
 | Agent path under reserved `_` prefix | 65 | Plain text, contains `reserved` |
 | Other failures (path escape, missing file, bad args) | 1 or 2 | Plain text |
 
-The **conflict (64)** and **reservation (65)** exit codes are stable contracts; the JSON envelope shape on 64 is documented in `mycelium-design.md` § 4. Other non-zero exits are generic failures whose specific code and stderr text may evolve.
+The **conflict (64)** and **reservation (65)** exit codes are stable contracts; the JSON envelope shape on 64 is documented in section 4 of `mycelium-design.md`. Other non-zero exits are generic failures whose specific code and stderr text may evolve.
