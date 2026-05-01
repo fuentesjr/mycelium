@@ -2,13 +2,13 @@
 
 Persistent memory for AI coding agents. A small CLI plus a daily activity log on disk: agents read and write notes via `mycelium <subcommand>`, and the log preserves context across sessions, processes, and concurrent agents.
 
-**Status:** early access (pre-1.0). The binary is correct and complete per the Phase 1 design — 337 tests including sibling-process CAS validation, property tests on the activity log, T3 failure-mode detectors, and a tarball-roundtrip test that pins the "plain files plus JSONL" contract. Benchmark validation against Frontier models runs against the released artifact rather than gating release; see `docs/benchmarks/phase-1.md`.
+**Status:** early access (pre-1.0). The binary is correct and complete per the Phase 1 design — 338 tests including sibling-process CAS validation, property tests on the activity log, T3 failure-mode detectors, and a tarball-roundtrip test that pins the "plain files plus JSONL" contract. Benchmark validation against Frontier models runs against the released artifact rather than gating release; see `docs/benchmarks/phase-1.md`.
 
 ## What's here
 
 - **`cmd/mycelium/`** — Go binary. Nine subcommands (`read`, `write`, `edit`, `ls`, `glob`, `grep`, `rm`, `mv`, `log`). Mount-level `flock`-guarded CAS, SHA-256 version tokens, JSONL activity log at `<mount>/_activity/YYYY/MM/DD/<agent>.jsonl`. Reserved `_`-prefix protects backend metadata from agent writes.
 - **`extensions/pi/`** — pi.dev extension. Sets up env vars on `session_start`, contributes a system-prompt block on `before_agent_start`, records `context_signal` entries on `context`. Registers no tools — agents invoke `mycelium` through pi's built-in `bash`.
-- **`docs/`** — design (`mycelium-design.md`), phasing (`mycelium-phases.md`), agent-facing usage (`mycelium-usage.md`), conflict-resolution conventions, self-evolution patterns, benchmark rubric.
+- **`docs/`** — design (`mycelium-design.md`), phasing (`mycelium-phases.md`), conflict-resolution conventions, self-evolution patterns, benchmark rubric.
 
 ## Install
 
@@ -53,10 +53,10 @@ Mount path is auto-detected from install location: project install mounts at `<c
 export MYCELIUM_MOUNT=$(pwd)/.mycelium-store
 export MYCELIUM_AGENT_ID=alice
 
-# Write a note (atomic, returns version + activity-log status)
+# Write a note (atomic, returns version)
 echo "incident: query latency spike correlates with deploys at 14:30" \
   | mycelium write notes/incident-2026-04-30.md
-# {"version":"sha256:...","log_status":"ok"}
+# {"version":"sha256:..."}
 
 # Read it back
 mycelium read notes/incident-2026-04-30.md
@@ -77,7 +77,6 @@ cat $MYCELIUM_MOUNT/_activity/*/*/*/alice.jsonl
 
 - [`mycelium-design.md`](mycelium-design.md) — design rationale, architecture, principles.
 - [`mycelium-phases.md`](mycelium-phases.md) — phasing roadmap; what's in scope when, and why.
-- [`mycelium-usage.md`](mycelium-usage.md) — agent-facing patterns and conventions.
 - [`docs/conflict-resolution.md`](docs/conflict-resolution.md) — multi-agent conflict-resolution conventions.
 - [`docs/self-evolution.md`](docs/self-evolution.md) — convention bootstrap, self-built indices, archiving patterns.
 - [`docs/benchmarks/phase-1.md`](docs/benchmarks/phase-1.md) — validation rubric, target models, scoring.
@@ -85,7 +84,7 @@ cat $MYCELIUM_MOUNT/_activity/*/*/*/alice.jsonl
 ## Development
 
 ```
-make test     # run the Go test suite (337 tests)
+make test     # run the Go test suite (338 tests)
 make build    # build the host-platform binary
 make dist     # cross-compile release tarballs for darwin+linux x amd64+arm64
 make clean    # remove build artifacts

@@ -64,7 +64,7 @@ The phasing rule: **every phase's scope must independently validate or extend th
 
 **In scope.**
 
-- **S3-compatible backend.** ETag as version token, `If-Match` for conditional puts, `ListObjectsV2` for `mycelium ls`. Tested against AWS S3, Cloudflare R2, and MinIO. Behavior under listing eventual consistency documented and surfaced honestly. Activity log entries written to `_activity/YYYY/MM/DD/{agent_id}.jsonl` as objects in the same bucket; per-agent path keeps log writes contention-free without coordinated appends. `Search` does prefix-scoped client-side scan with ripgrep-equivalent matching. Each operation result includes a `log_status` field (`"ok"` | `"deferred"` | `"missing"`) per design section 5; benchmarks include forced-failure scenarios that verify content/log divergence is *visible* rather than silent.
+- **S3-compatible backend.** ETag as version token, `If-Match` for conditional puts, `ListObjectsV2` for `mycelium ls`. Tested against AWS S3, Cloudflare R2, and MinIO. Behavior under listing eventual consistency documented and surfaced honestly. Activity log entries written to `_activity/YYYY/MM/DD/{agent_id}.jsonl` as objects in the same bucket; per-agent path keeps log writes contention-free without coordinated appends. `Search` does prefix-scoped client-side scan with ripgrep-equivalent matching. On activity-log append failure the binary warns to stderr and exits 0 (the content PUT has already committed); benchmarks include forced-failure scenarios that verify content/log divergence is *visible* rather than silent.
 - Activity log file format gets a documented v1 contract — a `_activity/SCHEMA.md` written by the system at mount initialization (or first write) declaring the entry shape and version. Stable interface for both downstream tooling and the agent.
 - Optional read-bytes cap with explicit override flag for `mycelium read` and a result-count cap on `mycelium grep`. Default generous; configurable per mount.
 - Backend-agnostic test suite: every concurrency, durability, and self-evolution test from Phase 1 runs against S3 with identical pass criteria.
@@ -84,8 +84,8 @@ The phasing rule: **every phase's scope must independently validate or extend th
 1. Two agents on different hosts, mounted at the same S3 prefix, can update overlapping files concurrently without silent loss.
 2. The same agent harness, with a single-line config change, runs against LocalFS and S3 with identical observable behavior on the full Phase 1 + Phase 2 task suite — including the self-evolution criterion.
 3. The activity log file format has a documented v1 contract that downstream tooling and agents can build against.
-4. The GLP-1 walkthrough from `mycelium-usage.md` runs unmodified after the user drops the `mycelium` skill in `~/.claude/skills/`, on a Frontier model in standard Claude Code with no further configuration.
-5. The same walkthrough runs unmodified on Hermes after the user installs the `mycelium` Hermes memory plugin via Hermes' standard plugin install path. The plugin's `system_prompt_block` is sufficient scaffolding — no further prompt engineering required.
+4. A multi-session research task — same shape as Phase 1's T1, run against an S3-mounted store — completes end-to-end on Claude Code after the user drops the `mycelium` skill in `~/.claude/skills/`, with no further configuration.
+5. The same task completes on Hermes after the user installs the `mycelium` Hermes memory plugin via Hermes' standard plugin install path. The plugin's `system_prompt_block` is sufficient scaffolding — no further prompt engineering required.
 
 **Decision gate after Phase 2.** Before starting Phase 3, run the benchmark suite against the strongest then-current Frontier model family on a long-running multi-agent task. If the system shows signs of capping the Frontier model — e.g., the model is fighting any feature added in Phase 1 or Phase 2 — that feature comes out before any new ones go in. **Special attention to the activity log shape:** if a Frontier model is parsing entries in ways that suggest the schema is too narrow (or too wide), revise it before it ossifies.
 
@@ -122,18 +122,6 @@ The phasing rule: **every phase's scope must independently validate or extend th
 
 ---
 
-## Phase 4 — Optional / future
-
-These items are real but neither blocking nor obviously next. Each gets pulled forward only when concrete demand justifies it.
-
-- **Binary blobs.** A separate `read_blob`/`write_blob` pair, with a clear contract that the agent reasons about blobs by path and sibling text notes. Worth doing if multimodal agents become common Mycelium users.
-- **Capability-tier eval harness as a public benchmark.** The internal harness from Phase 1 grows into a published benchmark for "how well does this model use a filesystem as memory, and at what tier does it begin to self-evolve?" Useful both for the project and the broader field, but it's a product in its own right.
-- **Garbage-collection prompts as a documented operator pattern.** A repository of "housekeeping" prompts operators run periodically (`"glob _activity/*/*/*/*.jsonl, find files not modified in 90 days, decide what to consolidate or delete"`). Operator instructions, not infrastructure.
-- **Cross-region replication patterns documented for the S3 backend.** Only when there's a deployment that needs it. Mycelium relies on S3's native replication; what we'd add is a documented pattern for keeping `_activity/` consistent across regions.
-- **Read-only knowledge sharing UX polish.** The mount-manifest plumbing lands in Phase 3; the UX (browser, viewer, share-link semantics) is its own design exercise.
-
----
-
 ## What stays absent across all phases
 
 These are restated from the design's anti-goals because phasing pressure is exactly when they get smuggled back in:
@@ -157,6 +145,5 @@ If a phase ships any of the above, the phase is wrong and the design is broken. 
 | 1     | MVP: multi-agent + multi-session + self-evolution | The core bet pays off under realistic conditions, including agent reflection | LocalFS + `mycelium` CLI + CAS + reserved `_activity/` + ripgrep + pi.dev extension |
 | 2     | Durable storage + harness distribution            | The bet survives cloud storage and ships to general users | + S3 + log format versioning + Hermes plugin + Claude Code skill   |
 | 3     | Production polish + integration                   | The system fits into normal engineering workflows        | + git/jj, layered, ACLs, historical reads          |
-| 4     | Demand-driven extensions                          | Specific pull from real users                            | Case-by-case                                       |
 
 The decision gate at the end of Phase 2 is the most important moment in the roadmap. If a Frontier model is bottlenecked by anything Mycelium added — including the activity log shape — that thing comes out. The whole design only works if that rule is honored.
