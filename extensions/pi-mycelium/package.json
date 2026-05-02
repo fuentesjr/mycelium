@@ -1,6 +1,6 @@
 {
   "name": "pi-mycelium",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Pi.dev extension for Mycelium agent memory",
   "type": "module",
   "main": "index.ts",
@@ -17,10 +17,10 @@
     "@mariozechner/pi-coding-agent": "*"
   },
   "optionalDependencies": {
-    "@fuentesjr/mycelium-cli-darwin-arm64": "0.1.1",
-    "@fuentesjr/mycelium-cli-darwin-amd64": "0.1.1",
-    "@fuentesjr/mycelium-cli-linux-arm64": "0.1.1",
-    "@fuentesjr/mycelium-cli-linux-amd64": "0.1.1"
+    "@fuentesjr/mycelium-cli-darwin-arm64": "0.1.2",
+    "@fuentesjr/mycelium-cli-darwin-amd64": "0.1.2",
+    "@fuentesjr/mycelium-cli-linux-arm64": "0.1.2",
+    "@fuentesjr/mycelium-cli-linux-amd64": "0.1.2"
   },
   "devDependencies": {
     "@mariozechner/pi-coding-agent": "*",

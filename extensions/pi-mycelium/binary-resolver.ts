@@ -5,6 +5,14 @@ import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 
 const require = createRequire(import.meta.url);
 
+// Map Node's process.arch values to the Go GOARCH names embedded in our
+// platform package names. The npm `cpu` field uses Node names (`x64`, `arm64`),
+// but the binary tarballs and package names use Go names (`amd64`, `arm64`).
+const NODE_TO_GO_ARCH: Record<string, string> = {
+  x64: "amd64",
+  arm64: "arm64",
+};
+
 /**
  * Resolve the bundled mycelium binary shipped via the matching
  * `@fuentesjr/mycelium-cli-<platform>-<arch>` optional dependency. Returns the
@@ -12,7 +20,9 @@ const require = createRequire(import.meta.url);
  * user is on an unsupported platform, or the optional dep was skipped).
  */
 export function resolveBundledBinary(): string | null {
-  const pkgName = `@fuentesjr/mycelium-cli-${process.platform}-${process.arch}`;
+  const goarch = NODE_TO_GO_ARCH[process.arch];
+  if (!goarch) return null;
+  const pkgName = `@fuentesjr/mycelium-cli-${process.platform}-${goarch}`;
   try {
     const pkgJson = require.resolve(`${pkgName}/package.json`);
     const bin = path.join(path.dirname(pkgJson), "mycelium");
