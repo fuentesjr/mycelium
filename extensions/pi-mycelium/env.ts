@@ -1,9 +1,9 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import type { MyceliumConfig } from "./config.js";
+import { resolveMyceliumBinary } from "./binary-resolver.js";
 
-export async function isBinaryAvailable(pi: ExtensionAPI): Promise<boolean> {
-  const r = await pi.exec("which", ["mycelium"]);
-  return r.code === 0;
+export async function resolveBinary(pi: ExtensionAPI): Promise<string | null> {
+  return resolveMyceliumBinary(pi);
 }
 
 export function setupEnv(config: MyceliumConfig, sessionLeafId: string | null): void {

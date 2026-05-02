@@ -9,10 +9,11 @@ import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
  */
 export async function runMyceliumJSON<T>(
   pi: ExtensionAPI,
+  binaryPath: string,
   args: string[],
 ): Promise<T | null> {
   try {
-    const r = await pi.exec("mycelium", args);
+    const r = await pi.exec(binaryPath, args);
     if (r.code !== 0) return null;
     const text = r.stdout.trim();
     if (!text) return null;
@@ -31,10 +32,11 @@ export async function runMyceliumJSON<T>(
  */
 export async function runMyceliumNDJSON<T>(
   pi: ExtensionAPI,
+  binaryPath: string,
   args: string[],
 ): Promise<T[]> {
   try {
-    const r = await pi.exec("mycelium", args);
+    const r = await pi.exec(binaryPath, args);
     if (r.code !== 0) return [];
     const lines = r.stdout.split("\n");
     const results: T[] = [];

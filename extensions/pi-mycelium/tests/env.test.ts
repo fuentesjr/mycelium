@@ -1,8 +1,17 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { isBinaryAvailable, setupEnv } from "../env.js";
-import type { MyceliumConfig } from "../config.js";
 import { execResult } from "./helpers.js";
+import type { MyceliumConfig } from "../config.js";
+
+// Module-level mock must come before importing the module under test.
+vi.mock("../binary-resolver.js", () => ({
+  resolveBundledBinary: vi.fn(() => null),
+  resolveMyceliumBinary: vi.fn(async () => null),
+}));
+
+// Import after the mock declaration so the mock is in place.
+import { resolveBinary, setupEnv } from "../env.js";
+import { resolveMyceliumBinary } from "../binary-resolver.js";
 
 const cfg: MyceliumConfig = { scope: "project", mountPath: "/tmp/store" };
 
@@ -48,15 +57,31 @@ describe("setupEnv", () => {
   });
 });
 
-describe("isBinaryAvailable", () => {
-  it("returns true when `which mycelium` exits 0", async () => {
-    const pi = { exec: vi.fn(async () => execResult(0)) } as unknown as ExtensionAPI;
-    expect(await isBinaryAvailable(pi)).toBe(true);
-    expect(pi.exec).toHaveBeenCalledWith("which", ["mycelium"]);
+describe("resolveBinary", () => {
+  const mockResolve = vi.mocked(resolveMyceliumBinary);
+
+  it("returns the bundled binary path when the optional package is installed", async () => {
+    mockResolve.mockResolvedValueOnce("/bundled/mycelium");
+    const pi = { exec: vi.fn() } as unknown as ExtensionAPI;
+    const result = await resolveBinary(pi);
+    expect(result).toBe("/bundled/mycelium");
   });
 
-  it("returns false when `which mycelium` exits non-zero", async () => {
-    const pi = { exec: vi.fn(async () => execResult(1)) } as unknown as ExtensionAPI;
-    expect(await isBinaryAvailable(pi)).toBe(false);
+  it("falls back to PATH when bundled binary is absent but `which mycelium` succeeds", async () => {
+    mockResolve.mockResolvedValueOnce("/usr/local/bin/mycelium");
+    const pi = {
+      exec: vi.fn(async () => execResult(0, "/usr/local/bin/mycelium")),
+    } as unknown as ExtensionAPI;
+    const result = await resolveBinary(pi);
+    expect(result).toBe("/usr/local/bin/mycelium");
+  });
+
+  it("returns null when both bundled and PATH lookups fail", async () => {
+    mockResolve.mockResolvedValueOnce(null);
+    const pi = {
+      exec: vi.fn(async () => execResult(1)),
+    } as unknown as ExtensionAPI;
+    const result = await resolveBinary(pi);
+    expect(result).toBeNull();
   });
 });

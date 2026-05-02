@@ -6,6 +6,7 @@ import type {
 
 export async function recordContextSignal(
   pi: ExtensionAPI,
+  binaryPath: string,
   event: ContextEvent,
 ): Promise<void> {
   const messages = event.messages;
@@ -14,7 +15,7 @@ export async function recordContextSignal(
   if (last && "role" in last && typeof last.role === "string") {
     payload.lastRole = last.role;
   }
-  await pi.exec("mycelium", [
+  await pi.exec(binaryPath, [
     "log",
     "context_signal",
     "--payload-json",
@@ -30,8 +31,9 @@ const BOUNDARY_REASONS: ReadonlySet<SessionStartEvent["reason"]> = new Set([
 
 export async function recordSessionBoundary(
   pi: ExtensionAPI,
+  binaryPath: string,
   reason: SessionStartEvent["reason"],
 ): Promise<void> {
   if (!BOUNDARY_REASONS.has(reason)) return;
-  await pi.exec("mycelium", ["log", `session_${reason}`]);
+  await pi.exec(binaryPath, ["log", `session_${reason}`]);
 }

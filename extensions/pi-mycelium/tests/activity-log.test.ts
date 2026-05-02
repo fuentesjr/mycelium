@@ -10,6 +10,8 @@ import {
 } from "../activity-log.js";
 import { execResult } from "./helpers.js";
 
+const BINARY_PATH = "/resolved/mycelium";
+
 function makeContextEvent(messages: ContextEvent["messages"]): ContextEvent {
   return { type: "context", messages };
 }
@@ -20,6 +22,7 @@ describe("recordContextSignal", () => {
     const pi = { exec } as unknown as ExtensionAPI;
     await recordContextSignal(
       pi,
+      BINARY_PATH,
       makeContextEvent([
         { role: "user", content: "hi", timestamp: 0 },
         {
@@ -51,7 +54,7 @@ describe("recordContextSignal", () => {
     );
 
     expect(exec).toHaveBeenCalledTimes(1);
-    expect(exec).toHaveBeenCalledWith("mycelium", [
+    expect(exec).toHaveBeenCalledWith(BINARY_PATH, [
       "log",
       "context_signal",
       "--payload-json",
@@ -62,9 +65,9 @@ describe("recordContextSignal", () => {
   it("omits lastRole when the messages array is empty", async () => {
     const exec = vi.fn(async () => execResult(0));
     const pi = { exec } as unknown as ExtensionAPI;
-    await recordContextSignal(pi, makeContextEvent([]));
+    await recordContextSignal(pi, BINARY_PATH, makeContextEvent([]));
 
-    expect(exec).toHaveBeenCalledWith("mycelium", [
+    expect(exec).toHaveBeenCalledWith(BINARY_PATH, [
       "log",
       "context_signal",
       "--payload-json",
@@ -86,9 +89,9 @@ describe("recordSessionBoundary", () => {
     it(`${expectedOp ? "logs" : "skips"} for reason=${reason}`, async () => {
       const exec = vi.fn(async () => execResult(0));
       const pi = { exec } as unknown as ExtensionAPI;
-      await recordSessionBoundary(pi, reason);
+      await recordSessionBoundary(pi, BINARY_PATH, reason);
       if (expectedOp) {
-        expect(exec).toHaveBeenCalledWith("mycelium", ["log", expectedOp]);
+        expect(exec).toHaveBeenCalledWith(BINARY_PATH, ["log", expectedOp]);
       } else {
         expect(exec).not.toHaveBeenCalled();
       }

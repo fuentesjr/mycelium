@@ -19,6 +19,8 @@ type AnyHandler = (event: unknown, ctx: ExtensionContext) => unknown;
 // Fixtures
 // ---------------------------------------------------------------------------
 
+const RESOLVED_BINARY = "/usr/local/bin/mycelium";
+
 const sampleKinds: EvolutionKindRow[] = [
   {
     name: "convention",
@@ -62,21 +64,24 @@ function makeRegistration(
   return { exec, handlers };
 }
 
-/** Default exec that:
- *  - passes `which mycelium` (binary available)
- *  - returns sampleKinds JSON for `--kinds`
- *  - returns one active event NDJSON for `--active`
- *  - returns success for everything else
+/**
+ * Default exec that:
+ * - passes `which mycelium` → returns the resolved binary path
+ * - returns sampleKinds JSON for `--kinds`
+ * - returns one active event NDJSON for `--active`
+ * - returns success for everything else
+ *
+ * The first arg will be "which" for the PATH lookup, and RESOLVED_BINARY
+ * (or any non-"which" string) for actual mycelium invocations.
  */
 function defaultExec(cmd: string, args: string[]): Promise<ExecResult> {
-  if (cmd === "which") return Promise.resolve(execResult(0));
-  if (cmd === "mycelium") {
-    if (args.includes("--kinds")) {
-      return Promise.resolve(execResult(0, JSON.stringify(sampleKinds)));
-    }
-    if (args.includes("--active")) {
-      return Promise.resolve(execResult(0, JSON.stringify(sampleActiveEvent)));
-    }
+  if (cmd === "which") return Promise.resolve(execResult(0, RESOLVED_BINARY));
+  // Any other first arg is the resolved binary path
+  if (args.includes("--kinds")) {
+    return Promise.resolve(execResult(0, JSON.stringify(sampleKinds)));
+  }
+  if (args.includes("--active")) {
+    return Promise.resolve(execResult(0, JSON.stringify(sampleActiveEvent)));
   }
   return Promise.resolve(execResult(0));
 }
@@ -154,6 +159,18 @@ describe("pi extension factory", () => {
     expect(result.systemPrompt).toContain("UNAVAILABLE");
   });
 
+  it("emits the UNAVAILABLE block when resolveMyceliumBinary returns null (no bundled, which fails)", async () => {
+    // All exec calls fail — which fails and there's no bundled binary
+    const { handlers } = makeRegistration(async () => execResult(1));
+    await handlers.get("session_start")!(makeSessionStartEvent(), ctx);
+    const result = (await handlers.get("before_agent_start")!(
+      makeBeforeAgentStartEvent("PREFIX"),
+      ctx,
+    )) as BeforeAgentStartEventResult;
+    expect(result.systemPrompt).toContain("UNAVAILABLE");
+    expect(result.systemPrompt?.startsWith("PREFIX\n\n")).toBe(true);
+  });
+
   it("context handler calls mycelium log and returns undefined", async () => {
     const { exec, handlers } = makeRegistration(defaultExec);
     await handlers.get("session_start")!(makeSessionStartEvent(), ctx);
@@ -183,7 +200,7 @@ describe("pi extension factory", () => {
       ctx,
     );
     expect(result).toBeUndefined();
-    expect(exec).toHaveBeenCalledWith("mycelium", [
+    expect(exec).toHaveBeenCalledWith(RESOLVED_BINARY, [
       "log",
       "context_signal",
       "--payload-json",
@@ -206,7 +223,7 @@ describe("pi extension factory", () => {
   it("logs session_new for reason=new when binary is available", async () => {
     const { exec, handlers } = makeRegistration(defaultExec);
     await handlers.get("session_start")!(makeSessionStartEvent("new"), ctx);
-    expect(exec).toHaveBeenCalledWith("mycelium", ["log", "session_new"]);
+    expect(exec).toHaveBeenCalledWith(RESOLVED_BINARY, ["log", "session_new"]);
   });
 
   it("does not log a boundary for reason=startup", async () => {
@@ -237,7 +254,7 @@ describe("pi extension factory", () => {
     await handlers.get("session_start")!(makeSessionStartEvent(), ctx);
     exec.mockClear();
     await handlers.get("before_agent_start")!(makeBeforeAgentStartEvent(""), ctx);
-    expect(exec).toHaveBeenCalledWith("mycelium", ["evolution", "--kinds", "--format", "json"]);
+    expect(exec).toHaveBeenCalledWith(RESOLVED_BINARY, ["evolution", "--kinds", "--format", "json"]);
   });
 
   it("invokes mycelium evolution --active --format json in before_agent_start", async () => {
@@ -245,7 +262,7 @@ describe("pi extension factory", () => {
     await handlers.get("session_start")!(makeSessionStartEvent(), ctx);
     exec.mockClear();
     await handlers.get("before_agent_start")!(makeBeforeAgentStartEvent(""), ctx);
-    expect(exec).toHaveBeenCalledWith("mycelium", ["evolution", "--active", "--format", "json"]);
+    expect(exec).toHaveBeenCalledWith(RESOLVED_BINARY, ["evolution", "--active", "--format", "json"]);
   });
 
   it("passes kinds payload into the system prompt when binary returns data", async () => {
@@ -274,9 +291,9 @@ describe("pi extension factory", () => {
 
   it("falls through with empty arrays when --kinds call fails (non-zero exit)", async () => {
     const { handlers } = makeRegistration(async (cmd, args) => {
-      if (cmd === "which") return execResult(0);
-      if (cmd === "mycelium" && args.includes("--kinds")) return execResult(1);
-      if (cmd === "mycelium" && args.includes("--active"))
+      if (cmd === "which") return execResult(0, RESOLVED_BINARY);
+      if (args.includes("--kinds")) return execResult(1);
+      if (args.includes("--active"))
         return execResult(0, JSON.stringify(sampleActiveEvent));
       return execResult(0);
     });
@@ -293,10 +310,10 @@ describe("pi extension factory", () => {
 
   it("falls through with empty arrays when --active call fails (non-zero exit)", async () => {
     const { handlers } = makeRegistration(async (cmd, args) => {
-      if (cmd === "which") return execResult(0);
-      if (cmd === "mycelium" && args.includes("--kinds"))
+      if (cmd === "which") return execResult(0, RESOLVED_BINARY);
+      if (args.includes("--kinds"))
         return execResult(0, JSON.stringify(sampleKinds));
-      if (cmd === "mycelium" && args.includes("--active")) return execResult(1);
+      if (args.includes("--active")) return execResult(1);
       return execResult(0);
     });
     await handlers.get("session_start")!(makeSessionStartEvent(), ctx);
@@ -312,7 +329,7 @@ describe("pi extension factory", () => {
 
   it("falls through with empty arrays when both evolution calls fail", async () => {
     const { handlers } = makeRegistration(async (cmd) => {
-      if (cmd === "which") return execResult(0);
+      if (cmd === "which") return execResult(0, RESOLVED_BINARY);
       // All mycelium calls fail
       return execResult(1);
     });
@@ -332,8 +349,9 @@ describe("pi extension factory", () => {
     await handlers.get("session_start")!(makeSessionStartEvent(), ctx);
     exec.mockClear();
     await handlers.get("before_agent_start")!(makeBeforeAgentStartEvent(""), ctx);
+    // No calls should have been made with evolution args
     const evolutionCalls = exec.mock.calls.filter(
-      ([cmd, args]) => cmd === "mycelium" && Array.isArray(args) && args[0] === "evolution",
+      ([, args]) => Array.isArray(args) && args[0] === "evolution",
     );
     expect(evolutionCalls).toHaveLength(0);
   });
