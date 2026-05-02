@@ -67,7 +67,10 @@ jobs:
         run: cd cmd/mycelium && go test ./...
 
       - name: Run TypeScript tests
-        run: cd extensions/pi-mycelium && npm ci && npm test
+        # Use `npm install` rather than `npm ci`: optionalDependencies pin
+        # to the just-being-cut version, which isn't on the registry until
+        # the publish step runs later in this same job.
+        run: cd extensions/pi-mycelium && npm install --no-audit --no-fund && npm test
 
       - name: Build cross-platform binaries and npm platform packages
         run: make npm-dist VERSION=${{ github.ref_name }}
@@ -83,14 +86,28 @@ jobs:
 
       - name: Publish platform packages to npm
         run: |
+          ver="${{ github.ref_name }}"
+          ver="${ver#v}"
           for plat in darwin-arm64 darwin-amd64 linux-arm64 linux-amd64; do
-            echo "Publishing @fuentesjr/mycelium-cli-$plat ..."
+            pkg="@fuentesjr/mycelium-cli-$plat"
+            if npm view "$pkg@$ver" version >/dev/null 2>&1; then
+              echo "$pkg@$ver already published, skipping"
+              continue
+            fi
+            echo "Publishing $pkg@$ver ..."
             (cd dist/npm/cli-$plat && npm publish --access=public)
           done
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish meta package to npm
-        run: cd extensions/pi-mycelium && npm publish --access=public
+        run: |
+          ver="${{ github.ref_name }}"
+          ver="${ver#v}"
+          if npm view "pi-mycelium@$ver" version >/dev/null 2>&1; then
+            echo "pi-mycelium@$ver already published, skipping"
+            exit 0
+          fi
+          cd extensions/pi-mycelium && npm publish --access=public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

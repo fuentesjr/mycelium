@@ -1,6 +1,6 @@
 .PHONY: build test dist clean npm-dist npm-publish
 
-VERSION ?= v0.1.0
+VERSION ?= v0.1.1
 DIST    := dist
 CMD     := cmd/mycelium
 NPM_DIR := $(DIST)/npm
