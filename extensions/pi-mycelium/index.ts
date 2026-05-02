@@ -15,7 +15,7 @@ export default function (pi: ExtensionAPI) {
     mountPath = cfg.mountPath;
     binaryPath = await resolveBinary(pi);
     if (binaryPath) {
-      setupEnv(cfg, ctx.sessionManager.getLeafId());
+      setupEnv(cfg, ctx.sessionManager.getLeafId(), binaryPath);
       await recordSessionBoundary(pi, binaryPath, event.reason);
     }
   });

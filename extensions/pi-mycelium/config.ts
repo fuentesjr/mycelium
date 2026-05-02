@@ -43,8 +43,8 @@ export function detectScope(filePath: string, cwd: string): Scope {
 
 export function mountPathFor(scope: Scope, cwd: string): string {
   return scope === "global"
-    ? path.join(os.homedir(), ".pi", "mycelium", "store")
-    : path.join(cwd, ".pi", "mycelium", "store");
+    ? path.join(os.homedir(), ".pi", "agent", "extensions", "pi-mycelium", "journal")
+    : path.join(cwd, ".pi", "pi-mycelium", "journal");
 }
 
 export function resolveConfig(cwd: string): MyceliumConfig {

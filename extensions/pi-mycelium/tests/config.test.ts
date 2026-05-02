@@ -49,15 +49,15 @@ describe("detectScope", () => {
 });
 
 describe("mountPathFor", () => {
-  it("uses ~/.pi/mycelium/store for global scope", () => {
+  it("uses ~/.pi/agent/extensions/pi-mycelium/journal for global scope", () => {
     expect(mountPathFor("global", "/some/cwd")).toBe(
-      path.join(os.homedir(), ".pi", "mycelium", "store"),
+      path.join(os.homedir(), ".pi", "agent", "extensions", "pi-mycelium", "journal"),
     );
   });
 
-  it("uses <cwd>/.pi/mycelium/store for project scope", () => {
+  it("uses <cwd>/.pi/pi-mycelium/journal for project scope", () => {
     expect(mountPathFor("project", "/some/cwd")).toBe(
-      path.join("/some/cwd", ".pi", "mycelium", "store"),
+      path.join("/some/cwd", ".pi", "pi-mycelium", "journal"),
     );
   });
 });

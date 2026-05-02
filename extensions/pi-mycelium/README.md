@@ -6,13 +6,13 @@ no manual install or PATH setup required.
 
 ## Install
 
-Global install (mount at `~/.pi/mycelium/store/`, available in every project):
+Global install (mount at `~/.pi/agent/extensions/pi-mycelium/journal/`, available in every project):
 
 ```bash
 pi install npm:pi-mycelium
 ```
 
-Project-local install (mount at `<repo>/.pi/mycelium/store/`):
+Project-local install (mount at `<repo>/.pi/pi-mycelium/journal/`):
 
 ```bash
 pi install npm:pi-mycelium -l
@@ -53,8 +53,8 @@ Auto-detected from where the extension is installed:
 
 | Install scope | Extension path | Mount path |
 | --- | --- | --- |
-| Global | `~/.pi/agent/extensions/` | `~/.pi/mycelium/store/` |
-| Project | `<repo>/.pi/extensions/` | `<repo>/.pi/mycelium/store/` |
+| Global | `~/.pi/agent/extensions/` | `~/.pi/agent/extensions/pi-mycelium/journal/` |
+| Project | `<repo>/.pi/extensions/` | `<repo>/.pi/pi-mycelium/journal/` |
 
 Detection compares `import.meta.url` against `~/.pi/agent/extensions/`.
 A locally-checked-out copy loaded via `pi -e ./path.ts` is treated as project.

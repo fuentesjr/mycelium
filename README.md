@@ -36,10 +36,10 @@ go install ./cmd/mycelium
 The extension ships on npm and bundles the platform-matching `mycelium` binary as an optional dependency — no separate binary install or PATH setup needed.
 
 ```
-# Global — available in every pi session, mounts at ~/.pi/mycelium/store/
+# Global — available in every pi session, mounts at ~/.pi/agent/extensions/pi-mycelium/journal/
 pi install npm:pi-mycelium
 
-# Or project-local — mounts at <cwd>/.pi/mycelium/store/
+# Or project-local — mounts at <cwd>/.pi/pi-mycelium/journal/
 pi install npm:pi-mycelium -l
 ```
 
