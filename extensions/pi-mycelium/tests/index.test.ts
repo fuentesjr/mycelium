@@ -11,12 +11,49 @@ import type {
 } from "@mariozechner/pi-coding-agent";
 import register from "../index.js";
 import { execResult } from "./helpers.js";
+import type { EvolutionKindRow, ActiveEvolutionEvent } from "../system-prompt.js";
 
 type AnyHandler = (event: unknown, ctx: ExtensionContext) => unknown;
 
-function makeRegistration(execImpl: (cmd: string, args: string[]) => Promise<ExecResult>) {
+// ---------------------------------------------------------------------------
+// Fixtures
+// ---------------------------------------------------------------------------
+
+const sampleKinds: EvolutionKindRow[] = [
+  {
+    name: "convention",
+    definition: "A naming, layout, or structural pattern.",
+    defined_at_version: "0.1.0",
+    source: "builtin",
+    event_count: 1,
+  },
+];
+
+const sampleActiveEvent: ActiveEvolutionEvent = {
+  ts: "2026-05-02T14:00:00Z",
+  agent_id: "pi-agent",
+  session_id: "s1",
+  op: "evolve",
+  id: "01HXKP4Z9M8YV1W6E2RTSA9KFG",
+  kind: "convention",
+  target: "notes/",
+  rationale: "Use date-slug filenames.",
+};
+
+// ---------------------------------------------------------------------------
+// Factory helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a pi registration whose exec mock dispatches based on the args passed.
+ * `routedExec` receives (cmd, args) and returns the ExecResult to use for that
+ * call. Defaults to execResult(0) for unrecognised calls.
+ */
+function makeRegistration(
+  routedExec: (cmd: string, args: string[]) => Promise<ExecResult> = async () => execResult(0),
+) {
   const handlers = new Map<string, AnyHandler>();
-  const exec = vi.fn(execImpl);
+  const exec = vi.fn(routedExec);
   const pi = {
     on: vi.fn((event: string, fn: AnyHandler) => handlers.set(event, fn)),
     exec,
@@ -24,6 +61,29 @@ function makeRegistration(execImpl: (cmd: string, args: string[]) => Promise<Exe
   register(pi);
   return { exec, handlers };
 }
+
+/** Default exec that:
+ *  - passes `which mycelium` (binary available)
+ *  - returns sampleKinds JSON for `--kinds`
+ *  - returns one active event NDJSON for `--active`
+ *  - returns success for everything else
+ */
+function defaultExec(cmd: string, args: string[]): Promise<ExecResult> {
+  if (cmd === "which") return Promise.resolve(execResult(0));
+  if (cmd === "mycelium") {
+    if (args.includes("--kinds")) {
+      return Promise.resolve(execResult(0, JSON.stringify(sampleKinds)));
+    }
+    if (args.includes("--active")) {
+      return Promise.resolve(execResult(0, JSON.stringify(sampleActiveEvent)));
+    }
+  }
+  return Promise.resolve(execResult(0));
+}
+
+// ---------------------------------------------------------------------------
+// Context / event builders
+// ---------------------------------------------------------------------------
 
 const ctx = {
   cwd: "/test/cwd",
@@ -49,6 +109,10 @@ function makeContextEvent(messages: ContextEvent["messages"]): ContextEvent {
   return { type: "context", messages };
 }
 
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
 describe("pi extension factory", () => {
   const original = { ...process.env };
 
@@ -70,7 +134,7 @@ describe("pi extension factory", () => {
   });
 
   it("chains before_agent_start systemPrompt off the incoming event", async () => {
-    const { handlers } = makeRegistration(async () => execResult(0));
+    const { handlers } = makeRegistration(defaultExec);
     await handlers.get("session_start")!(makeSessionStartEvent(), ctx);
     const result = (await handlers.get("before_agent_start")!(
       makeBeforeAgentStartEvent("EXISTING-CONTENT"),
@@ -91,7 +155,7 @@ describe("pi extension factory", () => {
   });
 
   it("context handler calls mycelium log and returns undefined", async () => {
-    const { exec, handlers } = makeRegistration(async () => execResult(0));
+    const { exec, handlers } = makeRegistration(defaultExec);
     await handlers.get("session_start")!(makeSessionStartEvent(), ctx);
     exec.mockClear();
     const result = await handlers.get("context")!(
@@ -140,16 +204,17 @@ describe("pi extension factory", () => {
   });
 
   it("logs session_new for reason=new when binary is available", async () => {
-    const { exec, handlers } = makeRegistration(async () => execResult(0));
+    const { exec, handlers } = makeRegistration(defaultExec);
     await handlers.get("session_start")!(makeSessionStartEvent("new"), ctx);
     expect(exec).toHaveBeenCalledWith("mycelium", ["log", "session_new"]);
   });
 
   it("does not log a boundary for reason=startup", async () => {
-    const { exec, handlers } = makeRegistration(async () => execResult(0));
+    const { exec, handlers } = makeRegistration(defaultExec);
     await handlers.get("session_start")!(makeSessionStartEvent("startup"), ctx);
     const boundaryCalls = exec.mock.calls.filter(
-      ([, args]) => Array.isArray(args) && args[0] === "log" && typeof args[1] === "string" && args[1].startsWith("session_"),
+      ([, args]) =>
+        Array.isArray(args) && args[0] === "log" && typeof args[1] === "string" && args[1].startsWith("session_"),
     );
     expect(boundaryCalls).toHaveLength(0);
   });
@@ -161,5 +226,115 @@ describe("pi extension factory", () => {
       ([, args]) => Array.isArray(args) && args[0] === "log",
     );
     expect(boundaryCalls).toHaveLength(0);
+  });
+
+  // -------------------------------------------------------------------------
+  // Evolution binary calls wiring
+  // -------------------------------------------------------------------------
+
+  it("invokes mycelium evolution --kinds --format json in before_agent_start", async () => {
+    const { exec, handlers } = makeRegistration(defaultExec);
+    await handlers.get("session_start")!(makeSessionStartEvent(), ctx);
+    exec.mockClear();
+    await handlers.get("before_agent_start")!(makeBeforeAgentStartEvent(""), ctx);
+    expect(exec).toHaveBeenCalledWith("mycelium", ["evolution", "--kinds", "--format", "json"]);
+  });
+
+  it("invokes mycelium evolution --active --format json in before_agent_start", async () => {
+    const { exec, handlers } = makeRegistration(defaultExec);
+    await handlers.get("session_start")!(makeSessionStartEvent(), ctx);
+    exec.mockClear();
+    await handlers.get("before_agent_start")!(makeBeforeAgentStartEvent(""), ctx);
+    expect(exec).toHaveBeenCalledWith("mycelium", ["evolution", "--active", "--format", "json"]);
+  });
+
+  it("passes kinds payload into the system prompt when binary returns data", async () => {
+    const { handlers } = makeRegistration(defaultExec);
+    await handlers.get("session_start")!(makeSessionStartEvent(), ctx);
+    const result = (await handlers.get("before_agent_start")!(
+      makeBeforeAgentStartEvent(""),
+      ctx,
+    )) as BeforeAgentStartEventResult;
+    // sampleKinds contains "convention" — should appear in the kinds table
+    expect(result.systemPrompt).toContain("`convention`");
+    expect(result.systemPrompt).toContain("builtin");
+  });
+
+  it("passes active evolution payload into the system prompt when binary returns data", async () => {
+    const { handlers } = makeRegistration(defaultExec);
+    await handlers.get("session_start")!(makeSessionStartEvent(), ctx);
+    const result = (await handlers.get("before_agent_start")!(
+      makeBeforeAgentStartEvent(""),
+      ctx,
+    )) as BeforeAgentStartEventResult;
+    expect(result.systemPrompt).toContain("[convention]");
+    expect(result.systemPrompt).toContain("notes/");
+    expect(result.systemPrompt).toContain("Use date-slug filenames.");
+  });
+
+  it("falls through with empty arrays when --kinds call fails (non-zero exit)", async () => {
+    const { handlers } = makeRegistration(async (cmd, args) => {
+      if (cmd === "which") return execResult(0);
+      if (cmd === "mycelium" && args.includes("--kinds")) return execResult(1);
+      if (cmd === "mycelium" && args.includes("--active"))
+        return execResult(0, JSON.stringify(sampleActiveEvent));
+      return execResult(0);
+    });
+    await handlers.get("session_start")!(makeSessionStartEvent(), ctx);
+    const result = (await handlers.get("before_agent_start")!(
+      makeBeforeAgentStartEvent(""),
+      ctx,
+    )) as BeforeAgentStartEventResult;
+    // Should not crash; should show the empty-state kinds message
+    expect(result.systemPrompt).toContain("Evolution surface unavailable");
+    // Active data should still render
+    expect(result.systemPrompt).toContain("[convention]");
+  });
+
+  it("falls through with empty arrays when --active call fails (non-zero exit)", async () => {
+    const { handlers } = makeRegistration(async (cmd, args) => {
+      if (cmd === "which") return execResult(0);
+      if (cmd === "mycelium" && args.includes("--kinds"))
+        return execResult(0, JSON.stringify(sampleKinds));
+      if (cmd === "mycelium" && args.includes("--active")) return execResult(1);
+      return execResult(0);
+    });
+    await handlers.get("session_start")!(makeSessionStartEvent(), ctx);
+    const result = (await handlers.get("before_agent_start")!(
+      makeBeforeAgentStartEvent(""),
+      ctx,
+    )) as BeforeAgentStartEventResult;
+    // Should not crash; kinds render normally
+    expect(result.systemPrompt).toContain("`convention`");
+    // Active section shows empty-state message
+    expect(result.systemPrompt).toContain("No active evolution recorded yet");
+  });
+
+  it("falls through with empty arrays when both evolution calls fail", async () => {
+    const { handlers } = makeRegistration(async (cmd) => {
+      if (cmd === "which") return execResult(0);
+      // All mycelium calls fail
+      return execResult(1);
+    });
+    await handlers.get("session_start")!(makeSessionStartEvent(), ctx);
+    // Should not throw
+    const result = (await handlers.get("before_agent_start")!(
+      makeBeforeAgentStartEvent(""),
+      ctx,
+    )) as BeforeAgentStartEventResult;
+    expect(result.systemPrompt).toBeDefined();
+    expect(result.systemPrompt).toContain("Evolution surface unavailable");
+    expect(result.systemPrompt).toContain("No active evolution recorded yet");
+  });
+
+  it("does not invoke evolution calls when binary is missing", async () => {
+    const { exec, handlers } = makeRegistration(async () => execResult(1));
+    await handlers.get("session_start")!(makeSessionStartEvent(), ctx);
+    exec.mockClear();
+    await handlers.get("before_agent_start")!(makeBeforeAgentStartEvent(""), ctx);
+    const evolutionCalls = exec.mock.calls.filter(
+      ([cmd, args]) => cmd === "mycelium" && Array.isArray(args) && args[0] === "evolution",
+    );
+    expect(evolutionCalls).toHaveLength(0);
   });
 });

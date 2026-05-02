@@ -2,7 +2,9 @@ import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { resolveConfig } from "./config.js";
 import { isBinaryAvailable, setupEnv } from "./env.js";
 import { systemPromptAvailable, systemPromptUnavailable } from "./system-prompt.js";
+import type { EvolutionKindRow, ActiveEvolutionEvent } from "./system-prompt.js";
 import { recordContextSignal, recordSessionBoundary } from "./activity-log.js";
+import { runMyceliumJSON, runMyceliumNDJSON } from "./mycelium.js";
 
 export default function (pi: ExtensionAPI) {
   let binaryAvailable = false;
@@ -19,13 +21,25 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on("before_agent_start", async (event, _ctx) => {
-    const block = binaryAvailable
-      ? systemPromptAvailable({
-          mountPath,
-          agentId: process.env.MYCELIUM_AGENT_ID!,
-          sessionId: process.env.MYCELIUM_SESSION_ID!,
-        })
-      : systemPromptUnavailable({ mountPath });
+    if (!binaryAvailable) {
+      return { systemPrompt: event.systemPrompt + "\n\n" + systemPromptUnavailable({ mountPath }) };
+    }
+
+    const [kinds, activeEvolution] = await Promise.all([
+      runMyceliumJSON<EvolutionKindRow[]>(pi, ["evolution", "--kinds", "--format", "json"]).then(
+        (r) => r ?? [],
+      ),
+      runMyceliumNDJSON<ActiveEvolutionEvent>(pi, ["evolution", "--active", "--format", "json"]),
+    ]);
+
+    const block = systemPromptAvailable({
+      mountPath,
+      agentId: process.env.MYCELIUM_AGENT_ID!,
+      sessionId: process.env.MYCELIUM_SESSION_ID!,
+      kinds,
+      activeEvolution,
+    });
+
     return { systemPrompt: event.systemPrompt + "\n\n" + block };
   });
 
