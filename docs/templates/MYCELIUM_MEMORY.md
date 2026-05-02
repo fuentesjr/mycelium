@@ -21,16 +21,16 @@ mycelium evolve question   --target <topic>         --rationale "..."
 # See: mycelium evolution --kinds --format json   for all available kinds
 ```
 
-## What the binary enforces
+## What the system enforces
 
 The mount has one rule: **any path whose first segment starts with `_` is
-reserved for the binary**. Agent-facing writes (`mycelium write`, `edit`, `rm`,
+reserved for the system**. Agent-facing writes (`mycelium write`, `edit`, `rm`,
 `mv`) under such paths are rejected with `path uses reserved '_' prefix`.
 
 Today, that rule reserves one tree:
 
 - `_activity/YYYY/MM/DD/{agent_id}.jsonl` — your daily activity log. The
-  binary appends one JSONL entry on every successful mutation and on every
+  Mycelium appends one JSONL entry on every successful mutation and on every
   `mycelium log` call. Payloads from `mycelium log` are inlined on the entry
   as a `payload` field. You cannot write to it; you can read it freely
   (`mycelium read`/`ls`/`glob`/`grep`).
@@ -39,7 +39,7 @@ Everything else under the mount is yours.
 
 ## What lives where
 
-- `_activity/` — see above. Binary-controlled metadata, append-only.
+- `_activity/` — see above. System-controlled metadata, append-only.
 
 - Anywhere else — yours. A reasonable starting layout:
   - `AGENTS/{agent_id}/` — your in-flight notes; other agents can read but

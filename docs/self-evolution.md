@@ -31,7 +31,7 @@ mycelium evolution --kinds --format json
 
 ## Built-in kinds
 
-Five kinds ship with the binary. No `--kind-definition` required on first use.
+Five kinds ship by default. No `--kind-definition` required on first use.
 
 | kind | definition |
 |------|------------|
@@ -79,7 +79,7 @@ mycelium evolve convention \
 # {"id":"01HXKP4Z9M8YV1W6E2RTSA9KFG"}
 ```
 
-When the same `(kind, target)` pair already has an active entry, the binary fills in `supersedes` automatically — the prior convention is retired and the chain is recorded:
+When the same `(kind, target)` pair already has an active entry, mycelium fills in `supersedes` automatically — the prior convention is retired and the chain is recorded:
 
 ```
 mycelium evolve convention \
@@ -198,10 +198,10 @@ mycelium evolve experiment \
   --rationale "Tracking the GLP-1 cardio-protection question as an open thread until I have N=3 independent supporting papers."
 ```
 
-`--kind-definition` is required on the first use of any non-builtin kind. Subsequent uses may omit it. To redefine a kind, pass a new `--kind-definition` — the binary writes a `_kind_definition` supersession chain automatically.
+`--kind-definition` is required on the first use of any non-builtin kind. Subsequent uses may omit it. To redefine a kind, pass a new `--kind-definition` — mycelium writes a `_kind_definition` supersession chain automatically.
 
 ---
 
 ## When this doc goes stale
 
-These recipes are written against the 0.1.0 binary. If `--format json` envelope shape, flag names, or `_activity/` path layout change in a future release, the recipes update with them.
+These recipes are written against the 0.1.0 release. If `--format json` envelope shape, flag names, or `_activity/` path layout change in a future release, the recipes update with them.

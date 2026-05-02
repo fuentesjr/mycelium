@@ -62,7 +62,7 @@ Every byte stored is plain content the user can open, read, and edit by hand. No
 
 ### Hints over enforcement; conventions over schemas
 
-System opinions about how the agent should organize memory live as **starter files inside the store** — not binary features, not enforced layouts, not middleware that rewrites calls. Hints are removable. Schemas are sticky.
+System opinions about how the agent should organize memory live as **starter files inside the store** — not system features, not enforced layouts, not middleware that rewrites calls. Hints are removable. Schemas are sticky.
 
 One principled exception (sections 4 and 8): the `_` prefix at the store root is reserved for system paths, and `mycelium` rejects agent writes under it. The activity log's integrity is load-bearing for self-evolution and debugging — if the agent could rewrite its own history, both break, and operators lose the ability to diagnose dysfunction. Reserving the prefix rather than just the current path (`_activity/`) prevents future namespace collisions.
 
@@ -136,7 +136,7 @@ Three contract notes:
 
 **Conditional writes are first-class.** Every content-mutating subcommand (`write`, `edit`, `rm`, `mv`) accepts optional `--expected-version`. This is how concurrency surfaces (section 6); a single-agent store can ignore it and the system behaves like a regular filesystem. `mycelium log` appends to the agent's daily log file unconditionally — concurrent appends are safe under POSIX `O_APPEND` (section 8).
 
-**The `_` prefix is reserved at the store root.** `mycelium` rejects `write`, `edit`, `rm`, and `mv` whose target is under any path beginning with `_`. Currently `_activity/`; future system paths (`_schema/`, `_config/`) inherit the same protection without binary changes.
+**The `_` prefix is reserved at the store root.** `mycelium` rejects `write`, `edit`, `rm`, and `mv` whose target is under any path beginning with `_`. Currently `_activity/`; future system paths (`_schema/`, `_config/`) inherit the same protection without code changes.
 
 **Identity travels via environment.** The harness sets `MYCELIUM_MOUNT` (the store directory), `MYCELIUM_AGENT_ID`, and (optionally) `MYCELIUM_SESSION_ID` once. Every invocation reads them; every log entry records the agent and session. Standard Unix request identity.
 
@@ -175,7 +175,7 @@ Every backend appends to `_activity/YYYY/MM/DD/{agent_id}.jsonl` on every succes
 
 ### Activity log durability
 
-Content commits first (LocalFS: write-temp-then-rename under `flock`; S3: PUT with `If-Match`); the activity-log append follows. On append failure the binary warns to stderr and exits 0 — the content mutation has already committed, and divergence is visible to the operator rather than silent. Multi-process LocalFS relies on `O_APPEND` atomicity for activity entries; metadata-only entries fit inside POSIX `PIPE_BUF`, and the per-agent daily path keeps contention low. LocalFS assumes a local POSIX filesystem with working `flock` and `O_APPEND` atomicity (Linux, macOS, BSD on local disk); NFS, SMB, FUSE not supported in MVP, distributed deployments use S3.
+Content commits first (LocalFS: write-temp-then-rename under `flock`; S3: PUT with `If-Match`); the activity-log append follows. On append failure mycelium warns to stderr and exits 0 — the content mutation has already committed, and divergence is visible to the operator rather than silent. Multi-process LocalFS relies on `O_APPEND` atomicity for activity entries; metadata-only entries fit inside POSIX `PIPE_BUF`, and the per-agent daily path keeps contention low. LocalFS assumes a local POSIX filesystem with working `flock` and `O_APPEND` atomicity (Linux, macOS, BSD on local disk); NFS, SMB, FUSE not supported in MVP, distributed deployments use S3.
 
 The Backend interface deliberately omits `BeginTransaction`, `Watch`, `Snapshot`, and log-write retry queues. Anything more ambitious belongs in a higher layer the agent constructs by writing files.
 
@@ -256,7 +256,7 @@ As of 0.1.0, self-evolution events are recorded via a dedicated `evolve` op rath
 
 `id` is a ULID — monotonically sortable, mint-on-write. `target` is unvalidated free-form (agents use mount-relative paths, globs, topic names, or leave it empty). `source` is never stored — it's a synthetic field in `mycelium evolution --kinds` output, derived from the built-in registry.
 
-**Five built-in kinds** ship with the binary so agents have a usable vocabulary without ceremony:
+**Five built-in kinds** ship with mycelium so agents have a usable vocabulary without ceremony:
 
 | kind | definition |
 |------|------------|
@@ -266,7 +266,7 @@ As of 0.1.0, self-evolution events are recorded via a dedicated `evolve` op rath
 | `lesson` | A distilled insight from past work, intended to inform future behavior. |
 | `question` | An open unknown the agent is tracking, expected to resolve into a `lesson` (or be superseded as no-longer-relevant) later. |
 
-**Open taxonomy.** Agents may introduce additional kinds by passing `--kind-definition` on first use (e.g. `experiment`, `hypothesis`, `decision`). Built-in and agent-introduced kinds coexist on equal footing in the activity log; both appear in `mycelium evolution --kinds`, distinguished by the synthetic `source: "builtin" | "agent"` field. The taxonomy is the agent's; the machinery is the binary's.
+**Open taxonomy.** Agents may introduce additional kinds by passing `--kind-definition` on first use (e.g. `experiment`, `hypothesis`, `decision`). Built-in and agent-introduced kinds coexist on equal footing in the activity log; both appear in `mycelium evolution --kinds`, distinguished by the synthetic `source: "builtin" | "agent"` field. The taxonomy is the agent's; the machinery is mycelium's.
 
 **Supersession** is implicit by `(kind, target)` pair — a new `evolve` with the same `kind` and `target` as an active entry automatically retires the prior one. `--supersedes <id>` overrides this when retiring an entry whose `(kind, target)` doesn't match.
 

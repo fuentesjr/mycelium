@@ -1,6 +1,6 @@
 # Conflict Resolution Conventions
 
-**Status:** Documentation only. Recovery guidance for the conflict envelope contract in section 6 and CLI section 4 of `mycelium-design.md`. The envelope shape and exit codes are the binary's contract; this doc records what to do with them.
+**Status:** Documentation only. Recovery guidance for the conflict envelope contract in section 6 and CLI section 4 of `mycelium-design.md`. The envelope shape and exit codes are mycelium's contract; this doc records what to do with them.
 
 ---
 
@@ -27,7 +27,7 @@
 - **Strongly recommended** for `write` when revising a file the agent has read this session. The version token comes from the most recent `_activity/` entry for the path, or from the stdout of the agent's own prior `write`/`edit`.
 - **Often unnecessary** for the first write to a path the agent owns exclusively (e.g., `tasks/T-current/notes.md` in a single-agent session).
 
-The flag is the agent's coordination knob. Never set by the binary, never required.
+The flag is the agent's coordination knob. Never set by mycelium, never required.
 
 ---
 
