@@ -1,6 +1,6 @@
 {
   "name": "pi-mycelium",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Pi.dev extension for Mycelium agent memory",
   "type": "module",
   "main": "index.ts",

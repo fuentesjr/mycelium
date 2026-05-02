@@ -1,3 +1,11 @@
+## [0.1.0] - 2026-05-01
+
+### Added
+- `mycelium evolve <kind>` subcommand: record self-evolution events (conventions, indices, archives, lessons, questions, or agent-introduced kinds) with structured kind/target/rationale/supersession metadata. See [ADR-0001](docs/adr/0001-self-evolution-as-first-class-concept.md).
+- `mycelium evolution` subcommand: query the evolution timeline. `--active` returns current rules in effect per `(kind, target)` pair; `--kinds` enumerates available kinds (built-in plus agent-introduced).
+- Five built-in kinds shipped with definitions: `convention`, `index`, `archive`, `lesson`, `question`. Agents may introduce additional kinds via `--kind-definition` on first use.
+- pi-mycelium extension surfaces evolution kinds, active evolution, and recording instructions in the `before_agent_start` system prompt.
+
 ## [0.0.1] - 2026-05-01
 
 Initial release. Phase 1 scope per [`mycelium-phases.md`](mycelium-phases.md).

@@ -4,6 +4,23 @@ This is your starter orientation for the mount at `$MYCELIUM_MOUNT`.
 You can edit this file. Replace the conventions below as you find shapes
 that fit your work better.
 
+## Current rules in effect
+
+Run `mycelium evolution --active` for the canonical list of active conventions,
+indexes, archives, lessons, and questions. This file is a prose companion —
+when it diverges from the activity log, **the activity log wins**. See
+[ADR-0001](../adr/0001-self-evolution-as-first-class-concept.md) for the
+divergence policy.
+
+To record a self-evolution event:
+
+```sh
+mycelium evolve convention --target <path-or-scope> --rationale "..."
+mycelium evolve lesson     --target <source>        --rationale "..."
+mycelium evolve question   --target <topic>         --rationale "..."
+# See: mycelium evolution --kinds --format json   for all available kinds
+```
+
 ## What the binary enforces
 
 The mount has one rule: **any path whose first segment starts with `_` is

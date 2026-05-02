@@ -236,6 +236,57 @@ Patterns that emerge — *not* features the system implements: convention bootst
 
 What the system does *not* do: run a reflection step between turns; analyze patterns or detect drift for the agent; maintain or update convention files on the agent's behalf; enforce that conventions are read before acting. Doing any of these would re-introduce the capability coupling this principle exists to reject. The system makes self-evolution *possible*; the agent *does* it.
 
+### Self-evolution as a first-class concept
+
+As of 0.1.0, self-evolution events are recorded via a dedicated `evolve` op rather than inferred after the fact from raw mutations. Full rationale in [ADR-0001](docs/adr/0001-self-evolution-as-first-class-concept.md).
+
+**The `evolve` op shape:**
+
+```json
+{
+  "op": "evolve",
+  "id": "<ULID, minted on write>",
+  "kind": "<built-in or agent-introduced kind>",
+  "target": "<optional opaque string scoping the evolution>",
+  "rationale": "<required free-text explanation, max 64 KB>",
+  "supersedes": "<optional ULID of the prior entry this replaces>",
+  "kind_definition": "<required on first use of a non-builtin kind>"
+}
+```
+
+`id` is a ULID — monotonically sortable, mint-on-write. `target` is unvalidated free-form (agents use mount-relative paths, globs, topic names, or leave it empty). `source` is never stored — it's a synthetic field in `mycelium evolution --kinds` output, derived from the built-in registry.
+
+**Five built-in kinds** ship with the binary so agents have a usable vocabulary without ceremony:
+
+| kind | definition |
+|------|------------|
+| `convention` | A naming, layout, or structural pattern for organizing data in the store. |
+| `index` | A derived or summary file the agent has built or regenerated over a region of the store. |
+| `archive` | A region of the store the agent has marked as no-longer-active and moved out of working scope. |
+| `lesson` | A distilled insight from past work, intended to inform future behavior. |
+| `question` | An open unknown the agent is tracking, expected to resolve into a `lesson` (or be superseded as no-longer-relevant) later. |
+
+**Open taxonomy.** Agents may introduce additional kinds by passing `--kind-definition` on first use (e.g. `experiment`, `hypothesis`, `decision`). Built-in and agent-introduced kinds coexist on equal footing in the activity log; both appear in `mycelium evolution --kinds`, distinguished by the synthetic `source: "builtin" | "agent"` field. The taxonomy is the agent's; the machinery is the binary's.
+
+**Supersession** is implicit by `(kind, target)` pair — a new `evolve` with the same `kind` and `target` as an active entry automatically retires the prior one. `--supersedes <id>` overrides this when retiring an entry whose `(kind, target)` doesn't match.
+
+**Two boundaries:**
+
+- `evolve` is strictly metadata. It records the decision but never mutates the store. `mycelium evolve archive --target old-notes/` does not move files; the agent calls `mycelium mv` separately. One op per concern; no partial-rollback complexity.
+- `evolve` and `MYCELIUM_MEMORY.md` are independent. `MYCELIUM_MEMORY.md` is a prose companion for editorialized summaries. When the two diverge, the activity log wins by definition. Forced synchronization breaks legitimate workflows (batching related conventions into one paragraph after the fact).
+
+**CLI surface:**
+
+```
+mycelium evolve <kind> [--target <str>] [--supersedes <id>] [--kind-definition "..."] --rationale "..."
+mycelium evolution [--kind X] [--since DATE] [--active] [--format json]
+mycelium evolution --kinds [--format json]
+```
+
+`--active` returns the latest non-superseded entry per `(kind, target)` pair — the "current rules in effect" view sessions consult to inherit prior decisions. `--kinds` enumerates the available vocabulary.
+
+See [ADR-0001](docs/adr/0001-self-evolution-as-first-class-concept.md) for full rationale, consequences, and open questions resolved.
+
 ---
 
 ## 8. Observability and Export
