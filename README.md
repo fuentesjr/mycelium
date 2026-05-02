@@ -81,6 +81,7 @@ cat $MYCELIUM_MOUNT/_activity/*/*/*/alice.jsonl
 - [`docs/conflict-resolution.md`](docs/conflict-resolution.md) — multi-agent conflict-resolution conventions.
 - [`docs/self-evolution.md`](docs/self-evolution.md) — convention bootstrap, self-built indices, archiving patterns.
 - [`docs/benchmarks/phase-1.md`](docs/benchmarks/phase-1.md) — validation rubric, target models, scoring.
+- [`docs/adr/`](docs/adr/) — architecture decision records.
 - [`CHANGELOG.md`](CHANGELOG.md) — release notes.
 
 ## Development
