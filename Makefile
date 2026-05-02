@@ -29,7 +29,7 @@ npm-dist: dist
 	  mv $$pkg/mycelium-$(VERSION)-$$plat $$pkg/mycelium; \
 	  chmod +x $$pkg/mycelium; \
 	  ver=$$(echo $(VERSION) | sed 's/^v//'); \
-	  printf '{\n  "name": "@mycelium/cli-%s",\n  "version": "%s",\n  "description": "Mycelium CLI binary for %s",\n  "license": "MIT",\n  "os": ["%s"],\n  "cpu": ["%s"],\n  "files": ["mycelium"],\n  "repository": "https://github.com/fuentesjr/mycelium"\n}\n' \
+	  printf '{\n  "name": "@fuentesjr/mycelium-cli-%s",\n  "version": "%s",\n  "description": "Mycelium CLI binary for %s",\n  "license": "MIT",\n  "os": ["%s"],\n  "cpu": ["%s"],\n  "files": ["mycelium"],\n  "repository": "https://github.com/fuentesjr/mycelium"\n}\n' \
 	    $$plat $$ver $$plat $$os $$arch > $$pkg/package.json; \
 	done
 	@ls -lh $(NPM_DIR)

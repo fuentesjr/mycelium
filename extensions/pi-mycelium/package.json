@@ -17,10 +17,10 @@
     "@mariozechner/pi-coding-agent": "*"
   },
   "optionalDependencies": {
-    "@mycelium/cli-darwin-arm64": "0.1.0",
-    "@mycelium/cli-darwin-amd64": "0.1.0",
-    "@mycelium/cli-linux-arm64": "0.1.0",
-    "@mycelium/cli-linux-amd64": "0.1.0"
+    "@fuentesjr/mycelium-cli-darwin-arm64": "0.1.0",
+    "@fuentesjr/mycelium-cli-darwin-amd64": "0.1.0",
+    "@fuentesjr/mycelium-cli-linux-arm64": "0.1.0",
+    "@fuentesjr/mycelium-cli-linux-amd64": "0.1.0"
   },
   "devDependencies": {
     "@mariozechner/pi-coding-agent": "*",
