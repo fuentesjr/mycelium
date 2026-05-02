@@ -16,6 +16,7 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    environment: production
 
     steps:
       - name: Checkout
@@ -84,7 +85,7 @@ jobs:
         run: |
           for plat in darwin-arm64 darwin-amd64 linux-arm64 linux-amd64; do
             echo "Publishing @fuentesjr/mycelium-cli-$plat ..."
-            cd dist/npm/cli-$plat && npm publish --access=public && cd ${{ github.workspace }}
+            (cd dist/npm/cli-$plat && npm publish --access=public)
           done
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
