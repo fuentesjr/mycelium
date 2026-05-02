@@ -138,7 +138,7 @@ Two boundaries that scope what `evolve` is and is not:
 ### Documentation alignment
 
 - [`docs/self-evolution.md`](../self-evolution.md) is rewritten from "agents do this ad-hoc with plain writes" to "agents do this via `mycelium evolve`, supplemented by `MYCELIUM_MEMORY.md` for prose context."
-- [`mycelium-design.md`](../../mycelium-design.md) gains a section on evolution as a first-class concept and the `kind` taxonomy.
+- [`mycelium-design.md`](../mycelium-design.md) gains a section on evolution as a first-class concept and the `kind` taxonomy.
 - The pi-mycelium system-prompt block instructs agents on when and how to invoke `mycelium evolve`.
 
 ## Consequences

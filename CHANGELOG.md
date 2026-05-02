@@ -8,7 +8,7 @@
 
 ## [0.0.1] - 2026-05-01
 
-Initial release. Phase 1 scope per [`mycelium-phases.md`](mycelium-phases.md).
+Initial release. Phase 1 scope per [`docs/mycelium-phases.md`](docs/mycelium-phases.md).
 
 ### Added
 

@@ -8,7 +8,7 @@ Persistent memory for AI coding agents. A small CLI plus a daily activity log on
 
 - **`cmd/mycelium/`** — Go binary. Eleven subcommands (`read`, `write`, `edit`, `ls`, `glob`, `grep`, `rm`, `mv`, `log`, `evolve`, `evolution`). Mount-level `flock`-guarded CAS, SHA-256 version tokens, JSONL activity log at `<mount>/_activity/YYYY/MM/DD/<agent>.jsonl`. Reserved `_`-prefix protects backend metadata from agent writes.
 - **`extensions/pi-mycelium/`** — pi.dev extension. Sets up env vars on `session_start`, contributes a system-prompt block on `before_agent_start`, records `context_signal` entries on `context`. Registers no tools — agents invoke `mycelium` through pi's built-in `bash`.
-- **`docs/`** — design (`mycelium-design.md`), phasing (`mycelium-phases.md`), conflict-resolution conventions, self-evolution patterns, benchmark rubric.
+- **`docs/`** — design (`docs/mycelium-design.md`), phasing (`docs/mycelium-phases.md`), conflict-resolution conventions, self-evolution patterns, benchmark rubric.
 
 ## Install
 
@@ -33,19 +33,19 @@ go install ./cmd/mycelium
 
 ### Pi extension
 
+The extension ships on npm and bundles the platform-matching `mycelium` binary as an optional dependency — no separate binary install or PATH setup needed.
+
 ```
-git clone https://github.com/fuentesjr/mycelium.git
-cd mycelium/extensions/pi-mycelium
-npm install
+# Global — available in every pi session, mounts at ~/.pi/mycelium/store/
+pi install npm:pi-mycelium
 
-# Project install — symlink into the repo where you'll run `pi`
-ln -s "$(pwd)" <your-repo>/.pi/extensions/pi-mycelium
-
-# Global install — available in every pi session
-ln -s "$(pwd)" ~/.pi/agent/extensions/pi-mycelium
+# Or project-local — mounts at <cwd>/.pi/mycelium/store/
+pi install npm:pi-mycelium -l
 ```
 
-Mount path is auto-detected from install location: project install mounts at `<cwd>/.pi/mycelium/store/`, global install at `~/.pi/mycelium/store/`. The extension expects the `mycelium` binary on `PATH` (see above); if it's missing, sessions continue normally with an `UNAVAILABLE` notice in the system prompt. See `extensions/pi-mycelium/README.md` for details.
+Verify with `pi list`. Updates: `pi update npm:pi-mycelium`.
+
+The bundled binary takes precedence; if the optional dependency was skipped (unsupported platform, `--omit=optional`), the extension falls back to `which mycelium` on PATH and contributes an `UNAVAILABLE` system-prompt notice if neither is found. See `extensions/pi-mycelium/README.md` for the full install / scope-detection / identity story.
 
 ## Quick example
 
@@ -85,8 +85,8 @@ cat $MYCELIUM_MOUNT/_activity/*/*/*/alice.jsonl
 
 ## Documentation
 
-- [`mycelium-design.md`](mycelium-design.md) — design rationale, architecture, principles.
-- [`mycelium-phases.md`](mycelium-phases.md) — phasing roadmap; what's in scope when, and why.
+- [`docs/mycelium-design.md`](docs/mycelium-design.md) — design rationale, architecture, principles.
+- [`docs/mycelium-phases.md`](docs/mycelium-phases.md) — phasing roadmap; what's in scope when, and why.
 - [`docs/conflict-resolution.md`](docs/conflict-resolution.md) — multi-agent conflict-resolution conventions.
 - [`docs/self-evolution.md`](docs/self-evolution.md) — convention bootstrap, self-built indices, archiving patterns.
 - [`docs/benchmarks/phase-1.md`](docs/benchmarks/phase-1.md) — validation rubric, target models, scoring.

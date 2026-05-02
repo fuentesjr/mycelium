@@ -43,7 +43,7 @@ gets resolved.
 
 - Registers no tools. The agent invokes `mycelium <sub>` through pi's
   built-in `bash` tool, the same way it runs `git`, `rg`, or any other shell
-  command. This is intentional — see `mycelium-design.md` section 1.
+  command. This is intentional — see `docs/mycelium-design.md` section 1 in the main repo.
 - Does not prefetch, summarize, or auto-inject memory hints. Self-evolution
   is an agent behavior, not a system feature (see design section 7).
 
