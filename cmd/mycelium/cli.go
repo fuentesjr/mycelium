@@ -24,6 +24,7 @@ var subcommands = []subcommand{
 	{"mv", runMv},
 	{"log", runLog},
 	{"evolve", runEvolve},
+	{"evolution", runEvolution},
 }
 
 func dispatch(in io.Reader, out, errOut io.Writer, args []string) int {
