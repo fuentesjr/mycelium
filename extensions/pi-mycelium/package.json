@@ -1,6 +1,6 @@
 {
   "name": "pi-mycelium",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "pi": {
     "extensions": ["./index.ts"]
   },
@@ -9,6 +9,7 @@
   "main": "index.ts",
   "files": [
     "*.ts",
+    "templates/",
     "README.md"
   ],
   "scripts": {
@@ -20,10 +21,10 @@
     "@mariozechner/pi-coding-agent": "*"
   },
   "optionalDependencies": {
-    "@fuentesjr/mycelium-cli-darwin-arm64": "0.1.5",
-    "@fuentesjr/mycelium-cli-darwin-amd64": "0.1.5",
-    "@fuentesjr/mycelium-cli-linux-arm64": "0.1.5",
-    "@fuentesjr/mycelium-cli-linux-amd64": "0.1.5"
+    "@fuentesjr/mycelium-cli-darwin-arm64": "0.1.6",
+    "@fuentesjr/mycelium-cli-darwin-amd64": "0.1.6",
+    "@fuentesjr/mycelium-cli-linux-arm64": "0.1.6",
+    "@fuentesjr/mycelium-cli-linux-amd64": "0.1.6"
   },
   "devDependencies": {
     "@mariozechner/pi-coding-agent": "*",

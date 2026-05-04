@@ -1,3 +1,16 @@
+## [0.1.6] - 2026-05-03
+
+### Added (pi-mycelium extension)
+- `MYCELIUM_MEMORY.md` is now auto-seeded into the mount on first `session_start` if it doesn't already exist. Routes through `mycelium write`, so the bootstrap appears in the journal as a normal `op:write`. Previously the system prompt told the agent "Read it once at session start" but no install step ever created the file — every fresh mount served a not-found on first read. Bundled template lives at `extensions/pi-mycelium/templates/MYCELIUM_MEMORY.md`.
+
+### Changed (template)
+- Moved canonical template from `docs/templates/MYCELIUM_MEMORY.md` to `extensions/pi-mycelium/templates/MYCELIUM_MEMORY.md` so it ships in the npm package.
+- Replaced the broken relative ADR link with an absolute GitHub URL — relative links from `docs/` don't resolve when the file is dropped into a mount.
+- Renamed suggested `AGENTS/{agent_id}/` directory to lowercase `agents/{agent_id}/` to avoid collision with the `AGENTS.md` instructions convention.
+- Added `memories/` to the suggested starter layout (matching the directory the agent already invents on its own).
+- Added an empty top-level `## Conventions` section so the agent has a concrete place for its first prose entry.
+- Trimmed sections that duplicated the system-prompt block (subcommand list, identity env-var enumeration, reserved-prefix rule explanation). The template now focuses on persistent, agent-editable content; the system prompt carries the per-session fundamentals.
+
 ## [0.1.5] - 2026-05-03
 
 ### Fixed (pi-mycelium extension)

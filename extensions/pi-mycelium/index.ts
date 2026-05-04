@@ -4,6 +4,7 @@ import { resolveBinary, setupEnv } from "./env.js";
 import { systemPromptAvailable, systemPromptUnavailable } from "./system-prompt.js";
 import type { EvolutionKindRow, ActiveEvolutionEvent } from "./system-prompt.js";
 import { recordContextSignal, recordSessionBoundary } from "./activity-log.js";
+import { bootstrapMemoryFile } from "./bootstrap.js";
 import { runMyceliumJSON, runMyceliumNDJSON } from "./mycelium.js";
 
 export default function (pi: ExtensionAPI) {
@@ -16,6 +17,7 @@ export default function (pi: ExtensionAPI) {
     binaryPath = await resolveBinary(pi);
     if (binaryPath) {
       setupEnv(cfg, ctx.sessionManager.getLeafId(), binaryPath);
+      await bootstrapMemoryFile(binaryPath, mountPath);
       await recordSessionBoundary(pi, binaryPath, event.reason);
     }
   });

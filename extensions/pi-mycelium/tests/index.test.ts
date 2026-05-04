@@ -9,8 +9,17 @@ import type {
   ExtensionContext,
   SessionStartEvent,
 } from "@mariozechner/pi-coding-agent";
+
+// Mock bootstrap so tests don't touch the real filesystem mount or spawn the
+// (non-existent) mycelium binary. bootstrap.ts has its own dedicated test file.
+vi.mock("../bootstrap.js", () => ({
+  bootstrapMemoryFile: vi.fn(async () => {}),
+  MEMORY_FILE: "MYCELIUM_MEMORY.md",
+}));
+
 import register from "../index.js";
 import { execResult } from "./helpers.js";
+import { bootstrapMemoryFile } from "../bootstrap.js";
 import type { EvolutionKindRow, ActiveEvolutionEvent } from "../system-prompt.js";
 
 type AnyHandler = (event: unknown, ctx: ExtensionContext) => unknown;
@@ -230,6 +239,26 @@ describe("pi extension factory", () => {
     const { exec, handlers } = makeRegistration(defaultExec);
     await handlers.get("session_start")!(makeSessionStartEvent("startup"), ctx);
     expect(exec).toHaveBeenCalledWith(RESOLVED_BINARY, ["log", "session_startup"]);
+  });
+
+  it("invokes bootstrapMemoryFile with the resolved binary and the mount path", async () => {
+    const mocked = vi.mocked(bootstrapMemoryFile);
+    mocked.mockClear();
+    const { handlers } = makeRegistration(defaultExec);
+    await handlers.get("session_start")!(makeSessionStartEvent(), ctx);
+    expect(mocked).toHaveBeenCalledTimes(1);
+    const [binary, mount] = mocked.mock.calls[0];
+    expect(binary).toBe(RESOLVED_BINARY);
+    expect(mount).toContain("pi-mycelium");
+    expect(mount).toContain("journal");
+  });
+
+  it("does not invoke bootstrapMemoryFile when binary is missing", async () => {
+    const mocked = vi.mocked(bootstrapMemoryFile);
+    mocked.mockClear();
+    const { handlers } = makeRegistration(async () => execResult(1));
+    await handlers.get("session_start")!(makeSessionStartEvent(), ctx);
+    expect(mocked).not.toHaveBeenCalled();
   });
 
   it("does not log a boundary when binary is missing", async () => {
