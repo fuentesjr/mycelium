@@ -97,8 +97,10 @@ metadata only — it never mutates the store.
 
 When to call it:
 
-- Adopting or retiring a convention:
-  \`mycelium evolve convention --target <path-or-glob> --rationale "..."\`
+- Adopting or retiring a convention (covers structural *or* behavioral patterns):
+  \`mycelium evolve convention --target <path-or-glob-or-scope> --rationale "..."\`
+  Path-scoped example: \`--target notes/incidents/ --rationale "Use <date>-<slug>.md filenames."\`
+  Behavior-scoped example: \`--target memory-discipline --rationale "Record durable preferences proactively."\`
 - Building or regenerating a derived index:
   \`mycelium evolve index --target <path> --rationale "..."\`
 - Archiving a region (run \`mycelium mv\` separately to move the files):

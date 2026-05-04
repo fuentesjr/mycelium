@@ -48,11 +48,11 @@ The `kind` taxonomy is **open and agent-adaptable**, but ships with five **built
 
 #### Built-in kinds (shipped with mycelium)
 
-The five built-ins sit on different axes: `convention` describes current data structure, `index` describes derived data over that structure, `archive` describes deactivated regions, `lesson` describes accumulated knowledge, and `question` describes accumulated *not*-knowing — open unknowns the agent is tracking and expects to resolve into lessons (or supersede as no-longer-relevant) later.
+The five built-ins sit on different axes: `convention` describes current data structure or behavioral norms (how data is organized or how the store is operated on), `index` describes derived data over that structure, `archive` describes deactivated regions, `lesson` describes accumulated knowledge, and `question` describes accumulated *not*-knowing — open unknowns the agent is tracking and expects to resolve into lessons (or supersede as no-longer-relevant) later.
 
 | kind | definition | example |
 |------|------------|---------|
-| `convention` | A naming, layout, or structural pattern for organizing data in the store. | "Incidents go under `notes/incidents/<date>-<slug>.md`." |
+| `convention` | A naming, layout, structural, or behavioral pattern for organizing or operating on the store. | "Incidents go under `notes/incidents/<date>-<slug>.md`."; behavioral: `--target memory-discipline --rationale "Record durable preferences proactively rather than treating memory as exceptional."` |
 | `index` | A derived or summary file the agent has built or regenerated over a region of the store. | A TOC at `notes/incidents/INDEX.md` regenerated nightly. |
 | `archive` | A region of the store the agent has marked as no-longer-active and moved out of working scope. | "Pre-2026 incidents moved to `archive/incidents-2025/`." |
 | `lesson` | A distilled insight from past work, intended to inform future behavior. | "Queries that mention `latency` correlate with deploy events 80% of the time." |

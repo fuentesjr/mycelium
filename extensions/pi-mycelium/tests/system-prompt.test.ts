@@ -9,7 +9,7 @@ import type { EvolutionKindRow, ActiveEvolutionEvent } from "../system-prompt.js
 const builtinKinds: EvolutionKindRow[] = [
   {
     name: "convention",
-    definition: "A naming, layout, or structural pattern for organizing data in the store.",
+    definition: "A naming, layout, structural, or behavioral pattern for organizing or operating on the store.",
     defined_at_version: "0.1.0",
     source: "builtin",
     event_count: 0,

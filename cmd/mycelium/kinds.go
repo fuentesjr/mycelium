@@ -12,7 +12,7 @@ type builtinKind struct {
 var builtinKinds = []builtinKind{
 	{
 		Name:             "convention",
-		Definition:       "A naming, layout, or structural pattern for organizing data in the store.",
+		Definition:       "A naming, layout, structural, or behavioral pattern for organizing or operating on the store.",
 		DefinedAtVersion: "0.1.0",
 	},
 	{

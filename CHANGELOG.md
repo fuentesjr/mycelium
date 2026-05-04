@@ -1,3 +1,15 @@
+## [0.1.7] - 2026-05-04
+
+### Fixed (pi-mycelium extension)
+- Session-start ordering: `recordSessionBoundary` now runs before `bootstrapMemoryFile`, so the journal shows the `session_*` boundary entry first and the seed `op:write MYCELIUM_MEMORY.md` second. Previously the seed appeared to predate the session, since bootstrap ran first.
+
+### Changed (mycelium binary)
+- Widened the `convention` kind's built-in definition from "A naming, layout, or structural pattern for organizing data in the store." to "A naming, layout, structural, or behavioral pattern for organizing or operating on the store." Conservative widening — calibrated to one observed agent stretch. Behavioral norms about how to use the store (e.g. "record preferences proactively") now fit the kind without an `experiment`/`policy` extension.
+- ADR-0001, `docs/mycelium-design.md`, and `docs/self-evolution.md` updated to match.
+
+### Changed (pi-mycelium extension)
+- System-prompt block's `convention` bullet now shows two worked examples (path-scoped and behavior-scoped) and broadens the target placeholder from `<path-or-glob>` to `<path-or-glob-or-scope>`. First observation showed an agent picking the vague target `mycelium usage` for a behavioral norm; the example gives a concrete model.
+
 ## [0.1.6] - 2026-05-03
 
 ### Added (pi-mycelium extension)

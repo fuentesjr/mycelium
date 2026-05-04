@@ -35,7 +35,7 @@ Five kinds ship by default. No `--kind-definition` required on first use.
 
 | kind | definition |
 |------|------------|
-| `convention` | A naming, layout, or structural pattern for organizing data in the store. |
+| `convention` | A naming, layout, structural, or behavioral pattern for organizing or operating on the store. |
 | `index` | A derived or summary file the agent has built or regenerated over a region of the store. |
 | `archive` | A region of the store the agent has marked as no-longer-active and moved out of working scope. |
 | `lesson` | A distilled insight from past work, intended to inform future behavior. |

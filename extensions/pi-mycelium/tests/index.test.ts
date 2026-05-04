@@ -33,7 +33,7 @@ const RESOLVED_BINARY = "/usr/local/bin/mycelium";
 const sampleKinds: EvolutionKindRow[] = [
   {
     name: "convention",
-    definition: "A naming, layout, or structural pattern.",
+    definition: "A naming, layout, structural, or behavioral pattern.",
     defined_at_version: "0.1.0",
     source: "builtin",
     event_count: 1,
