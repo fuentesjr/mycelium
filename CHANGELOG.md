@@ -1,3 +1,8 @@
+## [0.1.5] - 2026-05-03
+
+### Fixed (pi-mycelium extension)
+- `recordSessionBoundary` now logs all five `session_start` reasons (`startup`, `reload`, `new`, `resume`, `fork`) instead of dropping `startup` and `reload`. Previously the most common case — a fresh `pi` invocation, which fires `reason="startup"` — produced no boundary entry, leaving the journal with only `context_signal` rows and no record of when sessions began.
+
 ## [0.1.4] - 2026-05-02
 
 ### Changed (pi-mycelium extension)

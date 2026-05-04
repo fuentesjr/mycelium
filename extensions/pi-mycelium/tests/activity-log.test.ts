@@ -77,24 +77,20 @@ describe("recordContextSignal", () => {
 });
 
 describe("recordSessionBoundary", () => {
-  const cases: ReadonlyArray<[SessionStartEvent["reason"], string | null]> = [
+  const cases: ReadonlyArray<[SessionStartEvent["reason"], string]> = [
     ["new", "session_new"],
     ["resume", "session_resume"],
     ["fork", "session_fork"],
-    ["startup", null],
-    ["reload", null],
+    ["startup", "session_startup"],
+    ["reload", "session_reload"],
   ];
 
   for (const [reason, expectedOp] of cases) {
-    it(`${expectedOp ? "logs" : "skips"} for reason=${reason}`, async () => {
+    it(`logs ${expectedOp} for reason=${reason}`, async () => {
       const exec = vi.fn(async () => execResult(0));
       const pi = { exec } as unknown as ExtensionAPI;
       await recordSessionBoundary(pi, BINARY_PATH, reason);
-      if (expectedOp) {
-        expect(exec).toHaveBeenCalledWith(BINARY_PATH, ["log", expectedOp]);
-      } else {
-        expect(exec).not.toHaveBeenCalled();
-      }
+      expect(exec).toHaveBeenCalledWith(BINARY_PATH, ["log", expectedOp]);
     });
   }
 });

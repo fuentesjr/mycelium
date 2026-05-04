@@ -226,14 +226,10 @@ describe("pi extension factory", () => {
     expect(exec).toHaveBeenCalledWith(RESOLVED_BINARY, ["log", "session_new"]);
   });
 
-  it("does not log a boundary for reason=startup", async () => {
+  it("logs session_startup for reason=startup", async () => {
     const { exec, handlers } = makeRegistration(defaultExec);
     await handlers.get("session_start")!(makeSessionStartEvent("startup"), ctx);
-    const boundaryCalls = exec.mock.calls.filter(
-      ([, args]) =>
-        Array.isArray(args) && args[0] === "log" && typeof args[1] === "string" && args[1].startsWith("session_"),
-    );
-    expect(boundaryCalls).toHaveLength(0);
+    expect(exec).toHaveBeenCalledWith(RESOLVED_BINARY, ["log", "session_startup"]);
   });
 
   it("does not log a boundary when binary is missing", async () => {

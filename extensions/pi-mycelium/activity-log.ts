@@ -23,17 +23,10 @@ export async function recordContextSignal(
   ]);
 }
 
-const BOUNDARY_REASONS: ReadonlySet<SessionStartEvent["reason"]> = new Set([
-  "new",
-  "resume",
-  "fork",
-]);
-
 export async function recordSessionBoundary(
   pi: ExtensionAPI,
   binaryPath: string,
   reason: SessionStartEvent["reason"],
 ): Promise<void> {
-  if (!BOUNDARY_REASONS.has(reason)) return;
   await pi.exec(binaryPath, ["log", `session_${reason}`]);
 }
