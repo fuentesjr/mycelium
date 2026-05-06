@@ -24,7 +24,6 @@ var subcommands = []subcommand{
 	{"mv", runMv},
 	{"log", runLog},
 	{"evolve", runEvolve},
-	{"evolution", runEvolution},
 }
 
 func dispatch(in io.Reader, out, errOut io.Writer, args []string) int {
@@ -56,6 +55,7 @@ func printSubcommandList(w io.Writer) {
 func runRead(_ io.Reader, out, errOut io.Writer, args []string) int {
 	fs := flag.NewFlagSet("read", flag.ContinueOnError)
 	fs.SetOutput(errOut)
+	format := fs.String("format", "text", "output format: text|json")
 	positional, err := parseInterspersed(fs, args)
 	if err != nil {
 		return ExitUsage
@@ -64,7 +64,7 @@ func runRead(_ io.Reader, out, errOut io.Writer, args []string) int {
 		fmt.Fprintln(errOut, "mycelium read: PATH required")
 		return ExitUsage
 	}
-	return readFile(out, errOut, ReadIdentity().Mount, positional[0])
+	return readFile(out, errOut, ReadIdentity().Mount, positional[0], *format)
 }
 
 func runWrite(in io.Reader, out, errOut io.Writer, args []string) int {
@@ -81,7 +81,7 @@ func runWrite(in io.Reader, out, errOut io.Writer, args []string) int {
 		return ExitUsage
 	}
 	id := ReadIdentity()
-	// Check _-prefix reservation before calling writeFile.
+	// Check _-prefix reservation before reading stdin and entering transactional write.
 	if _, resErr := resolveAgentWritable(id.Mount, positional[0]); resErr != nil {
 		if errors.Is(resErr, ErrReservedPath) {
 			fmt.Fprintf(errOut, "mycelium write: %s: writes to '_'-prefixed paths are reserved\n", positional[0])
@@ -89,11 +89,15 @@ func runWrite(in io.Reader, out, errOut io.Writer, args []string) int {
 		}
 		// Other path errors are handled inside writeFile; fall through.
 	}
-	version, rc := writeFile(in, errOut, id.Mount, positional[0], *expectedVersion, *includeContent)
+	content, err := io.ReadAll(in)
+	if err != nil {
+		fmt.Fprintf(errOut, "mycelium write: read stdin: %v\n", err)
+		return ExitGenericError
+	}
+	version, rc := transactionalWrite(errOut, id, positional[0], content, *expectedVersion, *includeContent)
 	if rc != ExitOK {
 		return rc
 	}
-	logMutation(errOut, id, MutationLog{Op: "write", Path: positional[0], Version: version})
 	fmt.Fprintf(out, `{"version":%q}`+"\n", version)
 	return ExitOK
 }
@@ -118,18 +122,17 @@ func runEdit(_ io.Reader, out, errOut io.Writer, args []string) int {
 		return ExitUsage
 	}
 	id := ReadIdentity()
-	// Check _-prefix reservation before calling editFile.
+	// Check _-prefix reservation before entering transactional edit.
 	if _, resErr := resolveAgentWritable(id.Mount, positional[0]); resErr != nil {
 		if errors.Is(resErr, ErrReservedPath) {
 			fmt.Fprintf(errOut, "mycelium edit: %s: writes to '_'-prefixed paths are reserved\n", positional[0])
 			return ExitReservedPrefix
 		}
 	}
-	version, rc := editFile(errOut, id.Mount, positional[0], *oldStr, *newStr, *expectedVersion, *includeContent)
+	version, rc := transactionalEdit(errOut, id, positional[0], *oldStr, *newStr, *expectedVersion, *includeContent)
 	if rc != ExitOK {
 		return rc
 	}
-	logMutation(errOut, id, MutationLog{Op: "edit", Path: positional[0], Version: version})
 	fmt.Fprintf(out, `{"version":%q}`+"\n", version)
 	return ExitOK
 }
@@ -209,18 +212,17 @@ func runRm(_ io.Reader, out, errOut io.Writer, args []string) int {
 		return ExitUsage
 	}
 	id := ReadIdentity()
-	// Check _-prefix reservation before calling removeFile.
+	// Check _-prefix reservation before entering transactional remove.
 	if _, resErr := resolveAgentWritable(id.Mount, positional[0]); resErr != nil {
 		if errors.Is(resErr, ErrReservedPath) {
 			fmt.Fprintf(errOut, "mycelium rm: %s: writes to '_'-prefixed paths are reserved\n", positional[0])
 			return ExitReservedPrefix
 		}
 	}
-	priorVersion, rc := removeFile(errOut, id.Mount, positional[0], *expectedVersion, *includeContent)
+	_, rc := transactionalRemove(errOut, id, positional[0], *expectedVersion, *includeContent)
 	if rc != ExitOK {
 		return rc
 	}
-	logMutation(errOut, id, MutationLog{Op: "rm", Path: positional[0], PriorVersion: priorVersion})
 	return ExitOK
 }
 
@@ -252,11 +254,10 @@ func runMv(_ io.Reader, out, errOut io.Writer, args []string) int {
 			return ExitReservedPrefix
 		}
 	}
-	version, rc := moveFile(errOut, id.Mount, src, dst, *expectedVersion, *includeContent)
+	_, rc := transactionalMove(errOut, id, src, dst, *expectedVersion, *includeContent)
 	if rc != ExitOK {
 		return rc
 	}
-	logMutation(errOut, id, MutationLog{Op: "mv", Path: dst, From: src, Version: version})
 	return ExitOK
 }
 

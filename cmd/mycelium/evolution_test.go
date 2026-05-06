@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// parseEvolutionKindRows parses the JSON array output of `evolution --kinds`.
+// parseEvolutionKindRows parses the JSON array output of `evolve --kinds`.
 func parseEvolutionKindRows(t *testing.T, stdout string) []evolutionKindRow {
 	t.Helper()
 	line := strings.TrimRight(stdout, "\n")
@@ -19,7 +19,7 @@ func parseEvolutionKindRows(t *testing.T, stdout string) []evolutionKindRow {
 	return rows
 }
 
-// parseEvolutionEntries parses newline-delimited JSON entries from evolution default / --active output.
+// parseEvolutionEntries parses newline-delimited JSON entries from evolve --list / --active output.
 func parseEvolutionEntries(t *testing.T, stdout string) []evolveLogEntry {
 	t.Helper()
 	var entries []evolveLogEntry
@@ -55,7 +55,7 @@ func TestEvolutionKindsEmptyMount(t *testing.T) {
 	mount := t.TempDir()
 	t.Setenv("MYCELIUM_MOUNT", mount)
 
-	out, errOut, rc := runDispatch(t, "evolution", "--kinds")
+	out, errOut, rc := runDispatch(t, "evolve", "--kinds")
 	if rc != ExitOK {
 		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitOK, errOut)
 	}
@@ -92,7 +92,7 @@ func TestEvolutionDefaultEmptyMount(t *testing.T) {
 	mount := t.TempDir()
 	t.Setenv("MYCELIUM_MOUNT", mount)
 
-	out, errOut, rc := runDispatch(t, "evolution")
+	out, errOut, rc := runDispatch(t, "evolve", "--list")
 	if rc != ExitOK {
 		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitOK, errOut)
 	}
@@ -107,7 +107,7 @@ func TestEvolutionActiveEmptyMount(t *testing.T) {
 	mount := t.TempDir()
 	t.Setenv("MYCELIUM_MOUNT", mount)
 
-	out, errOut, rc := runDispatch(t, "evolution", "--active")
+	out, errOut, rc := runDispatch(t, "evolve", "--active")
 	if rc != ExitOK {
 		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitOK, errOut)
 	}
@@ -130,7 +130,7 @@ func TestEvolutionDefaultMultipleEvents(t *testing.T) {
 	time.Sleep(time.Millisecond)
 	r3 := seedEvolve(t, "index", "--target", "idx/", "--rationale", "Built an index.")
 
-	out, errOut, rc := runDispatch(t, "evolution")
+	out, errOut, rc := runDispatch(t, "evolve", "--list")
 	if rc != ExitOK {
 		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitOK, errOut)
 	}
@@ -173,7 +173,7 @@ func TestEvolutionKindFilter(t *testing.T) {
 	time.Sleep(time.Millisecond)
 	seedEvolve(t, "convention", "--target", "docs/", "--rationale", "Another convention.")
 
-	out, errOut, rc := runDispatch(t, "evolution", "--kind", "convention")
+	out, errOut, rc := runDispatch(t, "evolve", "--list", "--kind", "convention")
 	if rc != ExitOK {
 		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitOK, errOut)
 	}
@@ -228,7 +228,7 @@ func TestEvolutionSinceRFC3339(t *testing.T) {
 	}
 
 	sinceStr := ts2.UTC().Format(time.RFC3339Nano)
-	out, errOut, rc := runDispatch(t, "evolution", "--since", sinceStr)
+	out, errOut, rc := runDispatch(t, "evolve", "--list", "--since", sinceStr)
 	if rc != ExitOK {
 		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitOK, errOut)
 	}
@@ -251,7 +251,7 @@ func TestEvolutionSinceDateOnly(t *testing.T) {
 	seedEvolve(t, "lesson", "--rationale", "Some lesson.")
 
 	// Use a far-future date — should return no events.
-	out, errOut, rc := runDispatch(t, "evolution", "--since", "2099-01-01")
+	out, errOut, rc := runDispatch(t, "evolve", "--list", "--since", "2099-01-01")
 	if rc != ExitOK {
 		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitOK, errOut)
 	}
@@ -260,7 +260,7 @@ func TestEvolutionSinceDateOnly(t *testing.T) {
 	}
 
 	// Use a date in the past — should return the event.
-	out2, errOut2, rc2 := runDispatch(t, "evolution", "--since", "2000-01-01")
+	out2, errOut2, rc2 := runDispatch(t, "evolve", "--list", "--since", "2000-01-01")
 	if rc2 != ExitOK {
 		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc2, ExitOK, errOut2)
 	}
@@ -276,7 +276,7 @@ func TestEvolutionSinceInvalidFormat(t *testing.T) {
 	mount := t.TempDir()
 	t.Setenv("MYCELIUM_MOUNT", mount)
 
-	_, errOut, rc := runDispatch(t, "evolution", "--since", "not-a-date")
+	_, errOut, rc := runDispatch(t, "evolve", "--list", "--since", "not-a-date")
 	if rc != ExitUsage {
 		t.Errorf("rc: got %d, want %d (stderr=%q)", rc, ExitUsage, errOut)
 	}
@@ -295,7 +295,7 @@ func TestEvolutionActiveCollapsesChains(t *testing.T) {
 	time.Sleep(time.Millisecond)
 	r2 := seedEvolve(t, "convention", "--target", "foo", "--rationale", "Updated foo convention.")
 
-	out, errOut, rc := runDispatch(t, "evolution", "--active")
+	out, errOut, rc := runDispatch(t, "evolve", "--active")
 	if rc != ExitOK {
 		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitOK, errOut)
 	}
@@ -321,7 +321,7 @@ func TestEvolutionActiveMultipleDistinctPairs(t *testing.T) {
 	time.Sleep(time.Millisecond)
 	r3 := seedEvolve(t, "lesson", "--target", "baz", "--rationale", "Lesson baz.")
 
-	out, errOut, rc := runDispatch(t, "evolution", "--active")
+	out, errOut, rc := runDispatch(t, "evolve", "--active")
 	if rc != ExitOK {
 		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitOK, errOut)
 	}
@@ -356,7 +356,7 @@ func TestEvolutionKindsDistinguishesBuiltinAgent(t *testing.T) {
 		"--kind-definition", expDef,
 		"--rationale", "First experiment.")
 
-	out, errOut, rc := runDispatch(t, "evolution", "--kinds")
+	out, errOut, rc := runDispatch(t, "evolve", "--kinds")
 	if rc != ExitOK {
 		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitOK, errOut)
 	}
@@ -415,7 +415,7 @@ func TestEvolutionKindsEventCount(t *testing.T) {
 	// 1 lesson event.
 	seedEvolve(t, "lesson", "--rationale", "A lesson.")
 
-	out, errOut, rc := runDispatch(t, "evolution", "--kinds")
+	out, errOut, rc := runDispatch(t, "evolve", "--kinds")
 	if rc != ExitOK {
 		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitOK, errOut)
 	}
@@ -462,7 +462,7 @@ func TestEvolutionKindsExcludesKindDefinitionFromCount(t *testing.T) {
 		"--kind-definition", "Redefined hypothesis.",
 		"--rationale", "Third experiment.")
 
-	out, errOut, rc := runDispatch(t, "evolution", "--kinds")
+	out, errOut, rc := runDispatch(t, "evolve", "--kinds")
 	if rc != ExitOK {
 		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitOK, errOut)
 	}
@@ -501,7 +501,7 @@ func TestEvolutionKindsShowsLatestDefinition(t *testing.T) {
 		"--kind-definition", defB,
 		"--rationale", "Redefine.")
 
-	out, errOut, rc := runDispatch(t, "evolution", "--kinds")
+	out, errOut, rc := runDispatch(t, "evolve", "--kinds")
 	if rc != ExitOK {
 		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitOK, errOut)
 	}
@@ -537,7 +537,7 @@ func TestEvolutionDefaultExcludesKindDefinition(t *testing.T) {
 		"--kind-definition", "Redefined.",
 		"--rationale", "Second.")
 
-	out, errOut, rc := runDispatch(t, "evolution")
+	out, errOut, rc := runDispatch(t, "evolve", "--list")
 	if rc != ExitOK {
 		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitOK, errOut)
 	}
@@ -564,9 +564,9 @@ func TestEvolutionMutuallyExclusiveFlags(t *testing.T) {
 		name string
 		args []string
 	}{
-		{"active+kinds", []string{"evolution", "--active", "--kinds"}},
-		{"kinds+kind", []string{"evolution", "--kinds", "--kind", "convention"}},
-		{"kinds+since", []string{"evolution", "--kinds", "--since", "2026-01-01"}},
+		{"active+kinds", []string{"evolve", "--active", "--kinds"}},
+		{"kinds+kind", []string{"evolve", "--kinds", "--kind", "convention"}},
+		{"kinds+since", []string{"evolve", "--kinds", "--since", "2026-01-01"}},
 	}
 
 	for _, tt := range tests {
@@ -588,7 +588,7 @@ func TestEvolutionInvalidFormat(t *testing.T) {
 	mount := t.TempDir()
 	t.Setenv("MYCELIUM_MOUNT", mount)
 
-	_, errOut, rc := runDispatch(t, "evolution", "--format", "xml")
+	_, errOut, rc := runDispatch(t, "evolve", "--list", "--format", "xml")
 	if rc != ExitUsage {
 		t.Errorf("rc: got %d, want %d (stderr=%q)", rc, ExitUsage, errOut)
 	}
@@ -608,7 +608,7 @@ func TestEvolutionFormatTextSmoke(t *testing.T) {
 		"--target", "notes/incidents/",
 		"--rationale", rationale)
 
-	out, errOut, rc := runDispatch(t, "evolution", "--format", "text")
+	out, errOut, rc := runDispatch(t, "evolve", "--list", "--format", "text")
 	if rc != ExitOK {
 		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitOK, errOut)
 	}
@@ -638,7 +638,7 @@ func TestEvolutionJSONNewlineDelimited(t *testing.T) {
 	seedEvolve(t, "lesson", "--rationale", "Lesson.")
 
 	// Default mode.
-	outDefault, errOut, rc := runDispatch(t, "evolution")
+	outDefault, errOut, rc := runDispatch(t, "evolve", "--list")
 	if rc != ExitOK {
 		t.Fatalf("default: rc=%d stderr=%q", rc, errOut)
 	}
@@ -654,7 +654,7 @@ func TestEvolutionJSONNewlineDelimited(t *testing.T) {
 	}
 
 	// --active mode.
-	outActive, errOut2, rc2 := runDispatch(t, "evolution", "--active")
+	outActive, errOut2, rc2 := runDispatch(t, "evolve", "--active")
 	if rc2 != ExitOK {
 		t.Fatalf("active: rc=%d stderr=%q", rc2, errOut2)
 	}
@@ -675,7 +675,7 @@ func TestEvolutionJSONNewlineDelimited(t *testing.T) {
 func TestEvolutionMountUnset(t *testing.T) {
 	t.Setenv("MYCELIUM_MOUNT", "")
 
-	_, errOut, rc := runDispatch(t, "evolution")
+	_, errOut, rc := runDispatch(t, "evolve", "--list")
 	if rc != ExitGenericError {
 		t.Errorf("rc: got %d, want %d (stderr=%q)", rc, ExitGenericError, errOut)
 	}

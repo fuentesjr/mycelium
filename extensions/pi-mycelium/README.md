@@ -39,6 +39,10 @@ gets resolved.
 - **`context`** — records a `context_signal` entry to the activity log
   without modifying the agent's message stream.
 
+The bundled binary writes system metadata under `_activity/` and `_tx/`: the
+activity log is the durable history, and `_tx/pending/` lets content mutations
+and log entries recover together after crashes.
+
 ## What it does not do
 
 - Registers no tools. The agent invokes `mycelium <sub>` through pi's
@@ -51,10 +55,10 @@ gets resolved.
 
 Auto-detected from where the extension is installed:
 
-| Install scope | Extension path | Mount path |
-| --- | --- | --- |
-| Global | `~/.pi/agent/extensions/` | `~/.pi/agent/extensions/pi-mycelium/journal/` |
-| Project | `<repo>/.pi/extensions/` | `<repo>/.pi/pi-mycelium/journal/` |
+| Install scope | Extension path            | Mount path                                    |
+| ------------- | ------------------------- | --------------------------------------------- |
+| Global        | `~/.pi/agent/extensions/` | `~/.pi/agent/extensions/pi-mycelium/journal/` |
+| Project       | `<repo>/.pi/extensions/`  | `<repo>/.pi/pi-mycelium/journal/`             |
 
 Detection compares `import.meta.url` against `~/.pi/agent/extensions/`.
 A locally-checked-out copy loaded via `pi -e ./path.ts` is treated as project.

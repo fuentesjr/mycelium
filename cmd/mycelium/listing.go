@@ -168,4 +168,3 @@ func globAndPrint(out, errOut io.Writer, mount, pattern string) int {
 	}
 	return ExitOK
 }
-

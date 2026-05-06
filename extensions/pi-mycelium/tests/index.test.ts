@@ -274,20 +274,20 @@ describe("pi extension factory", () => {
   // Evolution binary calls wiring
   // -------------------------------------------------------------------------
 
-  it("invokes mycelium evolution --kinds --format json in before_agent_start", async () => {
+  it("invokes mycelium evolve --kinds --format json in before_agent_start", async () => {
     const { exec, handlers } = makeRegistration(defaultExec);
     await handlers.get("session_start")!(makeSessionStartEvent(), ctx);
     exec.mockClear();
     await handlers.get("before_agent_start")!(makeBeforeAgentStartEvent(""), ctx);
-    expect(exec).toHaveBeenCalledWith(RESOLVED_BINARY, ["evolution", "--kinds", "--format", "json"]);
+    expect(exec).toHaveBeenCalledWith(RESOLVED_BINARY, ["evolve", "--kinds", "--format", "json"]);
   });
 
-  it("invokes mycelium evolution --active --format json in before_agent_start", async () => {
+  it("invokes mycelium evolve --active --format json in before_agent_start", async () => {
     const { exec, handlers } = makeRegistration(defaultExec);
     await handlers.get("session_start")!(makeSessionStartEvent(), ctx);
     exec.mockClear();
     await handlers.get("before_agent_start")!(makeBeforeAgentStartEvent(""), ctx);
-    expect(exec).toHaveBeenCalledWith(RESOLVED_BINARY, ["evolution", "--active", "--format", "json"]);
+    expect(exec).toHaveBeenCalledWith(RESOLVED_BINARY, ["evolve", "--active", "--format", "json"]);
   });
 
   it("passes kinds payload into the system prompt when binary returns data", async () => {
@@ -352,7 +352,7 @@ describe("pi extension factory", () => {
     expect(result.systemPrompt).toContain("No active evolution recorded yet");
   });
 
-  it("falls through with empty arrays when both evolution calls fail", async () => {
+  it("falls through with empty arrays when both evolve query calls fail", async () => {
     const { handlers } = makeRegistration(async (cmd) => {
       if (cmd === "which") return execResult(0, RESOLVED_BINARY);
       // All mycelium calls fail
@@ -369,14 +369,14 @@ describe("pi extension factory", () => {
     expect(result.systemPrompt).toContain("No active evolution recorded yet");
   });
 
-  it("does not invoke evolution calls when binary is missing", async () => {
+  it("does not invoke evolve query calls when binary is missing", async () => {
     const { exec, handlers } = makeRegistration(async () => execResult(1));
     await handlers.get("session_start")!(makeSessionStartEvent(), ctx);
     exec.mockClear();
     await handlers.get("before_agent_start")!(makeBeforeAgentStartEvent(""), ctx);
-    // No calls should have been made with evolution args
+    // No calls should have been made with evolve query args
     const evolutionCalls = exec.mock.calls.filter(
-      ([, args]) => Array.isArray(args) && args[0] === "evolution",
+      ([, args]) => Array.isArray(args) && args[0] === "evolve",
     );
     expect(evolutionCalls).toHaveLength(0);
   });

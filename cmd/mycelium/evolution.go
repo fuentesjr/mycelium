@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io"
 	"sort"
@@ -10,7 +9,7 @@ import (
 	"time"
 )
 
-// evolutionKindRow is the JSON shape emitted by --kinds.
+// evolutionKindRow is the JSON shape emitted by evolve --kinds.
 type evolutionKindRow struct {
 	Name             string `json:"name"`
 	Definition       string `json:"definition"`
@@ -19,63 +18,69 @@ type evolutionKindRow struct {
 	EventCount       int    `json:"event_count"`
 }
 
-// runEvolution is the handler for `mycelium evolution [flags]`.
-func runEvolution(_ io.Reader, out, errOut io.Writer, args []string) int {
-	fs := flag.NewFlagSet("evolution", flag.ContinueOnError)
-	fs.SetOutput(errOut)
+type evolutionQueryOptions struct {
+	Kind   string
+	Since  string
+	Active bool
+	Kinds  bool
+	List   bool
+	Format string
+}
 
-	kindFlag := fs.String("kind", "", "filter by kind name")
-	sinceFlag := fs.String("since", "", "only events with ts >= DATE (RFC3339 or YYYY-MM-DD)")
-	activeFlag := fs.Bool("active", false, "return only the latest non-superseded entry per (kind, target)")
-	kindsFlag := fs.Bool("kinds", false, "enumerate distinct kinds")
-	formatFlag := fs.String("format", "json", "output format: json|text")
-
-	if _, err := parseInterspersed(fs, args); err != nil {
+// runEvolutionQuery handles the query modes owned by `mycelium evolve`:
+// --list, --active, and --kinds.
+func runEvolutionQuery(out, errOut io.Writer, opts evolutionQueryOptions) int {
+	if opts.Active && opts.Kinds {
+		fmt.Fprintln(errOut, "mycelium evolve: --active and --kinds are mutually exclusive")
+		return ExitUsage
+	}
+	if opts.Active && opts.List {
+		fmt.Fprintln(errOut, "mycelium evolve: --active and --list are mutually exclusive")
+		return ExitUsage
+	}
+	if opts.Kinds && opts.List {
+		fmt.Fprintln(errOut, "mycelium evolve: --kinds and --list are mutually exclusive")
+		return ExitUsage
+	}
+	if opts.Kinds && opts.Kind != "" {
+		fmt.Fprintln(errOut, "mycelium evolve: --kind cannot be used with --kinds")
+		return ExitUsage
+	}
+	if opts.Kinds && opts.Since != "" {
+		fmt.Fprintln(errOut, "mycelium evolve: --since cannot be used with --kinds")
+		return ExitUsage
+	}
+	if !opts.Active && !opts.Kinds && !opts.List {
+		fmt.Fprintln(errOut, "mycelium evolve: query mode requires --list, --active, or --kinds")
+		return ExitUsage
+	}
+	if opts.Format == "" {
+		opts.Format = "json"
+	}
+	if opts.Format != "json" && opts.Format != "text" {
+		fmt.Fprintln(errOut, "mycelium evolve: --format must be json or text")
 		return ExitUsage
 	}
 
-	// Validate mutual exclusions.
-	if *activeFlag && *kindsFlag {
-		fmt.Fprintln(errOut, "mycelium evolution: --active and --kinds are mutually exclusive")
-		return ExitUsage
-	}
-	if *kindsFlag && *kindFlag != "" {
-		fmt.Fprintln(errOut, "mycelium evolution: --kind cannot be used with --kinds")
-		return ExitUsage
-	}
-	if *kindsFlag && *sinceFlag != "" {
-		fmt.Fprintln(errOut, "mycelium evolution: --since cannot be used with --kinds")
-		return ExitUsage
-	}
-
-	// Validate format.
-	if *formatFlag != "json" && *formatFlag != "text" {
-		fmt.Fprintln(errOut, "mycelium evolution: --format must be json or text")
-		return ExitUsage
-	}
-
-	// Parse --since if provided.
 	var sinceTime time.Time
-	if *sinceFlag != "" {
+	if opts.Since != "" {
 		var err error
-		sinceTime, err = parseSince(*sinceFlag)
+		sinceTime, err = parseSince(opts.Since)
 		if err != nil {
-			fmt.Fprintf(errOut, "mycelium evolution: --since %q: %v\n", *sinceFlag, err)
+			fmt.Fprintf(errOut, "mycelium evolve: --since %q: %v\n", opts.Since, err)
 			return ExitUsage
 		}
 	}
 
 	id := ReadIdentity()
 	if id.Mount == "" {
-		fmt.Fprintln(errOut, "mycelium evolution: MYCELIUM_MOUNT is not set")
+		fmt.Fprintln(errOut, "mycelium evolve: MYCELIUM_MOUNT is not set")
 		return ExitGenericError
 	}
 
-	// Load all evolve entries from the activity log.
-	// An empty or missing _activity directory is not an error — return empty results.
 	entries, err := loadEvolveEntries(id.Mount)
 	if err != nil {
-		fmt.Fprintf(errOut, "mycelium evolution: scan activity log: %v\n", err)
+		fmt.Fprintf(errOut, "mycelium evolve: scan activity log: %v\n", err)
 		return ExitGenericError
 	}
 
@@ -85,27 +90,24 @@ func runEvolution(_ io.Reader, out, errOut io.Writer, args []string) int {
 	})
 
 	switch {
-	case *kindsFlag:
-		return runEvolutionKinds(out, errOut, entries, *formatFlag)
-	case *activeFlag:
-		return runEvolutionActive(out, errOut, entries, *kindFlag, sinceTime, *formatFlag)
+	case opts.Kinds:
+		return runEvolutionKinds(out, errOut, entries, opts.Format)
+	case opts.Active:
+		return runEvolutionActive(out, errOut, entries, opts.Kind, sinceTime, opts.Format)
 	default:
-		return runEvolutionDefault(out, errOut, entries, *kindFlag, sinceTime, *formatFlag)
+		return runEvolutionDefault(out, errOut, entries, opts.Kind, sinceTime, opts.Format)
 	}
 }
 
 // parseSince parses a --since value, accepting RFC3339 timestamps and
 // YYYY-MM-DD date-only strings. Any other format returns an error.
 func parseSince(s string) (time.Time, error) {
-	// Try RFC3339 first.
 	if t, err := time.Parse(time.RFC3339, s); err == nil {
 		return t, nil
 	}
-	// Try RFC3339Nano.
 	if t, err := time.Parse(time.RFC3339Nano, s); err == nil {
 		return t, nil
 	}
-	// Try date-only: YYYY-MM-DD (treated as midnight UTC).
 	if t, err := time.Parse("2006-01-02", s); err == nil {
 		return t.UTC(), nil
 	}
@@ -133,10 +135,8 @@ func applyKindSinceFilters(entries []evolveLogEntry, kindFilter string, since ti
 		if !since.IsZero() {
 			ts, err := time.Parse(time.RFC3339Nano, e.TS)
 			if err != nil {
-				// Try plain RFC3339.
 				ts, err = time.Parse(time.RFC3339, e.TS)
 				if err != nil {
-					// Skip events with unparseable timestamps only if filtering by since.
 					continue
 				}
 			}
@@ -149,7 +149,7 @@ func applyKindSinceFilters(entries []evolveLogEntry, kindFilter string, since ti
 	return out
 }
 
-// runEvolutionDefault handles the default mode: stream all non-_kind_definition
+// runEvolutionDefault handles --list mode: stream all non-_kind_definition
 // evolve events, optionally filtered by --kind and --since.
 func runEvolutionDefault(out, errOut io.Writer, entries []evolveLogEntry, kindFilter string, since time.Time, format string) int {
 	visible := userFacingEntries(entries)
@@ -157,63 +157,47 @@ func runEvolutionDefault(out, errOut io.Writer, entries []evolveLogEntry, kindFi
 
 	for _, e := range visible {
 		if err := printEvolveEntry(out, e, format); err != nil {
-			fmt.Fprintf(errOut, "mycelium evolution: write output: %v\n", err)
+			fmt.Fprintf(errOut, "mycelium evolve: write output: %v\n", err)
 			return ExitGenericError
 		}
 	}
 	return ExitOK
 }
 
-// runEvolutionActive handles --active mode: per (kind, target) pair, return
-// only the latest non-superseded entry.
+// runEvolutionActive handles --active mode. Targeted entries are active by
+// supersession chain. Targetless entries are additive unless explicitly superseded.
 func runEvolutionActive(out, errOut io.Writer, entries []evolveLogEntry, kindFilter string, since time.Time, format string) int {
-	// Work on user-facing entries only (exclude _kind_definition).
 	visible := userFacingEntries(entries)
-
-	// Compute superseded IDs across the full user-facing set.
 	sup := supersededIDs(visible)
 
-	// Collect active entries: not in the superseded set.
-	// We walk in order (already sorted chronologically) and keep a map of
-	// (kind, target) -> latest active entry. Since entries are in chronological
-	// order and we overwrite, the last one seen per pair wins.
 	type kindTarget struct{ kind, target string }
-	latest := make(map[kindTarget]evolveLogEntry)
-	var order []kindTarget // to maintain stable output order
+	latestTargeted := make(map[kindTarget]evolveLogEntry)
+	var targetedOrder []kindTarget
+	var active []evolveLogEntry
 
 	for _, e := range visible {
 		if sup[e.ID] {
 			continue
 		}
-		kt := kindTarget{e.Kind, e.Target}
-		if _, seen := latest[kt]; !seen {
-			order = append(order, kt)
-		}
-		latest[kt] = e
-	}
-
-	// Apply filters and emit.
-	for _, kt := range order {
-		e := latest[kt]
-		// Apply kind filter.
-		if kindFilter != "" && e.Kind != kindFilter {
+		if e.Target == "" {
+			active = append(active, e)
 			continue
 		}
-		// Apply since filter.
-		if !since.IsZero() {
-			ts, err := time.Parse(time.RFC3339Nano, e.TS)
-			if err != nil {
-				ts, err = time.Parse(time.RFC3339, e.TS)
-				if err != nil {
-					continue
-				}
-			}
-			if ts.Before(since) {
-				continue
-			}
+		kt := kindTarget{e.Kind, e.Target}
+		if _, seen := latestTargeted[kt]; !seen {
+			targetedOrder = append(targetedOrder, kt)
 		}
+		latestTargeted[kt] = e
+	}
+
+	for _, kt := range targetedOrder {
+		active = append(active, latestTargeted[kt])
+	}
+	active = applyKindSinceFilters(active, kindFilter, since)
+
+	for _, e := range active {
 		if err := printEvolveEntry(out, e, format); err != nil {
-			fmt.Fprintf(errOut, "mycelium evolution: write output: %v\n", err)
+			fmt.Fprintf(errOut, "mycelium evolve: write output: %v\n", err)
 			return ExitGenericError
 		}
 	}
@@ -222,7 +206,6 @@ func runEvolutionActive(out, errOut io.Writer, entries []evolveLogEntry, kindFil
 
 // runEvolutionKinds handles --kinds mode: enumerate distinct kinds.
 func runEvolutionKinds(out, errOut io.Writer, entries []evolveLogEntry, format string) int {
-	// Count user-facing events per kind (excludes _kind_definition synthetics).
 	eventCounts := make(map[string]int)
 	for _, e := range entries {
 		if e.Kind == reservedKindDefinition {
@@ -231,10 +214,7 @@ func runEvolutionKinds(out, errOut io.Writer, entries []evolveLogEntry, format s
 		eventCounts[e.Kind]++
 	}
 
-	// Build output rows.
 	var rows []evolutionKindRow
-
-	// Built-ins always first, in registry order.
 	for _, b := range builtinKinds {
 		rows = append(rows, evolutionKindRow{
 			Name:             b.Name,
@@ -245,22 +225,15 @@ func runEvolutionKinds(out, errOut io.Writer, entries []evolveLogEntry, format s
 		})
 	}
 
-	// Agent-introduced kinds: any kind in the log not in the builtin registry.
-	// Use a set of builtin names for fast lookup.
 	builtinSet := make(map[string]bool)
 	for _, b := range builtinKinds {
 		builtinSet[b.Name] = true
 	}
 
-	// Collect distinct agent kind names (preserving first-seen order for
-	// alphabetical sort below).
 	agentKindSeen := make(map[string]bool)
 	var agentKindNames []string
 	for _, e := range entries {
-		if e.Kind == reservedKindDefinition {
-			continue
-		}
-		if builtinSet[e.Kind] {
+		if e.Kind == reservedKindDefinition || builtinSet[e.Kind] {
 			continue
 		}
 		if !agentKindSeen[e.Kind] {
@@ -270,46 +243,40 @@ func runEvolutionKinds(out, errOut io.Writer, entries []evolveLogEntry, format s
 	}
 	sort.Strings(agentKindNames)
 
-	// Build agent kind rows with the currently-active definition.
 	for _, name := range agentKindNames {
-		def := activeKindDefinition(entries, name)
 		rows = append(rows, evolutionKindRow{
 			Name:       name,
-			Definition: def,
+			Definition: activeKindDefinition(entries, name),
 			Source:     "agent",
 			EventCount: eventCounts[name],
 		})
 	}
 
-	// Emit rows.
 	if format == "json" {
-		// Emit as JSON array.
 		b, err := json.Marshal(rows)
 		if err != nil {
-			fmt.Fprintf(errOut, "mycelium evolution: marshal kinds: %v\n", err)
+			fmt.Fprintf(errOut, "mycelium evolve: marshal kinds: %v\n", err)
 			return ExitGenericError
 		}
 		fmt.Fprintf(out, "%s\n", b)
-	} else {
-		// Text: one row per line.
-		for _, r := range rows {
-			defLine := strings.SplitN(r.Definition, "\n", 2)[0]
-			if len(defLine) > 60 {
-				defLine = defLine[:57] + "..."
-			}
-			fmt.Fprintf(out, "%s\t%s\t%s\t%d\n", r.Name, r.Source, defLine, r.EventCount)
-		}
+		return ExitOK
 	}
 
+	for _, r := range rows {
+		defLine := strings.SplitN(r.Definition, "\n", 2)[0]
+		if len(defLine) > 60 {
+			defLine = defLine[:57] + "..."
+		}
+		fmt.Fprintf(out, "%s\t%s\t%s\t%d\n", r.Name, r.Source, defLine, r.EventCount)
+	}
 	return ExitOK
 }
 
 // activeKindDefinition returns the currently-active definition for an
 // agent-introduced kind. It prefers the rationale of the latest active
-// _kind_definition event targeting that kind; falls back to the kind_definition
+// _kind_definition event targeting kindName; falls back to the kind_definition
 // field on the first event of that kind.
 func activeKindDefinition(entries []evolveLogEntry, kindName string) string {
-	// Find the latest non-superseded _kind_definition event for this kind.
 	sup := supersededIDs(entries)
 	for i := len(entries) - 1; i >= 0; i-- {
 		e := entries[i]
@@ -317,7 +284,6 @@ func activeKindDefinition(entries []evolveLogEntry, kindName string) string {
 			return e.Rationale
 		}
 	}
-	// Fall back: first event of this kind with a kind_definition field.
 	for _, e := range entries {
 		if e.Kind == kindName && e.KindDefinition != "" {
 			return e.KindDefinition
@@ -336,7 +302,6 @@ func printEvolveEntry(out io.Writer, e evolveLogEntry, format string) error {
 		_, err = fmt.Fprintf(out, "%s\n", b)
 		return err
 	}
-	// Text format: <ts>  <kind>  <target>  <id>  → <rationale first line>
 	rationaleFirst := strings.SplitN(e.Rationale, "\n", 2)[0]
 	_, err := fmt.Fprintf(out, "%s\t%s\t%s\t%s\t%s\n",
 		e.TS, e.Kind, e.Target, e.ID, rationaleFirst)

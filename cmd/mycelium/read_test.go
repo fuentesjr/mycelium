@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -36,6 +37,70 @@ func TestReadFileNested(t *testing.T) {
 	out, _, rc := runDispatch(t, "read", "notes/today.md")
 	if rc != ExitOK || out != "nested" {
 		t.Errorf("got rc=%d out=%q, want rc=0 out=%q", rc, out, "nested")
+	}
+}
+
+func TestReadFileJSONFormat(t *testing.T) {
+	mount := t.TempDir()
+	content := "hello json\n"
+	if err := os.WriteFile(filepath.Join(mount, "memory.md"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("MYCELIUM_MOUNT", mount)
+
+	out, errOut, rc := runDispatch(t, "read", "memory.md", "--format", "json")
+	if rc != ExitOK {
+		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitOK, errOut)
+	}
+
+	var env readEnvelope
+	if err := json.Unmarshal([]byte(out), &env); err != nil {
+		t.Fatalf("stdout is not JSON: %v; out=%q", err, out)
+	}
+	if env.Path != "memory.md" {
+		t.Errorf("path: got %q, want memory.md", env.Path)
+	}
+	if env.Content != content {
+		t.Errorf("content: got %q, want %q", env.Content, content)
+	}
+	if env.Version != sha256Hex(content) {
+		t.Errorf("version: got %q, want %q", env.Version, sha256Hex(content))
+	}
+}
+
+func TestReadFileInvalidFormat(t *testing.T) {
+	mount := t.TempDir()
+	t.Setenv("MYCELIUM_MOUNT", mount)
+	_, errOut, rc := runDispatch(t, "read", "memory.md", "--format", "xml")
+	if rc != ExitUsage {
+		t.Errorf("rc: got %d, want %d", rc, ExitUsage)
+	}
+	if !strings.Contains(errOut, "--format") {
+		t.Errorf("stderr should mention --format, got %q", errOut)
+	}
+}
+
+func TestReadFileJSONRejectsInvalidUTF8(t *testing.T) {
+	mount := t.TempDir()
+	if err := os.WriteFile(filepath.Join(mount, "binary.dat"), []byte{0xff, 0xfe, 0x00}, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("MYCELIUM_MOUNT", mount)
+
+	_, errOut, rc := runDispatch(t, "read", "binary.dat", "--format", "json")
+	if rc != ExitGenericError {
+		t.Errorf("rc: got %d, want %d", rc, ExitGenericError)
+	}
+	if !strings.Contains(errOut, "UTF-8") {
+		t.Errorf("stderr should mention UTF-8, got %q", errOut)
+	}
+
+	out, _, rc := runDispatch(t, "read", "binary.dat")
+	if rc != ExitOK {
+		t.Fatalf("text read rc: got %d, want %d", rc, ExitOK)
+	}
+	if []byte(out)[0] != 0xff {
+		t.Errorf("text read should preserve raw bytes, got %v", []byte(out))
 	}
 }
 

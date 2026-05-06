@@ -13,10 +13,10 @@ import (
 //	[1] near_duplicate_paths
 //	[2] thrashing
 var expectedVerdicts = map[string][3]bool{
-	"healthy.jsonl":                         {true, true, true},
-	"unhealthy-writes-without-reads.jsonl":  {false, true, true},
-	"unhealthy-duplicate-paths.jsonl":       {true, false, true},
-	"unhealthy-thrashing.jsonl":             {true, true, false},
+	"healthy.jsonl":                        {true, true, true},
+	"unhealthy-writes-without-reads.jsonl": {false, true, true},
+	"unhealthy-duplicate-paths.jsonl":      {true, false, true},
+	"unhealthy-thrashing.jsonl":            {true, true, false},
 }
 
 func loadFixture(t *testing.T, name string) []LogEntry {

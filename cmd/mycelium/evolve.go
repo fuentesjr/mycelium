@@ -218,40 +218,63 @@ func appendEvolveEntry(errOut io.Writer, id Identity, e EvolveEntry, now time.Ti
 	}
 	line = append(line, '\n')
 
-	logPath := activityLogPath(id.Mount, id.AgentID, now)
-	logDir := filepath.Dir(logPath)
-	if err := os.MkdirAll(logDir, 0o755); err != nil {
-		fmt.Fprintf(errOut, "mycelium evolve: mkdir: %v\n", err)
-		return ExitGenericError
-	}
-
-	f, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
-	if err != nil {
-		fmt.Fprintf(errOut, "mycelium evolve: open log file: %v\n", err)
-		return ExitGenericError
-	}
-	defer f.Close()
-
-	if _, err := f.Write(line); err != nil {
-		fmt.Fprintf(errOut, "mycelium evolve: write log file: %v\n", err)
+	if err := appendActivityLineDurable(id.Mount, id.AgentID, now, line); err != nil {
+		fmt.Fprintf(errOut, "mycelium evolve: %v\n", err)
 		return ExitGenericError
 	}
 	return ExitOK
 }
 
-// runEvolve is the handler for `mycelium evolve <kind> [flags]`.
+// runEvolve is the handler for both `mycelium evolve <kind> ...` and
+// query modes such as `mycelium evolve --active`.
 func runEvolve(_ io.Reader, out, errOut io.Writer, args []string) int {
 	fs := flag.NewFlagSet("evolve", flag.ContinueOnError)
 	fs.SetOutput(errOut)
+
+	// Record-mode flags.
 	targetFlag := fs.String("target", "", "opaque agent-chosen scope string (≤4 KiB)")
 	supersedesFlag := fs.String("supersedes", "", "explicit ULID of a prior evolve event to supersede")
 	kindDefFlag := fs.String("kind-definition", "", "meaning of kind; required on first use of a non-builtin kind")
 	rationaleFlag := fs.String("rationale", "", "required explanation for this evolution event (≤64 KiB)")
 
+	// Query-mode flags.
+	listFlag := fs.Bool("list", false, "list the evolution timeline")
+	activeFlag := fs.Bool("active", false, "return active evolution entries")
+	kindsFlag := fs.Bool("kinds", false, "enumerate available evolution kinds")
+	queryKindFlag := fs.String("kind", "", "filter query output by kind")
+	sinceFlag := fs.String("since", "", "only query events with ts >= DATE")
+	formatFlag := fs.String("format", "json", "query output format: json|text")
+
 	positional, err := parseInterspersed(fs, args)
 	if err != nil {
 		return ExitUsage
 	}
+
+	queryFlagSet := *listFlag || *activeFlag || *kindsFlag || *queryKindFlag != "" || *sinceFlag != "" || flagWasSet(fs, "format")
+	queryMode := *listFlag || *activeFlag || *kindsFlag
+	if queryMode || (queryFlagSet && len(positional) == 0) {
+		if len(positional) != 0 {
+			fmt.Fprintln(errOut, "mycelium evolve: query modes do not accept a positional kind")
+			return ExitUsage
+		}
+		if *targetFlag != "" || *supersedesFlag != "" || *kindDefFlag != "" || *rationaleFlag != "" {
+			fmt.Fprintln(errOut, "mycelium evolve: record flags cannot be used with query modes")
+			return ExitUsage
+		}
+		return runEvolutionQuery(out, errOut, evolutionQueryOptions{
+			Kind:   *queryKindFlag,
+			Since:  *sinceFlag,
+			Active: *activeFlag,
+			Kinds:  *kindsFlag,
+			List:   *listFlag,
+			Format: *formatFlag,
+		})
+	}
+	if queryFlagSet {
+		fmt.Fprintln(errOut, "mycelium evolve: query flags cannot be used when recording an evolution event")
+		return ExitUsage
+	}
+
 	if len(positional) < 1 {
 		fmt.Fprintln(errOut, "mycelium evolve: <kind> is required")
 		return ExitUsage
@@ -298,6 +321,10 @@ func runEvolve(_ io.Reader, out, errOut io.Writer, args []string) int {
 	}
 	defer release()
 
+	if rc := recoverPendingTransactions(errOut, id); rc != ExitOK {
+		return rc
+	}
+
 	// Load all prior evolve events from the activity log.
 	priorEntries, err := loadEvolveEntries(id.Mount)
 	if err != nil {
@@ -317,20 +344,14 @@ func runEvolve(_ io.Reader, out, errOut io.Writer, args []string) int {
 	var resolvedSupersedes string
 
 	if supersedesID != "" {
-		// Explicit supersession: validate the referenced event exists and matches kind.
-		prior, found := findByID(priorEntries, supersedesID)
-		if !found {
+		// Explicit supersession: validate the referenced event exists.
+		if _, found := findByID(priorEntries, supersedesID); !found {
 			fmt.Fprintf(errOut, "mycelium evolve: --supersedes %q: no such evolve event\n", supersedesID)
 			return ExitReservedPrefix
 		}
-		if prior.Kind != kind {
-			fmt.Fprintf(errOut, "mycelium evolve: --supersedes %q: kind mismatch (event has kind %q, new event has kind %q)\n",
-				supersedesID, prior.Kind, kind)
-			return ExitReservedPrefix
-		}
 		resolvedSupersedes = supersedesID
-	} else {
-		// Implicit supersession by (kind, target) pair.
+	} else if target != "" {
+		// Implicit supersession by non-empty (kind, target) pair only.
 		if prior, found := latestActiveForKindTarget(priorEntries, kind, target); found {
 			resolvedSupersedes = prior.ID
 		}
@@ -355,10 +376,6 @@ func runEvolve(_ io.Reader, out, errOut io.Writer, args []string) int {
 
 	// If a kind_definition was supplied, write the synthetic _kind_definition chain event.
 	if kindDef != "" {
-		// Reload entries to include the one we just wrote (so supersession of
-		// prior _kind_definition events is found correctly). We scan for
-		// _kind_definition events separately: use the full set as collected so far
-		// plus the one we wrote.
 		allEntries := append(priorEntries, evolveLogEntry{
 			ID:             newID,
 			Kind:           kind,
@@ -377,13 +394,11 @@ func runEvolve(_ io.Reader, out, errOut io.Writer, args []string) int {
 			Supersedes: priorKDID,
 			Rationale:  kindDef,
 		}
-		// Use a slightly later timestamp to ensure ordering.
 		if rc := appendEvolveEntry(errOut, id, kdEv, now.Add(time.Nanosecond)); rc != ExitOK {
 			return rc
 		}
 	}
 
-	// Print result to stdout.
 	if resolvedSupersedes != "" {
 		fmt.Fprintf(out, `{"id":%q,"supersedes":%q}`+"\n", newID, resolvedSupersedes)
 	} else {
@@ -391,4 +406,14 @@ func runEvolve(_ io.Reader, out, errOut io.Writer, args []string) int {
 	}
 
 	return ExitOK
+}
+
+func flagWasSet(fs *flag.FlagSet, name string) bool {
+	seen := false
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == name {
+			seen = true
+		}
+	})
+	return seen
 }

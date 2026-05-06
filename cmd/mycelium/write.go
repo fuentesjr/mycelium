@@ -46,9 +46,12 @@ func writeFile(in io.Reader, errOut io.Writer, mount, requested, expectedVersion
 		fmt.Fprintf(errOut, "mycelium write: %v\n", err)
 		return "", ExitGenericError
 	}
+	return hashVersion(content), ExitOK
+}
+
+func hashVersion(content []byte) string {
 	sum := sha256.Sum256(content)
-	ver := versionPrefix + hex.EncodeToString(sum[:])
-	return ver, ExitOK
+	return versionPrefix + hex.EncodeToString(sum[:])
 }
 
 // conflictEnvelope is the JSON structure emitted to stderr on a CAS conflict.
@@ -113,7 +116,7 @@ func currentVersion(abs string) (string, error) {
 	return versionPrefix + hex.EncodeToString(h.Sum(nil)), nil
 }
 
-func atomicWrite(abs string, content []byte) error {
+func atomicWrite(abs string, content []byte, syncStops ...string) error {
 	dir := filepath.Dir(abs)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
@@ -131,12 +134,24 @@ func atomicWrite(abs string, content []byte) error {
 		cleanup()
 		return err
 	}
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		cleanup()
+		return err
+	}
 	if err := tmp.Close(); err != nil {
 		cleanup()
 		return err
 	}
 	if err := os.Rename(tmpPath, abs); err != nil {
 		cleanup()
+		return err
+	}
+	if len(syncStops) > 0 && syncStops[0] != "" {
+		if err := syncDirAncestors(dir, syncStops[0]); err != nil {
+			return err
+		}
+	} else if err := syncDir(dir); err != nil {
 		return err
 	}
 	return nil

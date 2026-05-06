@@ -1,12 +1,12 @@
 # Mycelium
 
-Persistent memory for AI coding agents. A small CLI plus a daily activity log on disk: agents read and write notes via `mycelium <subcommand>`, and the log preserves context across sessions, processes, and concurrent agents.
+Persistent memory for AI coding agents. A small CLI plus an authoritative, `_tx`-backed activity log on disk: agents read and write notes via `mycelium <subcommand>`, and the log preserves context across sessions, processes, and concurrent agents.
 
-**Status:** early access (pre-1.0). The binary is correct and complete per the Phase 1 design — 393 tests including sibling-process CAS validation, property tests on the activity log, T3 failure-mode detectors, and a tarball-roundtrip test that pins the "plain files plus JSONL" contract. Benchmark validation against Frontier models runs against the released artifact rather than gating release; see `docs/benchmarks/phase-1.md`.
+**Status:** early access (pre-1.0). The binary is correct and complete per the Phase 1 design — with tests covering sibling-process CAS validation, transaction-journal recovery, property checks on the activity log, T3 failure-mode detectors, and a tarball-roundtrip test that pins the "plain files plus JSONL" contract. Benchmark validation against Frontier models runs against the released artifact rather than gating release; see `docs/benchmarks/phase-1.md`.
 
 ## What's here
 
-- **`cmd/mycelium/`** — Go binary. Eleven subcommands (`read`, `write`, `edit`, `ls`, `glob`, `grep`, `rm`, `mv`, `log`, `evolve`, `evolution`). Mount-level `flock`-guarded CAS, SHA-256 version tokens, JSONL activity log at `<mount>/_activity/YYYY/MM/DD/<agent>.jsonl`. Reserved `_`-prefix protects backend metadata from agent writes.
+- **`cmd/mycelium/`** — Go binary. Ten subcommands (`read`, `write`, `edit`, `ls`, `glob`, `grep`, `rm`, `mv`, `log`, `evolve`). Mount-level `flock`-guarded CAS, SHA-256 version tokens, JSONL activity log at `<mount>/_activity/YYYY/MM/DD/<agent>.jsonl`, and `_tx/pending/` recovery records so content mutations and log entries recover together. Reserved `_`-prefix protects system metadata from agent writes.
 - **`extensions/pi-mycelium/`** — pi.dev extension. Sets up env vars on `session_start`, contributes a system-prompt block on `before_agent_start`, records `context_signal` entries on `context`. Registers no tools — agents invoke `mycelium` through pi's built-in `bash`.
 - **`docs/`** — design (`docs/mycelium-design.md`), phasing (`docs/mycelium-phases.md`), conflict-resolution conventions, self-evolution patterns, benchmark rubric.
 
@@ -61,6 +61,10 @@ echo "incident: query latency spike correlates with deploys at 14:30" \
 # Read it back
 mycelium read notes/incident-2026-04-30.md
 
+# Read content plus version for a future CAS update
+mycelium read notes/incident-2026-04-30.md --format json
+# {"path":"notes/incident-2026-04-30.md","version":"sha256:...","content":"..."}
+
 # Search
 mycelium grep --pattern latency --format json
 
@@ -71,7 +75,7 @@ mycelium evolve convention \
 # {"id":"01HXKP4Z9M8YV1W6E2RTSA9KFG"}
 
 # View the current rules in effect across all kinds
-mycelium evolution --active --format json
+mycelium evolve --active --format json
 
 # Concurrent-safe update via CAS — pass the prior version, retry on conflict (exit 64).
 # On conflict, mycelium emits a JSON envelope with current_version (and current_content

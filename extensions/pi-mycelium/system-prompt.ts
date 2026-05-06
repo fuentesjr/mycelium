@@ -1,52 +1,52 @@
-/** Shape of one row returned by `mycelium evolution --kinds --format json`. */
+/** Shape of one row returned by `mycelium evolve --kinds --format json`. */
 export interface EvolutionKindRow {
-  name: string;
-  definition: string;
-  defined_at_version?: string;
-  source: "builtin" | "agent";
-  event_count: number;
+	name: string;
+	definition: string;
+	defined_at_version?: string;
+	source: "builtin" | "agent";
+	event_count: number;
 }
 
-/** Shape of one entry returned by `mycelium evolution --active --format json`. */
+/** Shape of one entry returned by `mycelium evolve --active --format json`. */
 export interface ActiveEvolutionEvent {
-  ts: string;
-  agent_id: string;
-  session_id: string;
-  op: string;
-  id: string;
-  kind: string;
-  target?: string;
-  supersedes?: string;
-  rationale: string;
+	ts: string;
+	agent_id: string;
+	session_id: string;
+	op: string;
+	id: string;
+	kind: string;
+	target?: string;
+	supersedes?: string;
+	rationale: string;
 }
 
 export interface AvailableContext {
-  mountPath: string;
-  agentId: string;
-  sessionId: string;
-  kinds: EvolutionKindRow[];
-  activeEvolution: ActiveEvolutionEvent[];
+	mountPath: string;
+	agentId: string;
+	sessionId: string;
+	kinds: EvolutionKindRow[];
+	activeEvolution: ActiveEvolutionEvent[];
 }
 
 export interface UnavailableContext {
-  mountPath: string;
+	mountPath: string;
 }
 
 const ACTIVE_EVOLUTION_DISPLAY_LIMIT = 10;
 const RATIONALE_TRUNCATE_LENGTH = 200;
 
 function renderKindsSection(kinds: EvolutionKindRow[]): string {
-  if (kinds.length === 0) {
-    return `### Evolution kinds
+	if (kinds.length === 0) {
+		return `### Evolution kinds
 
-Evolution surface unavailable — \`mycelium evolution --kinds\` did not return data.`;
-  }
+Evolution surface unavailable — \`mycelium evolve --kinds\` did not return data.`;
+	}
 
-  const rows = kinds
-    .map((k) => `| \`${k.name}\` | ${k.source} | ${k.definition} |`)
-    .join("\n");
+	const rows = kinds
+		.map((k) => `| \`${k.name}\` | ${k.source} | ${k.definition} |`)
+		.join("\n");
 
-  return `### Evolution kinds
+	return `### Evolution kinds
 
 The following kinds are available in this mount. Built-in kinds ship with
 mycelium; agent kinds were introduced by a prior session on this mount.
@@ -59,30 +59,30 @@ To introduce a new kind, pass \`--kind-definition "..."\` on first use.`;
 }
 
 function renderActiveEvolutionSection(active: ActiveEvolutionEvent[]): string {
-  if (active.length === 0) {
-    return `### Active evolution
+	if (active.length === 0) {
+		return `### Active evolution
 
 No active evolution recorded yet. Use \`mycelium evolve\` to record conventions, lessons, indices, archives, or open questions.`;
-  }
+	}
 
-  const displayItems = active.slice(0, ACTIVE_EVOLUTION_DISPLAY_LIMIT);
-  const overflow = active.length - displayItems.length;
+	const displayItems = active.slice(0, ACTIVE_EVOLUTION_DISPLAY_LIMIT);
+	const overflow = active.length - displayItems.length;
 
-  const lines = displayItems.map((e) => {
-    const target = e.target ? ` ${e.target}` : "";
-    const rationale =
-      e.rationale.length > RATIONALE_TRUNCATE_LENGTH
-        ? e.rationale.slice(0, RATIONALE_TRUNCATE_LENGTH) + "…"
-        : e.rationale;
-    return `- [${e.kind}]${target} — ${rationale}`;
-  });
+	const lines = displayItems.map((e) => {
+		const target = e.target ? ` ${e.target}` : "";
+		const rationale =
+			e.rationale.length > RATIONALE_TRUNCATE_LENGTH
+				? e.rationale.slice(0, RATIONALE_TRUNCATE_LENGTH) + "…"
+				: e.rationale;
+		return `- [${e.kind}]${target} — ${rationale}`;
+	});
 
-  const footer =
-    overflow > 0
-      ? `\n\n...and ${overflow} more — run \`mycelium evolution --active\` for the full list.`
-      : "";
+	const footer =
+		overflow > 0
+			? `\n\n...and ${overflow} more — run \`mycelium evolve --active\` for the full list.`
+			: "";
 
-  return `### Active evolution
+	return `### Active evolution
 
 The conventions, lessons, and other evolution currently in force on this mount:
 
@@ -90,7 +90,7 @@ ${lines.join("\n")}${footer}`;
 }
 
 function renderRecordingEvolutionSection(): string {
-  return `### Recording evolution
+	return `### Recording evolution
 
 Use \`mycelium evolve\` to record structured evolution decisions. This is
 metadata only — it never mutates the store.
@@ -114,17 +114,17 @@ When to call it:
 
 The \`--target\` flag is optional for kinds that aren't path-scoped (e.g.
 \`lesson\`). When superseding a prior entry, the binary detects it automatically
-via \`(kind, target)\` matching — no need to pass \`--supersedes\` manually.`;
+via non-empty \`(kind, target)\` matching — no need to pass \`--supersedes\` manually for targeted entries. Targetless entries are additive unless you pass \`--supersedes\` explicitly.`;
 }
 
 export function systemPromptAvailable(c: AvailableContext): string {
-  return `## Mycelium memory
+	return `## Mycelium memory
 
 You have a persistent file-based memory store mounted at ${c.mountPath}.
 It survives sessions and may be shared with other agents mounted concurrently.
 
 Use these subcommands via the \`bash\` tool:
-- \`mycelium read <path>\` — read a file
+- \`mycelium read <path> [--format text|json]\` — read a file; JSON includes UTF-8 content plus version for CAS
 - \`mycelium write <path>\` — write or overwrite (content via stdin)
 - \`mycelium edit <path> --old <str> --new <str>\` — find/replace a unique substring
 - \`mycelium ls <path> [--recursive]\` — list entries
@@ -149,7 +149,7 @@ JSON to stderr:
 \`\`\`
 
 Add \`--include-current-content\` to also retrieve the current bytes inline
-(\`current_content\` field, UTF-8 only). Standard recovery: re-read, merge, retry.
+(\`current_content\` field, UTF-8 only). Standard recovery: re-read with \`mycelium read <path> --format json\`, merge, retry.
 
 Reserved paths: \`mycelium\` rejects writes to any first-segment path beginning
 with \`_\`. Today this means:
@@ -159,6 +159,9 @@ with \`_\`. Today this means:
   \`mycelium grep --path _activity --format json --pattern <str>\` to look back across
   sessions. Payloads from \`mycelium log\` are inlined on each entry as a \`payload\`
   field — no separate file to look up.
+- \`_tx/pending/{tx_id}.json\` — internal recovery records that keep content
+  mutations and activity entries in sync across crashes. A cleanly recovered
+  store normally has no pending entries; do not edit this path manually.
 
 When to log explicitly: this extension already records context boundaries
 automatically, so use \`mycelium log <op> --stdin\` only for signals you'd want
@@ -179,7 +182,7 @@ ${renderRecordingEvolutionSection()}`;
 }
 
 export function systemPromptUnavailable(c: UnavailableContext): string {
-  return `## Mycelium memory (UNAVAILABLE)
+	return `## Mycelium memory (UNAVAILABLE)
 
 Memory store is configured at ${c.mountPath} but the \`mycelium\` binary
 is not on PATH. Install it and ensure it's visible to this session to enable

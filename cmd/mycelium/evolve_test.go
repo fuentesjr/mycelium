@@ -236,27 +236,30 @@ func TestEvolveExplicitSupersedesMissingID(t *testing.T) {
 	}
 }
 
-func TestEvolveExplicitSupersedesKindMismatch(t *testing.T) {
+func TestEvolveExplicitSupersedesAllowsCrossKind(t *testing.T) {
 	mount := t.TempDir()
 	t.Setenv("MYCELIUM_MOUNT", mount)
 
-	// Write a lesson.
-	out1, _, rc1 := runDispatch(t, "evolve", "lesson",
-		"--rationale", "A lesson.")
+	// Write a question.
+	out1, _, rc1 := runDispatch(t, "evolve", "question",
+		"--target", "hypotheses/glp1-cardio.md",
+		"--rationale", "Open question.")
 	if rc1 != ExitOK {
 		t.Fatalf("setup: rc=%d", rc1)
 	}
 	res1 := parseEvolveResult(t, out1)
 
-	// Try to supersede it with a convention — kind mismatch.
-	_, errOut, rc := runDispatch(t, "evolve", "convention",
+	// Resolve it with a lesson. Cross-kind retirement is explicit and allowed.
+	out2, errOut, rc := runDispatch(t, "evolve", "lesson",
+		"--target", "hypotheses/glp1-cardio.md",
 		"--supersedes", res1.ID,
-		"--rationale", "Wrong kind.")
-	if rc != ExitReservedPrefix {
-		t.Errorf("rc: got %d, want %d (stderr=%q)", rc, ExitReservedPrefix, errOut)
+		"--rationale", "Resolved lesson.")
+	if rc != ExitOK {
+		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitOK, errOut)
 	}
-	if !strings.Contains(errOut, "kind mismatch") {
-		t.Errorf("stderr should mention 'kind mismatch', got %q", errOut)
+	res2 := parseEvolveResult(t, out2)
+	if res2.Supersedes != res1.ID {
+		t.Errorf("supersedes: got %q, want %q", res2.Supersedes, res1.ID)
 	}
 }
 
@@ -709,8 +712,8 @@ func TestEvolveNoTargetLessonNoSupersession(t *testing.T) {
 	mount := t.TempDir()
 	t.Setenv("MYCELIUM_MOUNT", mount)
 
-	// Two lessons with no target — same (kind="lesson", target="") pair.
-	// Second should implicitly supersede first.
+	// Two lessons with no target are additive. Empty target does not trigger
+	// implicit supersession.
 	out1, _, rc1 := runDispatch(t, "evolve", "lesson", "--rationale", "First lesson.")
 	if rc1 != ExitOK {
 		t.Fatalf("first: rc=%d", rc1)
@@ -723,9 +726,21 @@ func TestEvolveNoTargetLessonNoSupersession(t *testing.T) {
 	}
 	res2 := parseEvolveResult(t, out2)
 
-	// Both have target="", so second supersedes first.
-	if res2.Supersedes != res1.ID {
-		t.Errorf("supersedes: got %q, want %q", res2.Supersedes, res1.ID)
+	if res2.Supersedes != "" {
+		t.Errorf("targetless event should not auto-supersede, got %q", res2.Supersedes)
+	}
+
+	outActive, errOut, rc := runDispatch(t, "evolve", "--active")
+	if rc != ExitOK {
+		t.Fatalf("active: rc=%d stderr=%q", rc, errOut)
+	}
+	active := parseEvolutionEntries(t, outActive)
+	ids := map[string]bool{}
+	for _, e := range active {
+		ids[e.ID] = true
+	}
+	if !ids[res1.ID] || !ids[res2.ID] {
+		t.Fatalf("both targetless lessons should remain active; got ids=%v", ids)
 	}
 }
 

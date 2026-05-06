@@ -12,7 +12,7 @@ to also record the event in the activity log.)_
 
 ## Current rules in effect
 
-Run `mycelium evolution --active` for the canonical list of active conventions,
+Run `mycelium evolve --active` for the canonical list of active conventions,
 indexes, archives, lessons, and questions. This file is a prose companion —
 when it diverges from the activity log, **the activity log wins**.
 
@@ -25,8 +25,12 @@ To record a self-evolution event:
 mycelium evolve convention --target <path-or-scope> --rationale "..."
 mycelium evolve lesson     --target <source>        --rationale "..."
 mycelium evolve question   --target <topic>         --rationale "..."
-# See: mycelium evolution --kinds --format json   for all available kinds
+# See: mycelium evolve --kinds --format json      for all available kinds
 ```
+
+Targeted entries supersede the prior active entry for the same `(kind, target)`.
+Targetless entries are additive and remain active unless you explicitly retire
+one with `--supersedes <id>`.
 
 ## What lives where
 
@@ -48,7 +52,10 @@ update this file.
 ## Reading your own activity
 
 The activity log at `_activity/YYYY/MM/DD/{agent_id}.jsonl` is plain JSONL.
-Standard tools work; `mycelium grep`/`ls`/`glob` work on the same files.
+Standard tools work; `mycelium grep`/`ls`/`glob` work on the same files. The
+binary may also create `_tx/pending/{tx_id}.json` recovery records while tying
+content mutations to activity entries; cleanly recovered stores normally have no
+pending `_tx/` entries.
 
 ```sh
 # Today's entries (your agent)

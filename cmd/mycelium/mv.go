@@ -59,28 +59,9 @@ func moveFile(errOut io.Writer, mount, src, dst, expectedVersion string, include
 
 	// Refuse to overwrite an existing dst.
 	if _, err := os.Stat(dstAbs); err == nil {
-		dstRel := relForwardSlash(mount, dstAbs)
-		dstVer, verErr := currentVersion(dstAbs)
-		if verErr != nil {
-			fmt.Fprintf(errOut, "mycelium mv: %v\n", verErr)
-			return "", ExitGenericError
+		if rc := emitDestinationExists(errOut, mount, dstAbs, includeContent); rc != ExitOK {
+			return "", rc
 		}
-		env := conflictEnvelope{
-			Error:          "destination_exists",
-			Op:             "mv",
-			Path:           dstRel,
-			CurrentVersion: dstVer,
-		}
-		if includeContent {
-			fileBytes, readErr := os.ReadFile(dstAbs)
-			if readErr == nil && utf8.Valid(fileBytes) {
-				env.CurrentContent = string(fileBytes)
-			}
-		}
-		line, _ := json.Marshal(env)
-		line = append(line, '\n')
-		_, _ = errOut.Write(line)
-		return "", ExitConflict
 	} else if !errors.Is(err, fs.ErrNotExist) {
 		fmt.Fprintf(errOut, "mycelium mv: stat dst: %v\n", err)
 		return "", ExitGenericError
@@ -102,6 +83,41 @@ func moveFile(errOut io.Writer, mount, src, dst, expectedVersion string, include
 		fmt.Fprintf(errOut, "mycelium mv: %v\n", err)
 		return "", ExitGenericError
 	}
+	if err := syncDirAncestors(filepath.Dir(srcAbs), mount); err != nil {
+		fmt.Fprintf(errOut, "mycelium mv: %v\n", err)
+		return "", ExitGenericError
+	}
+	if dstDir := filepath.Dir(dstAbs); dstDir != filepath.Dir(srcAbs) {
+		if err := syncDirAncestors(dstDir, mount); err != nil {
+			fmt.Fprintf(errOut, "mycelium mv: %v\n", err)
+			return "", ExitGenericError
+		}
+	}
 
 	return ver, ExitOK
+}
+
+func emitDestinationExists(errOut io.Writer, mount, dstAbs string, includeContent bool) int {
+	dstRel := relForwardSlash(mount, dstAbs)
+	dstVer, verErr := currentVersion(dstAbs)
+	if verErr != nil {
+		fmt.Fprintf(errOut, "mycelium mv: %v\n", verErr)
+		return ExitGenericError
+	}
+	env := conflictEnvelope{
+		Error:          "destination_exists",
+		Op:             "mv",
+		Path:           dstRel,
+		CurrentVersion: dstVer,
+	}
+	if includeContent {
+		fileBytes, readErr := os.ReadFile(dstAbs)
+		if readErr == nil && utf8.Valid(fileBytes) {
+			env.CurrentContent = string(fileBytes)
+		}
+	}
+	line, _ := json.Marshal(env)
+	line = append(line, '\n')
+	_, _ = errOut.Write(line)
+	return ExitConflict
 }

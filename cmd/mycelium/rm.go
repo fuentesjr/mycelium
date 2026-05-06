@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path/filepath"
 )
 
 // removeFile resolves requested under mount, checks CAS if expectedVersion is
@@ -53,6 +54,10 @@ func removeFile(errOut io.Writer, mount, requested, expectedVersion string, incl
 			fmt.Fprintf(errOut, "mycelium rm: %s: not found\n", requested)
 			return "", ExitGenericError
 		}
+		fmt.Fprintf(errOut, "mycelium rm: %v\n", err)
+		return "", ExitGenericError
+	}
+	if err := syncDirAncestors(filepath.Dir(abs), mount); err != nil {
 		fmt.Fprintf(errOut, "mycelium rm: %v\n", err)
 		return "", ExitGenericError
 	}

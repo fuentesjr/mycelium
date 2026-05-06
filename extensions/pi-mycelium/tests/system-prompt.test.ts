@@ -134,7 +134,7 @@ describe("systemPromptAvailable — kinds section", () => {
   it("renders the empty-state message when kinds array is empty (binary unavailable)", () => {
     const block = makeBlock({ kinds: [] });
     expect(block).toContain("Evolution surface unavailable");
-    expect(block).toContain("mycelium evolution --kinds");
+    expect(block).toContain("mycelium evolve --kinds");
     // Should not render a table header
     expect(block).not.toContain("| Kind |");
   });
@@ -211,7 +211,7 @@ describe("systemPromptAvailable — active evolution section", () => {
     expect(block).toContain("Lesson 9");
     expect(block).not.toContain("Lesson 10");
     expect(block).toContain("...and 3 more");
-    expect(block).toContain("mycelium evolution --active");
+    expect(block).toContain("mycelium evolve --active");
   });
 
   it("does not show overflow footer when events are exactly at the limit", () => {

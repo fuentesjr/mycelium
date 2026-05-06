@@ -9,11 +9,11 @@ import (
 
 // conflictResult is the parsed form of the structured JSON conflict envelope.
 type conflictResult struct {
-	Error           string `json:"error"`
-	Op              string `json:"op"`
-	Path            string `json:"path"`
-	CurrentVersion  string `json:"current_version"`
-	ExpectedVersion string `json:"expected_version"`
+	Error           string  `json:"error"`
+	Op              string  `json:"op"`
+	Path            string  `json:"path"`
+	CurrentVersion  string  `json:"current_version"`
+	ExpectedVersion string  `json:"expected_version"`
 	CurrentContent  *string `json:"current_content"`
 }
 
@@ -111,5 +111,15 @@ func TestDispatchListsSubcommands(t *testing.T) {
 		if !strings.Contains(errOut, sc.name) {
 			t.Errorf("stderr missing subcommand %q in listing: %q", sc.name, errOut)
 		}
+	}
+}
+
+func TestEvolutionSubcommandRemoved(t *testing.T) {
+	_, errOut, rc := runDispatch(t, "evolution", "--active")
+	if rc != ExitUsage {
+		t.Errorf("rc: got %d, want %d", rc, ExitUsage)
+	}
+	if !strings.Contains(errOut, "unknown subcommand") {
+		t.Errorf("stderr should mention unknown subcommand, got %q", errOut)
 	}
 }

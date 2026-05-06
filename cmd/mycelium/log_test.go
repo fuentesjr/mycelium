@@ -525,8 +525,11 @@ func TestActivityLogSchemaFlatForWrite(t *testing.T) {
 	if e.Version != wantVersion {
 		t.Errorf("version: got %q, want %q", e.Version, wantVersion)
 	}
-	if e.PriorVersion != "" {
-		t.Errorf("prior_version should be absent for write, got %q", e.PriorVersion)
+	if e.PriorVersion != versionPrefix+"absent" {
+		t.Errorf("prior_version: got %q, want %q", e.PriorVersion, versionPrefix+"absent")
+	}
+	if e.TxID == "" {
+		t.Error("tx_id should be set for write entry")
 	}
 	if e.From != "" {
 		t.Errorf("from should be absent for write, got %q", e.From)
@@ -566,6 +569,9 @@ func TestActivityLogSchemaFlatForRm(t *testing.T) {
 	if e.Version != "" {
 		t.Errorf("version should be absent for rm, got %q", e.Version)
 	}
+	if e.TxID == "" {
+		t.Error("tx_id should be set for rm entry")
+	}
 }
 
 func TestActivityLogSchemaFlatForMv(t *testing.T) {
@@ -602,6 +608,9 @@ func TestActivityLogSchemaFlatForMv(t *testing.T) {
 	}
 	if e.PriorVersion != "" {
 		t.Errorf("prior_version should be absent for mv, got %q", e.PriorVersion)
+	}
+	if e.TxID == "" {
+		t.Error("tx_id should be set for mv entry")
 	}
 }
 

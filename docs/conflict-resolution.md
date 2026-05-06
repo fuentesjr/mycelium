@@ -8,7 +8,7 @@
 
 > **Re-read, merge, retry.**
 
-1. **Re-read** the path. Either parse `current_content` from the envelope (cheapest — requires `--include-current-content` on the original call), or call `mycelium read <path>` (one extra invocation, always works).
+1. **Re-read** the path. Either parse `current_content` from the envelope (cheapest — requires `--include-current-content` on the original call), or call `mycelium read <path> --format json` to get current content and version from the same read.
 
 2. **Merge** the agent's intended change with the current state. Semantics depend on the operation:
    - **`write`:** combine the new content with the current. Most "writes" are appends or section additions — apply that intent against the current bytes rather than the bytes the agent expected to overwrite.
@@ -16,15 +16,15 @@
    - **`mv` `destination_exists`:** read the destination, decide whether to overwrite (`mycelium rm <dst>` then `mv`) or pick a new path.
    - **`rm`:** the file changed since the agent observed it. Re-read; if it still merits deletion, retry; if not, abort.
 
-3. **Retry** with a fresh `--expected-version` token from the re-read, or omit the flag entirely if the agent has decided to stop being pessimistic.
+3. **Retry** with the fresh `version` token from `read --format json`, or omit the flag entirely if the agent has decided to stop being pessimistic.
 
 ---
 
 ## When to use `--expected-version`
 
 - **Always** for `edit` — the substring being replaced is itself a claim about prior state.
-- **Always** for `rm` when the agent is removing because of *content* it observed.
-- **Strongly recommended** for `write` when revising a file the agent has read this session. The version token comes from the most recent `_activity/` entry for the path, or from the stdout of the agent's own prior `write`/`edit`.
+- **Always** for `rm` when the agent is removing because of _content_ it observed.
+- **Strongly recommended** for `write` when revising a file the agent has read this session. The version token comes from `mycelium read <path> --format json`, from the most recent `_activity/` entry for the path, or from the stdout of the agent's own prior `write`/`edit`.
 - **Often unnecessary** for the first write to a path the agent owns exclusively (e.g., `tasks/T-current/notes.md` in a single-agent session).
 
 The flag is the agent's coordination knob. Never set by mycelium, never required.
@@ -43,11 +43,11 @@ Some conflicts can't be auto-recovered, and the agent should surface them rather
 
 ## Quick reference
 
-| Situation | Exit code | Stderr |
-|---|---|---|
-| Stale `--expected-version` on write/edit/rm/mv-src | 64 | JSON envelope, `error: "conflict"` |
-| `mv` destination already exists | 64 | JSON envelope, `error: "destination_exists"` |
-| Agent path under reserved `_` prefix | 65 | Plain text, contains `reserved` |
-| Other failures (path escape, missing file, bad args) | 1 or 2 | Plain text |
+| Situation                                            | Exit code | Stderr                                       |
+| ---------------------------------------------------- | --------- | -------------------------------------------- |
+| Stale `--expected-version` on write/edit/rm/mv-src   | 64        | JSON envelope, `error: "conflict"`           |
+| `mv` destination already exists                      | 64        | JSON envelope, `error: "destination_exists"` |
+| Agent path under reserved `_` prefix                 | 65        | Plain text, contains `reserved`              |
+| Other failures (path escape, missing file, bad args) | 1 or 2    | Plain text                                   |
 
 The **conflict (64)** and **reservation (65)** exit codes are stable contracts; the JSON envelope shape on 64 is documented in section 4 of `mycelium-design.md`. Other non-zero exits are generic failures whose specific code and stderr text may evolve.

@@ -9,7 +9,7 @@ This rubric operationalizes the three Phase 1 criteria that depend on real model
 - **#4 Self-evolution via the activity log.** Validated by T2.
 - **#5 Failure-mode observability.** Validated by T3.
 
-Criteria 2, 3, 6, 7, 8 are validated by the binary's property tests, concurrent-process tests, and tarball inspection — not here.
+Criteria 2, 3, 6, 7, 8, and 9 are validated by the binary's property tests, concurrent-process tests, crash-recovery tests, and tarball inspection — not here.
 
 ---
 
@@ -47,7 +47,7 @@ Each task ships as a directory under `docs/benchmarks/tasks/T<n>-<slug>/`, conta
 
 Three sessions, not two: two sessions test "did the agent re-read its notes"; three tests "did the agent build something compositional across resumes." The latter is the bet.
 
-**Held-out questions.** Five questions in `held-out.md` probe specific differentiators (pool modes, read/write splitting, implementation language, failover, prepared statements in transaction pooling). A grader (a Frontier model from the other provider than the one under test) reads the final store and answers each from the agent's notes. **Pass: ≥4/5 answered correctly *and* traceable to specific notes.**
+**Held-out questions.** Five questions in `held-out.md` probe specific differentiators (pool modes, read/write splitting, implementation language, failover, prepared statements in transaction pooling). A grader (a Frontier model from the other provider than the one under test) reads the final store and answers each from the agent's notes. **Pass: ≥4/5 answered correctly _and_ traceable to specific notes.**
 
 **Comparison run.** Same task, same model, no Mycelium mount, single session with the three prompts concatenated. The grader reads the transcript only. **Pass: the Mycelium run's output is judged more substantively grounded than the no-memory run.** Per `harness.md`: run 5 instances per model; both criteria require ≥3/5 to pass.
 
@@ -64,7 +64,7 @@ Three sessions, not two: two sessions test "did the agent re-read its notes"; th
 1. The agent is told it is `glp1-researcher` continuing prior work, and asked to extend the analytics into cardiovascular outcomes for the same patient cohort.
 2. "Continue. Take a moment first to look at how the store is shaped."
 
-**Pass.** After session 2, the rubric grader judges that the agent recognized the seeded pattern and responded with at least one convention edit, index file, or grep-before-write behavior visible in the post-run store or activity log. Single grader judgment; no signal-counting threshold. Per `harness.md`: run 5 instances per model; pass requires majority (≥3/5).
+**Pass.** After session 2, the rubric grader judges that the agent recognized the seeded pattern and responded with at least one convention edit, `mycelium evolve` event, index file, or grep-before-write behavior visible in the post-run store or activity log. Single grader judgment; no signal-counting threshold. Per `harness.md`: run 5 instances per model; pass requires majority (≥3/5).
 
 Why seeded: self-evolution requires something to evolve in response to. A clean store has nothing for the agent to notice.
 
@@ -84,7 +84,7 @@ Why seeded: self-evolution requires something to evolve in response to. A clean 
 
 ## Scoring
 
-A *run* executes T1–T3 against one model. Per-task scoring is binary (pass/fail).
+A _run_ executes T1–T3 against one model. Per-task scoring is binary (pass/fail).
 
 - **Acceptance #1** passes for a model if T1 passes.
 - **Acceptance #4** passes for a model if T2 passes.
@@ -102,7 +102,7 @@ Performance, long-running stores, cost ceilings, and non-pi.dev harnesses (Herme
 
 ## Release decoupling
 
-Binary-side acceptance criteria (#2 multi-agent concurrency, #5 failure-mode observability, #6 activity-log integrity, #7 backend correctness, #8 store readability) are met by tests in `cmd/mycelium/` and ship with `v0.1.0`. Model-run criteria (#1 multi-session synthesis, #3 conflict recovery on real models, #4 self-evolution) are open and validate against the released artifact rather than gating release. Results land here as runs complete.
+Binary-side acceptance criteria (#2 multi-agent concurrency, #5 failure-mode observability, #6 activity-log integrity, #7 reserved-path protection, #8 LocalFS correctness, #9 store readability) are met by tests in `cmd/mycelium/` and ship with the binary. Model-run criteria (#1 multi-session synthesis, #3 conflict recovery on real models, #4 self-evolution) are open and validate against the released artifact rather than gating release. Results land here as runs complete.
 
 Rationale: model-run validation does not change the artifact, only the public claim about it. Shipping early-access lets real users exercise the multi-session and concurrent-agent paths that the synthetic suite covers; waiting for full validation costs months of zero-feedback delay. Release framing is "early access, validation in progress" until both target models pass #1 and #4.
 

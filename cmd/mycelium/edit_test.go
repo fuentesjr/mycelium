@@ -7,7 +7,6 @@ import (
 	"testing"
 )
 
-
 // writeTestFile is a helper that creates a file with the given content under mount.
 func writeTestFile(t *testing.T, mount, name, content string) {
 	t.Helper()
