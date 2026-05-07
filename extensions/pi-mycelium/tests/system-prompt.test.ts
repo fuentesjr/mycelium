@@ -107,8 +107,17 @@ describe("systemPromptAvailable", () => {
     expect(block).toContain("payload");
   });
 
+  it("documents adapter-recorded activity events for the agent", () => {
+    expect(block).toContain("### Activity events");
+    expect(block).toContain("context_checkpoint");
+    expect(block).toContain("tool_start");
+    expect(block).toContain("metadata-only by default");
+    expect(block).toContain("context_signal");
+  });
+
   it("guides explicit log usage", () => {
     expect(block).toContain("When to log explicitly");
+    expect(block).toContain("agent_note");
   });
 });
 

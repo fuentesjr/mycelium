@@ -135,7 +135,7 @@ A single binary, `mycelium`, invoked through the agent's shell. Ten subcommands:
 
 ### Metadata operations
 
-- **`mycelium log <op> [--path PATH] [--payload-json STR | --stdin]`** — append a non-mutation signal entry to `_activity/YYYY/MM/DD/{agent_id}.jsonl`. The system fills `ts`, `agent_id`, `session_id`; the caller supplies `op` (a non-mutation tag like `context_signal`, `compaction`, or an agent annotation), an optional `--path`, and an optional JSON payload. Silent on success.
+- **`mycelium log <op> [--path PATH] [--payload-json STR | --stdin]`** — append a non-mutation signal entry to `_activity/YYYY/MM/DD/{agent_id}.jsonl`. The system fills `ts`, `agent_id`, `session_id`; the caller supplies `op` (a non-mutation tag like `context_checkpoint`, `compaction`, or an agent annotation), an optional `--path`, and an optional JSON payload. Silent on success.
 
 - **`mycelium evolve ...`** — record and query self-evolution metadata. One command owns the whole evolution surface:
 
@@ -413,10 +413,18 @@ A `mycelium log` entry with an inline payload:
   "ts": "2026-04-26T18:43:02.117Z",
   "agent_id": "researcher-7",
   "session_id": "sess-9b2f",
-  "op": "context_signal",
-  "payload": { "message_count": 42, "last_role": "assistant" }
+  "op": "context_checkpoint",
+  "payload": {
+    "message_count": 42,
+    "last_role": "assistant",
+    "fingerprint": "sha256:..."
+  }
 }
 ```
+
+Adapter-owned event names and generic payload fields are conventions, documented
+in [portable activity events](portable-activity-events.md), not binary-enforced
+schema.
 
 An evolution entry:
 

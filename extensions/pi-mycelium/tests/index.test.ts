@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type {
   BeforeAgentStartEvent,
@@ -28,7 +29,9 @@ type AnyHandler = (event: unknown, ctx: ExtensionContext) => unknown;
 // Fixtures
 // ---------------------------------------------------------------------------
 
+const require = createRequire(import.meta.url);
 const RESOLVED_BINARY = "/usr/local/bin/mycelium";
+const ADAPTER_VERSION = (require("../package.json") as { version: string }).version;
 
 const sampleKinds: EvolutionKindRow[] = [
   {
@@ -123,6 +126,16 @@ function makeContextEvent(messages: ContextEvent["messages"]): ContextEvent {
   return { type: "context", messages };
 }
 
+function argsFromExecCall(exec: ReturnType<typeof vi.fn>, callIndex = 0): string[] {
+  return (exec.mock.calls[callIndex] as unknown as [string, string[]])[1];
+}
+
+function payloadFromExecCall(exec: ReturnType<typeof vi.fn>, callIndex = 0): Record<string, unknown> {
+  const args = argsFromExecCall(exec, callIndex);
+  expect(args[2]).toBe("--payload-json");
+  return JSON.parse(args[3]) as Record<string, unknown>;
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -140,11 +153,21 @@ describe("pi extension factory", () => {
     process.env = { ...original };
   });
 
-  it("registers session_start, before_agent_start, and context handlers", () => {
+  it("registers lifecycle, context, turn, tool, and compaction handlers", () => {
     const { handlers } = makeRegistration(async () => execResult(0));
-    expect(handlers.has("session_start")).toBe(true);
-    expect(handlers.has("before_agent_start")).toBe(true);
-    expect(handlers.has("context")).toBe(true);
+    for (const eventName of [
+      "session_start",
+      "session_shutdown",
+      "before_agent_start",
+      "turn_start",
+      "turn_end",
+      "tool_execution_start",
+      "tool_execution_end",
+      "session_compact",
+      "context",
+    ]) {
+      expect(handlers.has(eventName)).toBe(true);
+    }
   });
 
   it("chains before_agent_start systemPrompt off the incoming event", async () => {
@@ -209,12 +232,23 @@ describe("pi extension factory", () => {
       ctx,
     );
     expect(result).toBeUndefined();
-    expect(exec).toHaveBeenCalledWith(RESOLVED_BINARY, [
-      "log",
-      "context_signal",
-      "--payload-json",
-      JSON.stringify({ messageCount: 3, lastRole: "user" }),
-    ]);
+    expect(exec).toHaveBeenCalledTimes(1);
+    const args = argsFromExecCall(exec);
+    expect(args[0]).toBe("log");
+    expect(args[1]).toBe("context_checkpoint");
+    const payload = payloadFromExecCall(exec);
+    expect(payload).toMatchObject({
+      harness: "pi.dev",
+      adapter_version: ADAPTER_VERSION,
+      seq: 2,
+      message_count: 3,
+      last_role: "user",
+      role_counts: { user: 2, assistant: 1 },
+      provider: "anthropic",
+      model: "m",
+      stop_reason: "stop",
+    });
+    expect(payload.fingerprint).toMatch(/^sha256:/);
   });
 
   it("context handler is a no-op when binary is missing", async () => {
@@ -232,13 +266,27 @@ describe("pi extension factory", () => {
   it("logs session_new for reason=new when binary is available", async () => {
     const { exec, handlers } = makeRegistration(defaultExec);
     await handlers.get("session_start")!(makeSessionStartEvent("new"), ctx);
-    expect(exec).toHaveBeenCalledWith(RESOLVED_BINARY, ["log", "session_new"]);
+    expect(exec).toHaveBeenCalledWith(
+      RESOLVED_BINARY,
+      expect.arrayContaining(["log", "session_new", "--payload-json"]),
+    );
+    expect(payloadFromExecCall(exec, 1)).toMatchObject({
+      session_reason: "new",
+      harness: "pi.dev",
+    });
   });
 
   it("logs session_startup for reason=startup", async () => {
     const { exec, handlers } = makeRegistration(defaultExec);
     await handlers.get("session_start")!(makeSessionStartEvent("startup"), ctx);
-    expect(exec).toHaveBeenCalledWith(RESOLVED_BINARY, ["log", "session_startup"]);
+    expect(exec).toHaveBeenCalledWith(
+      RESOLVED_BINARY,
+      expect.arrayContaining(["log", "session_startup", "--payload-json"]),
+    );
+    expect(payloadFromExecCall(exec, 1)).toMatchObject({
+      session_reason: "startup",
+      harness: "pi.dev",
+    });
   });
 
   it("invokes bootstrapMemoryFile with the resolved binary and the mount path", async () => {

@@ -7,7 +7,7 @@ Persistent memory for AI coding agents. A small CLI plus an authoritative, `_tx`
 ## What's here
 
 - **`cmd/mycelium/`** — Go binary. Ten subcommands (`read`, `write`, `edit`, `ls`, `glob`, `grep`, `rm`, `mv`, `log`, `evolve`). Mount-level `flock`-guarded CAS, SHA-256 version tokens, JSONL activity log at `<mount>/_activity/YYYY/MM/DD/<agent>.jsonl`, and `_tx/pending/` recovery records so content mutations and log entries recover together. Reserved `_`-prefix protects system metadata from agent writes.
-- **`extensions/pi-mycelium/`** — pi.dev extension. Sets up env vars on `session_start`, contributes a system-prompt block on `before_agent_start`, records `context_signal` entries on `context`. Registers no tools — agents invoke `mycelium` through pi's built-in `bash`.
+- **`extensions/pi-mycelium/`** — pi.dev extension. Sets up env vars on `session_start`, contributes a system-prompt block on `before_agent_start`, and records portable activity events (`context_checkpoint`, turn/tool boundaries, compaction). Registers no tools — agents invoke `mycelium` through pi's built-in `bash`.
 - **`docs/`** — design (`docs/mycelium-design.md`), phasing (`docs/mycelium-phases.md`), conflict-resolution conventions, self-evolution patterns, benchmark rubric.
 
 ## Install
@@ -93,6 +93,7 @@ cat $MYCELIUM_MOUNT/_activity/*/*/*/alice.jsonl
 - [`docs/mycelium-phases.md`](docs/mycelium-phases.md) — phasing roadmap; what's in scope when, and why.
 - [`docs/conflict-resolution.md`](docs/conflict-resolution.md) — multi-agent conflict-resolution conventions.
 - [`docs/self-evolution.md`](docs/self-evolution.md) — convention bootstrap, self-built indices, archiving patterns.
+- [`docs/portable-activity-events.md`](docs/portable-activity-events.md) — adapter event vocabulary and payload conventions.
 - [`docs/benchmarks/phase-1.md`](docs/benchmarks/phase-1.md) — validation rubric, target models, scoring.
 - [`docs/adr/`](docs/adr/) — architecture decision records.
 - [`CHANGELOG.md`](CHANGELOG.md) — release notes.

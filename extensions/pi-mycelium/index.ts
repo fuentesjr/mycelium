@@ -9,13 +9,15 @@ import type {
 	EvolutionKindRow,
 	ActiveEvolutionEvent,
 } from "./system-prompt.js";
-import { recordContextSignal, recordSessionBoundary } from "./activity-log.js";
+import { createActivityLogRecorder } from "./activity-log.js";
 import { bootstrapMemoryFile } from "./bootstrap.js";
 import { runMyceliumJSON, runMyceliumNDJSON } from "./mycelium.js";
 
 export default function (pi: ExtensionAPI) {
+	const activity = createActivityLogRecorder();
 	let binaryPath: string | null = null;
 	let mountPath = "";
+	let currentTurnIndex: number | undefined;
 
 	pi.on("session_start", async (event, ctx) => {
 		const cfg = resolveConfig(ctx.cwd);
@@ -23,9 +25,13 @@ export default function (pi: ExtensionAPI) {
 		binaryPath = await resolveBinary(pi);
 		if (binaryPath) {
 			setupEnv(cfg, ctx.sessionManager.getLeafId(), binaryPath);
-			await recordSessionBoundary(pi, binaryPath, event.reason);
+			await activity.recordSessionBoundary(pi, binaryPath, event.reason);
 			await bootstrapMemoryFile(binaryPath, mountPath);
 		}
+	});
+
+	pi.on("session_shutdown", async (event, _ctx) => {
+		if (binaryPath) await activity.recordSessionShutdown(pi, binaryPath, event);
 	});
 
 	pi.on("before_agent_start", async (event, _ctx) => {
@@ -62,8 +68,33 @@ export default function (pi: ExtensionAPI) {
 		return { systemPrompt: event.systemPrompt + "\n\n" + block };
 	});
 
+	pi.on("turn_start", async (event, _ctx) => {
+		currentTurnIndex = event.turnIndex;
+		if (binaryPath) await activity.recordTurnStart(pi, binaryPath, event);
+	});
+
+	pi.on("turn_end", async (event, _ctx) => {
+		if (binaryPath) await activity.recordTurnEnd(pi, binaryPath, event);
+	});
+
+	pi.on("tool_execution_start", async (event, _ctx) => {
+		if (binaryPath) await activity.recordToolStart(pi, binaryPath, event);
+	});
+
+	pi.on("tool_execution_end", async (event, _ctx) => {
+		if (binaryPath) await activity.recordToolEnd(pi, binaryPath, event);
+	});
+
+	pi.on("session_compact", async (event, _ctx) => {
+		if (binaryPath) await activity.recordCompaction(pi, binaryPath, event);
+	});
+
 	pi.on("context", async (event, _ctx) => {
-		if (binaryPath) await recordContextSignal(pi, binaryPath, event);
+		if (binaryPath) {
+			await activity.recordContextCheckpoint(pi, binaryPath, event, {
+				turnIndex: currentTurnIndex,
+			});
+		}
 		return undefined;
 	});
 }

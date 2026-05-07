@@ -117,6 +117,22 @@ The \`--target\` flag is optional for kinds that aren't path-scoped (e.g.
 via non-empty \`(kind, target)\` matching — no need to pass \`--supersedes\` manually for targeted entries. Targetless entries are additive unless you pass \`--supersedes\` explicitly.`;
 }
 
+function renderActivityEventsSection(): string {
+	return `### Activity events
+
+The pi-mycelium adapter automatically records portable activity events under
+\`_activity/\`: session boundaries, \`turn_start\` / \`turn_end\`,
+\`tool_start\` / \`tool_end\`, \`compaction\`, and deduped
+\`context_checkpoint\` entries. Older logs may contain legacy
+\`context_signal\` entries; treat them as low-detail context checkpoints.
+
+These event names are adapter conventions, not binary-enforced schema. Payloads
+are metadata-only by default (counts, roles, tool names/ids, timings, usage,
+error flags, fingerprints), not full prompt/tool/file contents. Read them with
+\`mycelium grep --path _activity --pattern context_checkpoint --format json\` or
+other normal file/search tools.`;
+}
+
 export function systemPromptAvailable(c: AvailableContext): string {
 	return `## Mycelium memory
 
@@ -163,10 +179,11 @@ with \`_\`. Today this means:
   mutations and activity entries in sync across crashes. A cleanly recovered
   store normally has no pending entries; do not edit this path manually.
 
-When to log explicitly: this extension already records context boundaries
+${renderActivityEventsSection()}
+
+When to log explicitly: this extension already records portable activity events
 automatically, so use \`mycelium log <op> --stdin\` only for signals you'd want
-to grep later — e.g. a \`decision\` with rationale, or a \`compaction\` marker
-before truncating a working note.
+to grep later — e.g. a \`decision\` or \`agent_note\` with rationale.
 
 This session's identity: MYCELIUM_AGENT_ID=${c.agentId}, MYCELIUM_SESSION_ID=${c.sessionId}.
 

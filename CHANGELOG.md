@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.1.8] - 2026-05-08
+
 ### Added (mycelium binary)
 
 - `mycelium read --format json` now returns `{path, version, content}` so agents can obtain content and a CAS token from the same read.
@@ -17,6 +19,13 @@
 - Active-evolution startup queries now call `mycelium evolve --active/--kinds`.
 - System-prompt conflict guidance now points agents to `mycelium read <path> --format json` for CAS recovery.
 - Starter memory template now documents targetless additive evolution entries and explicit `--supersedes` retirement.
+- Activity logging now emits portable `context_checkpoint` entries with generic payload fields, fingerprint-based duplicate suppression, and turn/tool/compaction/session-shutdown events. The legacy `context_signal` helper remains for compatibility.
+- The injected system prompt now documents the adapter-recorded activity events, metadata-only payload policy, and how agents should grep `context_checkpoint` history.
+
+### Added (docs)
+
+- `docs/portable-activity-events.md` documents the adapter event vocabulary, payload conventions, dedupe policy, shell/tool/pi adapter examples, and links a representative JSONL fixture.
+- ADR-0002 records the decision to keep portable activity events as adapter conventions rather than binary-enforced schema.
 
 ## [0.1.7] - 2026-05-04
 

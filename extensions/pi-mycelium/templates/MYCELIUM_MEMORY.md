@@ -67,8 +67,8 @@ mycelium glob '_activity/2026/04/*/*.jsonl'
 # Find write ops
 mycelium grep --path _activity --pattern '"op":"write"' --format=json
 
-# Find signal entries with payloads (payload is inline on each entry)
-mycelium grep --path _activity --pattern context_signal --format=json
+# Find context checkpoints with inline payloads
+mycelium grep --path _activity --pattern context_checkpoint --format=json
 ```
 
 Grepping your own log between sessions is how you notice duplicated writes,

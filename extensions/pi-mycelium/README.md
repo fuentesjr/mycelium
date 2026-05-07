@@ -32,11 +32,16 @@ gets resolved.
   `MYCELIUM_AGENT_ID` (default `pi-agent`), `MYCELIUM_SESSION_ID` (from
   `ctx.sessionManager.getLeafId()`), and `MYCELIUM_MOUNT` for the agent's
   bash invocations. Records a session-boundary entry in the activity log.
+- **`session_shutdown`** — records a portable `session_shutdown` entry before
+  the extension runtime is torn down.
 - **`before_agent_start`** — appends a system-prompt block describing the
   `mycelium` subcommands, conventions, identity, and conflict semantics,
   plus the project's evolution kinds and any active evolution. Chains off
   `event.systemPrompt` so other extensions' contributions are preserved.
-- **`context`** — records a `context_signal` entry to the activity log
+- **turn/tool/context events** — records `turn_start`, `turn_end`,
+  `tool_start`, `tool_end`, `compaction`, and deduped `context_checkpoint`
+  entries using the portable vocabulary in
+  [`docs/portable-activity-events.md`](https://github.com/fuentesjr/mycelium/blob/main/docs/portable-activity-events.md),
   without modifying the agent's message stream.
 
 The bundled binary writes system metadata under `_activity/` and `_tx/`: the
@@ -47,7 +52,9 @@ and log entries recover together after crashes.
 
 - Registers no tools. The agent invokes `mycelium <sub>` through pi's
   built-in `bash` tool, the same way it runs `git`, `rg`, or any other shell
-  command. This is intentional — see `docs/mycelium-design.md` section 1 in the main repo.
+  command. This is intentional — see
+  [`docs/mycelium-design.md`](https://github.com/fuentesjr/mycelium/blob/main/docs/mycelium-design.md)
+  section 1 in the main repo.
 - Does not prefetch, summarize, or auto-inject memory hints. Self-evolution
   is an agent behavior, not a system feature (see design section 7).
 
