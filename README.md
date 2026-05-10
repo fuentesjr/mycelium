@@ -71,19 +71,19 @@ see [`docs/benchmarks/phase-1.md`](docs/benchmarks/phase-1.md).
 
 Requires Go 1.26+.
 
-\```
+```
 git clone https://github.com/fuentesjr/mycelium.git
 cd mycelium
 make build
 sudo install cmd/mycelium/mycelium /usr/local/bin/
 mycelium    # prints subcommand list
-\```
+```
 
 Or via `go install`:
 
-\```
+```
 go install ./cmd/mycelium
-\```
+```
 
 ### Pi extension
 
@@ -91,13 +91,13 @@ The extension ships on npm and bundles the platform-matching
 `mycelium` binary as an optional dependency — no separate binary
 install or PATH setup needed.
 
-\```
+```
 # Global — available in every pi session, mounts at ~/.pi/agent/extensions/pi-mycelium/journal/
 pi install npm:pi-mycelium
 
 # Or project-local — mounts at <cwd>/.pi/pi-mycelium/journal/
 pi install npm:pi-mycelium -l
-\```
+```
 
 Verify with `pi list`. Updates: `pi update npm:pi-mycelium`.
 
@@ -110,7 +110,7 @@ for the full install / scope-detection / identity story.
 
 ## Quick example
 
-\```
+```
 export MYCELIUM_MOUNT=$(pwd)/.mycelium-store
 export MYCELIUM_AGENT_ID=alice
 
@@ -146,7 +146,7 @@ echo "updated content" | mycelium write notes/incident-2026-04-30.md \
 
 # Inspect activity log directly — plain JSONL, no tooling required
 cat $MYCELIUM_MOUNT/_activity/*/*/*/alice.jsonl
-\```
+```
 
 ## What agents record
 
@@ -165,7 +165,7 @@ craft as a good commit message, applied to every note.
 adopted, indices built, patterns archived — each recorded as a
 first-class entry in the activity log:
 
-\```bash
+```bash
 # A decision with its alternative
 mycelium evolve convention \
   --target notes/incidents/ \
@@ -180,7 +180,7 @@ mycelium evolve index \
 mycelium evolve archive \
   --target notes/spikes/2026-Q1/ \
   --rationale "Archiving Q1 spikes; none referenced in 30+ days and they were drowning grep results for active work."
-\```
+```
 
 A future agent asking "why are incidents named this way?" gets the
 original reasoning, not a guess. The reasoning is queryable: `mycelium
@@ -223,12 +223,12 @@ for the schema.
 
 ## Development
 
-\```
+```
 make test     # run the Go test suite
 make build    # build the host-platform binary
 make dist     # cross-compile release tarballs for darwin+linux x amd64+arm64
 make clean    # remove build artifacts
-\```
+```
 
 The repository uses [Jujutsu](https://docs.jj-vcs.dev/) (`jj`)
 co-located with git. Either toolchain works against the same history.
