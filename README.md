@@ -61,17 +61,26 @@ agent writes from clobbering system metadata.
 
 ```
 .mycelium-store/
-├── notes/                          ← agent-owned content
-│   ├── incident-2026-04-30.md
-│   └── services/
-│       └── _index.md               ← self-built indices live with the data
-├── _lock                           ← mount-level flock target
-├── _activity/                      ← append-only JSONL log per agent
+├── notes/                                        ← agent-owned content
+│   ├── incidents/
+│   │   ├── 2026-04-30-query-latency-spike.md     ← mycelium evolve convention: <date>-<slug>.md
+│   │   └── 2026-05-02-checkout-503s.md
+│   ├── services/
+│   │   ├── _index.md                             ← mycelium evolve index: services by team
+│   │   ├── checkout-api.md
+│   │   └── payments-worker.md
+│   ├── reviews/
+│   │   └── 2026-05-08-pr-1247.md
+│   └── spikes/
+│       └── 2026-Q1/                              ← mycelium evolve archive (no file changes)
+│           └── caching-prototype.md
+├── _lock                                         ← mount-level flock target
+├── _activity/                                    ← append-only JSONL log per agent
 │   └── 2026/05/09/
-│       ├── coder.jsonl
-│       └── indexer.jsonl
+│       ├── coder.jsonl                           ← writes + evolve events
+│       └── reviewer.jsonl
 └── _tx/
-    └── pending/                    ← crash-recovery journal
+    └── pending/                                  ← crash-recovery journal
 ```
 
 ## Subcommands
@@ -98,7 +107,7 @@ on the next write. On conflict, mycelium emits a JSON envelope with
 can re-merge in memory without a second read:
 
 ```
-coder         mycelium         indexer
+coder         mycelium         reviewer
   │              │                │
   │──write v1───▶│                │
   │◀───ok, v2────│                │
@@ -191,8 +200,11 @@ mycelium evolve convention \
   --rationale "Adopting <date>-<slug>.md filenames so incidents sort chronologically without a separate index. Tried index.md first; it drifted from reality within a week."
 # {"id":"01HXKP4Z9M8YV1W6E2RTSA9KFG"}
 
-# View the current rules in effect across all kinds
+# View the current rules in effect across all kinds (NDJSON; one event per line)
 mycelium evolve --active --format json
+# {"ts":"2026-04-28T09:14:32Z","agent_id":"coder","session_id":"01HXJX2K7N9R5T2YQ8M3D1B6V4","op":"evolve","id":"01HXKP4Z9M8YV1W6E2RTSA9KFG","kind":"convention","target":"notes/incidents/","supersedes":"","kind_definition":"","rationale":"Adopting <date>-<slug>.md filenames so incidents sort chronologically without a separate index."}
+# {"ts":"2026-05-01T14:22:09Z","agent_id":"coder","session_id":"01HXKM5R8P2Q6V3Z9N4S1T0Y7K","op":"evolve","id":"01HXKP6F3J8C2YV1W6E2RTSA9K","kind":"index","target":"notes/services/","supersedes":"","kind_definition":"","rationale":"Built _index.md grouped by team owner; lookups were dominated by 'whose service is this?'"}
+# {"ts":"2026-05-05T16:08:51Z","agent_id":"coder","session_id":"01HXKQ8T9V3R5W4Y2N7Z1B6P0M","op":"evolve","id":"01HXKP9YQ7M2K8V1W6E2RTSA9F","kind":"archive","target":"notes/spikes/2026-Q1/","supersedes":"","kind_definition":"","rationale":"Archiving Q1 spikes; none referenced in 30+ days and they were drowning grep results for active work."}
 
 # Concurrent-safe update via CAS — pass the prior version, retry on conflict (exit 64).
 # On conflict, mycelium emits a JSON envelope with current_version (and current_content
