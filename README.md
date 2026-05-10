@@ -273,6 +273,7 @@ for the schema.
 
 **Start here:**
 
+- [`docs/faq.md`](docs/faq.md) — common questions about adopting, integrating, and operating mycelium.
 - [`docs/mycelium-design.md`](docs/mycelium-design.md) — design rationale, architecture, principles.
 - [`docs/self-evolution.md`](docs/self-evolution.md) — convention bootstrap, self-built indices, archiving patterns.
 
