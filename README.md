@@ -5,6 +5,23 @@ that lets agents keep notes across sessions, processes, and concurrent
 runs — using plain files plus a JSONL activity log. No daemon, no
 network, no database.
 
+```
+   ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+   │ Claude Code  │  │      π       │  │   scripts    │
+   └──────┬───────┘  └──────┬───────┘  └──────┬───────┘
+          │                 │                 │
+          └─────────────────┼─────────────────┘
+                            │  mycelium <subcommand>
+                    ┌───────▼───────┐
+                    │ mycelium CLI  │
+                    └───────┬───────┘
+                            │  atomic writes, CAS, _tx journal
+                    ┌───────▼───────┐
+                    │    mount/     │  ◀── git, grep, tar, cat
+                    │  plain files  │      read this directly
+                    └───────────────┘
+```
+
 ## Why
 
 AI coding agents lose context the moment a session ends. The usual
@@ -42,6 +59,21 @@ Claude Code, a script, whatever — invoke `mycelium <subcommand>` to
 read and write inside the mount. The reserved `_` path prefix keeps
 agent writes from clobbering system metadata.
 
+```
+.mycelium-store/
+├── notes/                          ← agent-owned content
+│   ├── incident-2026-04-30.md
+│   └── services/
+│       └── _index.md               ← self-built indices live with the data
+├── _lock                           ← mount-level flock target
+├── _activity/                      ← append-only JSONL log per agent
+│   └── 2026/05/09/
+│       ├── coder.jsonl
+│       └── indexer.jsonl
+└── _tx/
+    └── pending/                    ← crash-recovery journal
+```
+
 ## Subcommands
 
 | Command | Group | Purpose |
@@ -56,6 +88,30 @@ agent writes from clobbering system metadata.
 | `grep` | discovery | Content search across the mount |
 | `log` | meta | Read the per-agent activity log |
 | `evolve` | meta | Record or query self-evolution events (conventions, indices, archives) |
+
+## Concurrent writes
+
+Two agents racing on the same file resolve via compare-and-swap. Each
+write returns a SHA-256 version; pass it back as `--expected-version`
+on the next write. On conflict, mycelium emits a JSON envelope with
+`current_version` (and `current_content` if requested) so the caller
+can re-merge in memory without a second read:
+
+```
+coder         mycelium         indexer
+  │              │                │
+  │──write v1───▶│                │
+  │◀───ok, v2────│                │
+  │              │◀───write v1────│
+  │              │─CONFLICT(64)──▶│
+  │              │   current=v2   │   ← conflict envelope
+  │              │  content="..." │     (caller has both fields)
+  │              │                │
+  │              │                │     re-merge in memory, no re-read
+  │              │                │
+  │              │◀───write v2────│
+  │              │──ok, v3───────▶│
+```
 
 ## Status
 
@@ -112,7 +168,7 @@ for the full install / scope-detection / identity story.
 
 ```
 export MYCELIUM_MOUNT=$(pwd)/.mycelium-store
-export MYCELIUM_AGENT_ID=alice
+export MYCELIUM_AGENT_ID=coder
 
 # Write a note (atomic, returns version)
 echo "incident: query latency spike correlates with deploys at 14:30" \
@@ -145,7 +201,16 @@ echo "updated content" | mycelium write notes/incident-2026-04-30.md \
   --expected-version sha256:abc123... --include-current-content
 
 # Inspect activity log directly — plain JSONL, no tooling required
-cat $MYCELIUM_MOUNT/_activity/*/*/*/alice.jsonl
+cat $MYCELIUM_MOUNT/_activity/*/*/*/coder.jsonl
+```
+
+A log entry — the keys are self-describing; the annotations explain the
+value formats:
+
+```
+{"id":"01HXKP4Z9M","ts":"2026-05-09T15:32Z","kind":"write","path":"notes/inc.md","version":"sha256:abc..."}
+       │                 │                          │              │                        │
+       └─ ULID           └─ ISO timestamp           └─ event kind  └─ mount-relative        └─ post-write version
 ```
 
 ## What agents record
