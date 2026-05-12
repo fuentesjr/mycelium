@@ -1,7 +1,7 @@
 import { createRequire } from "node:module";
 import path from "node:path";
 import fs from "node:fs";
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 const require = createRequire(import.meta.url);
 

@@ -9,13 +9,25 @@ import type {
   ExtensionAPI,
   ExtensionContext,
   SessionStartEvent,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 
 // Mock bootstrap so tests don't touch the real filesystem mount or spawn the
 // (non-existent) mycelium binary. bootstrap.ts has its own dedicated test file.
 vi.mock("../bootstrap.js", () => ({
   bootstrapMemoryFile: vi.fn(async () => {}),
   MEMORY_FILE: "MYCELIUM_MEMORY.md",
+}));
+
+vi.mock("../binary-resolver.js", () => ({
+  resolveBundledBinary: vi.fn(() => null),
+  resolveMyceliumBinary: vi.fn(async (pi) => {
+    const r = await pi.exec("which", ["mycelium"]);
+    if (r.code === 0) {
+      const out = r.stdout.trim();
+      if (out) return out;
+    }
+    return null;
+  }),
 }));
 
 import register from "../index.js";

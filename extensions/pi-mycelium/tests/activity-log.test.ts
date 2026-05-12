@@ -4,7 +4,7 @@ import type {
 	ContextEvent,
 	ExtensionAPI,
 	SessionStartEvent,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 import {
 	createActivityLogRecorder,
 	recordContextSignal,

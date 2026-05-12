@@ -1,6 +1,6 @@
 import path from "node:path";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { execResult } from "./helpers.js";
 import type { MyceliumConfig } from "../config.js";
 
