@@ -22,6 +22,7 @@
   - [Does it conflict with Claude Code, Cursor, or Codex built-in memory?](#does-it-conflict-with-claude-code-cursor-or-codex-built-in-memory)
 - [Auditing and operations](#auditing-and-operations)
   - [How do I see what an agent has been doing in a mount?](#how-do-i-see-what-an-agent-has-been-doing-in-a-mount)
+  - [What does mycelium record so a future reviewer can understand why a change happened?](#what-does-mycelium-record-so-a-future-reviewer-can-understand-why-a-change-happened)
   - [Should I commit a mount to git?](#should-i-commit-a-mount-to-git)
   - [How do I move a mount between machines?](#how-do-i-move-a-mount-between-machines)
   - [How big does the activity log get, and how do I prune it?](#how-big-does-the-activity-log-get-and-how-do-i-prune-it)
@@ -146,6 +147,18 @@ mycelium grep --pattern '"op":"write"' --path _activity --format json
 ```
 
 For structured decisions — conventions the agent adopted, lessons distilled, regions archived — query `mycelium evolve --active` to see what rules are currently in effect, or `mycelium evolve --list` for the full timeline.
+
+### What does mycelium record so a future reviewer can understand why a change happened?
+
+The diff is the cheap part — any version control system can tell you *what* changed. The thing a future reviewer (or another agent) usually can't reconstruct is the *why*. Mycelium records that across two surfaces, both governed by the same discipline: capture the rationale at the moment of decision, and name what was rejected — not just what was chosen.
+
+**File contents carry the per-note reasoning.** When the agent writes an incident note, an investigation log, or a plan file, the *why* lives in the note itself — the trigger, the hypothesis being tested, the alternatives considered and rejected. Same craft as a good commit message, applied to every note. A diff shows what changed; the note explains why.
+
+**`evolve` events carry the structural decisions** — the patterns and rules the agent adopts for itself. When the agent picks a filename convention, builds an index, or archives a region, it records the choice with `mycelium evolve convention|index|archive --rationale "..."`. Rationale is required. `mycelium evolve --active` shows the rules currently in effect with their original reasoning attached; `mycelium evolve --list` gives the full timeline including superseded rules.
+
+**The activity log is the chain of custody.** Every mutation lands in `<mount>/_activity/YYYY/MM/DD/<agent>.jsonl` with `agent_id`, `session_id`, timestamp, op kind, path, and version hash. By itself the log answers *what*, *when*, and *by whom* — not *why*. With session-boundary entries (`session_startup`/`session_shutdown`, and optionally `turn_start`/`turn_end` from richer harnesses), you can group a burst of writes as one turn of one session rather than as scattered events, then cross-reference the note content and any `evolve` entries to recover the reasoning.
+
+The split is deliberate: notes carry *why-this-thing*, `evolve` events carry *why-this-pattern*, and the activity log carries *who* and *when*. A reviewer typically reads the notes for per-decision rationale, runs `mycelium evolve --active` for the workspace's current rules, and consults the activity log to reconstruct timelines or find which session a given change belonged to.
 
 ### Should I commit a mount to git?
 
