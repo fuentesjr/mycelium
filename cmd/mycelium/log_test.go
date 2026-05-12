@@ -115,7 +115,7 @@ func TestLogWithPayloadJSON(t *testing.T) {
 	mount := t.TempDir()
 	id := Identity{AgentID: "a", SessionID: "s", Mount: mount}
 
-	rc := appendLog(strings.NewReader(""), io.Discard, id, "tool_call", "", `{"x":1}`, false, fixedNow)
+	rc := appendLog(strings.NewReader(""), io.Discard, id, "tool_call", "", `{"x":1}`, false, "", fixedNow)
 	if rc != ExitOK {
 		t.Fatalf("rc: got %d, want %d", rc, ExitOK)
 	}
@@ -144,7 +144,7 @@ func TestLogWithStdin(t *testing.T) {
 	mount := t.TempDir()
 	id := Identity{AgentID: "a", SessionID: "s", Mount: mount}
 
-	rc := appendLog(strings.NewReader(`{"y":2}`), io.Discard, id, "tool_call", "", "", true, fixedNow)
+	rc := appendLog(strings.NewReader(`{"y":2}`), io.Discard, id, "tool_call", "", "", true, "", fixedNow)
 	if rc != ExitOK {
 		t.Fatalf("rc: got %d, want %d", rc, ExitOK)
 	}
@@ -189,7 +189,7 @@ func TestLogInvalidPayloadJSON(t *testing.T) {
 	var errBuf strings.Builder
 	id := Identity{AgentID: "a", SessionID: "s", Mount: mount}
 
-	rc := appendLog(strings.NewReader(""), &errBuf, id, "op", "", "not-json", false, fixedNow)
+	rc := appendLog(strings.NewReader(""), &errBuf, id, "op", "", "not-json", false, "", fixedNow)
 	if rc != ExitUsage {
 		t.Errorf("rc: got %d, want %d", rc, ExitUsage)
 	}
@@ -203,7 +203,7 @@ func TestLogInvalidStdinJSON(t *testing.T) {
 	var errBuf strings.Builder
 	id := Identity{AgentID: "a", SessionID: "s", Mount: mount}
 
-	rc := appendLog(strings.NewReader("not-json"), &errBuf, id, "op", "", "", true, fixedNow)
+	rc := appendLog(strings.NewReader("not-json"), &errBuf, id, "op", "", "", true, "", fixedNow)
 	if rc != ExitUsage {
 		t.Errorf("rc: got %d, want %d", rc, ExitUsage)
 	}
@@ -216,7 +216,7 @@ func TestLogMountUnset(t *testing.T) {
 	var errBuf strings.Builder
 	id := Identity{AgentID: "a", SessionID: "s", Mount: ""}
 
-	rc := appendLog(strings.NewReader(""), &errBuf, id, "op", "", "", false, fixedNow)
+	rc := appendLog(strings.NewReader(""), &errBuf, id, "op", "", "", false, "", fixedNow)
 	if rc != ExitGenericError {
 		t.Errorf("rc: got %d, want %d", rc, ExitGenericError)
 	}

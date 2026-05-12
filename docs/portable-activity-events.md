@@ -39,6 +39,35 @@ These names are documented conventions, not binary-reserved schema. The
 should use the shared names above when they fit and keep any harness-local names
 clearly documented.
 
+## Rationale field
+
+Any rationale-bearing op (`write`, `edit`, `rm`, `mv`, `log`) can include a
+top-level `rationale` field when the caller supplies `--rationale "..."`. This
+is distinct from the `payload` object: `rationale` is a direct string on the
+entry, not nested inside the payload. It is `omitempty` — absent when not
+supplied, so existing log readers are unaffected.
+
+Example entry with rationale:
+
+```json
+{
+  "ts": "2026-05-12T14:22:00.000Z",
+  "agent_id": "pi-agent",
+  "session_id": "sess-1",
+  "tx_id": "01HWKP4Z9M8YV1W6E2RTSA9KFG",
+  "op": "write",
+  "path": "notes/incidents/2026-05-12-api-503.md",
+  "prior_version": "sha256:absent",
+  "version": "sha256:8c4d...",
+  "rationale": "API began returning 503 at 14:22; recording symptoms before mitigation closes the window."
+}
+```
+
+Adapter authors do not need to emit `rationale` — it comes from the caller's
+`--rationale` flag, not from the adapter payload. It is documented here because
+downstream consumers of the JSONL stream should treat it as an optional
+top-level field alongside `op`, `path`, and `version`.
+
 ## Payload conventions
 
 Payloads are optional and best-effort. Use snake_case for portable fields and

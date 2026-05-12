@@ -15,6 +15,7 @@ type conflictResult struct {
 	CurrentVersion  string  `json:"current_version"`
 	ExpectedVersion string  `json:"expected_version"`
 	CurrentContent  *string `json:"current_content"`
+	Rationale       string  `json:"rationale"`
 }
 
 // parseConflictEnvelope parses the first line of stderr as a conflict envelope.

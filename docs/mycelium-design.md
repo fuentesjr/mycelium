@@ -125,17 +125,17 @@ A single binary, `mycelium`, invoked through the agent's shell. Ten subcommands:
 
   Raw `cat` is fine for inspection; `read --format json` is the normal pre-read before a conditional mutation.
 
-- **`mycelium write <path> [--expected-version SHA]`** — create or overwrite from stdin. With `--expected-version`, conditional on the current version; otherwise unconditional. Prints the new version on success.
-- **`mycelium edit <path> --old STR --new STR [--expected-version SHA]`** — find-and-replace a unique substring. Fails if `--old` is absent or non-unique. _Earns its complexity:_ token economy on large files, diff quality under git/jj, and the unique-substring constraint catches stale-view errors a full overwrite would silently paper over.
+- **`mycelium write <path> [--expected-version SHA] [--rationale STR]`** — create or overwrite from stdin. With `--expected-version`, conditional on the current version; otherwise unconditional. Prints the new version on success. `--rationale` is captured as a top-level field on the activity log entry and in the conflict envelope on CAS failure.
+- **`mycelium edit <path> --old STR --new STR [--expected-version SHA] [--rationale STR]`** — find-and-replace a unique substring. Fails if `--old` is absent or non-unique. _Earns its complexity:_ token economy on large files, diff quality under git/jj, and the unique-substring constraint catches stale-view errors a full overwrite would silently paper over.
 - **`mycelium ls [--recursive]`** — list paths under the mount. _Earns its complexity:_ `glob` requires a pattern; `ls` is the unprefixed survey.
 - **`mycelium glob <pattern>`** — print paths matching a glob (`**/*.md`, `notes/2026-*/*.txt`, `_activity/2026/04/*/*.jsonl`).
 - **`mycelium grep --pattern STR [--path PATH] [--regex] [--file-type T] [--format text|json] [--limit N]`** — print matching lines with paths and line numbers. `--format=text` is `path:line:text`; `--format=json` returns `{matches: [{path, line, text}, ...], truncated}`. `--limit` caps results (default 1000, hard ceiling). Implementation prefers ripgrep, falls back to grep, then to a Go-native scan. _Earns its complexity:_ JSON and type filter make the activity log usable through general tools; the `--limit` cap keeps log-reflection from overflowing context.
-- **`mycelium rm <path> [--expected-version SHA]`** — remove. _Earns its complexity:_ not expressible as `write` — empty content creates an empty file, not a deletion.
-- **`mycelium mv <src> <dst> [--expected-version SHA]`** — atomic rename within the store. `--expected-version`, when supplied, checks the source version. The destination must not exist; destination collisions return a structured conflict. _Earns its complexity:_ read+write+delete is not atomic; emulating rename loses the guarantee.
+- **`mycelium rm <path> [--expected-version SHA] [--rationale STR]`** — remove. _Earns its complexity:_ not expressible as `write` — empty content creates an empty file, not a deletion.
+- **`mycelium mv <src> <dst> [--expected-version SHA] [--rationale STR]`** — atomic rename within the store. `--expected-version`, when supplied, checks the source version. The destination must not exist; destination collisions return a structured conflict. _Earns its complexity:_ read+write+delete is not atomic; emulating rename loses the guarantee.
 
 ### Metadata operations
 
-- **`mycelium log <op> [--path PATH] [--payload-json STR | --stdin]`** — append a non-mutation signal entry to `_activity/YYYY/MM/DD/{agent_id}.jsonl`. The system fills `ts`, `agent_id`, `session_id`; the caller supplies `op` (a non-mutation tag like `context_checkpoint`, `compaction`, or an agent annotation), an optional `--path`, and an optional JSON payload. Silent on success.
+- **`mycelium log <op> [--path PATH] [--payload-json STR | --stdin] [--rationale STR]`** — append a non-mutation signal entry to `_activity/YYYY/MM/DD/{agent_id}.jsonl`. The system fills `ts`, `agent_id`, `session_id`; the caller supplies `op` (a non-mutation tag like `context_checkpoint`, `compaction`, or an agent annotation), an optional `--path`, an optional JSON payload, and an optional `--rationale`. Silent on success.
 
 - **`mycelium evolve ...`** — record and query self-evolution metadata. One command owns the whole evolution surface:
 
@@ -172,6 +172,8 @@ Four contract notes:
 **Raw reads are allowed; raw writes are not.** `cat`, `ls`, `rg`, editors, `tar`, and `cp -r` are fine for inspection/export. Mutations inside the live mount go through `mycelium` so CAS, `_tx/`, and `_activity/` remain authoritative.
 
 **Conditional writes are first-class.** Every content-mutating subcommand (`write`, `edit`, `rm`, `mv`) accepts optional `--expected-version`. Version tokens are opaque strings to the caller; the LocalFS implementation uses content hashes (`sha256:...`) and the sentinel `sha256:absent` for a missing file. A single-agent store can ignore CAS and the system behaves like a regular filesystem with an audit log.
+
+**Operational rationale is optional on every mutation and signal.** `write`, `edit`, `rm`, `mv`, and `log` all accept optional `--rationale "..."`. When supplied, rationale appears as `rationale` on the activity log entry and on the conflict envelope. Maximum 64 KiB; oversize input is rejected with exit 65 before the mutation runs. `evolve` requires `--rationale`; that is unchanged.
 
 **The `_` prefix is reserved at the store root.** `mycelium` rejects `write`, `edit`, `rm`, and `mv` whose target/source is under any path beginning with `_`. Currently `_activity/` and `_tx/`; future system paths inherit the same protection without code changes.
 
@@ -387,9 +389,27 @@ A mutation entry (`write`):
   "op": "write",
   "path": "learnings/glp1-pipeline.md",
   "prior_version": "sha256:abc...",
-  "version": "sha256:8c4d..."
+  "version": "sha256:8c4d...",
+  "rationale": "Recording initial synthesis before the literature window closes."
 }
 ```
+
+`rationale` is an optional top-level field (`omitempty`) on every mutation and `log` entry. When the caller passes `--rationale "..."` to `write`, `edit`, `rm`, `mv`, or `log`, the text is stored here — maximum 64 KiB, enforced before the mutation runs (exit 65 on violation). When absent, the field is omitted; existing log readers and fixtures remain valid without migration.
+
+On a CAS or destination-exists conflict, the `rationale` field also appears on the conflict envelope emitted to stderr alongside `current_version`:
+
+```json
+{
+  "error": "conflict",
+  "op": "write",
+  "path": "notes/foo.md",
+  "current_version": "sha256:def...",
+  "expected_version": "sha256:abc...",
+  "rationale": "Adding GLP-1 cardio section — hypothesis confirmed across 4 studies."
+}
+```
+
+This lets the retrying agent merge intent rather than just bytes when both sides supplied rationale.
 
 A move entry:
 

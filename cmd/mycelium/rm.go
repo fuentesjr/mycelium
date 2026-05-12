@@ -44,7 +44,7 @@ func removeFile(errOut io.Writer, mount, requested, expectedVersion string, incl
 
 	if expectedVersion != "" {
 		mountRel := relForwardSlash(mount, abs)
-		if rc := checkExpectedVersion(errOut, "rm", mountRel, abs, expectedVersion, includeContent); rc != ExitOK {
+		if rc := checkExpectedVersion(errOut, "rm", mountRel, abs, expectedVersion, includeContent, ""); rc != ExitOK {
 			return "", rc
 		}
 	}

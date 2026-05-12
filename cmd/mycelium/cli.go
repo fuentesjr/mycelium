@@ -72,6 +72,7 @@ func runWrite(in io.Reader, out, errOut io.Writer, args []string) int {
 	fs.SetOutput(errOut)
 	expectedVersion := fs.String("expected-version", "", "current version token for CAS")
 	includeContent := fs.Bool("include-current-content", false, "include current file content in conflict envelope")
+	rationaleFlag := fs.String("rationale", "", "optional reasoning captured to the activity log (≤64 KiB)")
 	positional, err := parseInterspersed(fs, args)
 	if err != nil {
 		return ExitUsage
@@ -79,6 +80,10 @@ func runWrite(in io.Reader, out, errOut io.Writer, args []string) int {
 	if len(positional) < 1 {
 		fmt.Fprintln(errOut, "mycelium write: PATH required")
 		return ExitUsage
+	}
+	if len(*rationaleFlag) > maxRationaleSize {
+		fmt.Fprintf(errOut, "mycelium write: --rationale exceeds %d bytes\n", maxRationaleSize)
+		return ExitReservedPrefix
 	}
 	id := ReadIdentity()
 	// Check _-prefix reservation before reading stdin and entering transactional write.
@@ -94,7 +99,7 @@ func runWrite(in io.Reader, out, errOut io.Writer, args []string) int {
 		fmt.Fprintf(errOut, "mycelium write: read stdin: %v\n", err)
 		return ExitGenericError
 	}
-	version, rc := transactionalWrite(errOut, id, positional[0], content, *expectedVersion, *includeContent)
+	version, rc := transactionalWrite(errOut, id, positional[0], content, *expectedVersion, *includeContent, *rationaleFlag)
 	if rc != ExitOK {
 		return rc
 	}
@@ -109,6 +114,7 @@ func runEdit(_ io.Reader, out, errOut io.Writer, args []string) int {
 	includeContent := fs.Bool("include-current-content", false, "include current file content in conflict envelope")
 	oldStr := fs.String("old", "", "string to replace")
 	newStr := fs.String("new", "", "replacement string")
+	rationaleFlag := fs.String("rationale", "", "optional reasoning captured to the activity log (≤64 KiB)")
 	positional, err := parseInterspersed(fs, args)
 	if err != nil {
 		return ExitUsage
@@ -121,6 +127,10 @@ func runEdit(_ io.Reader, out, errOut io.Writer, args []string) int {
 		fmt.Fprintln(errOut, "mycelium edit: --old is required")
 		return ExitUsage
 	}
+	if len(*rationaleFlag) > maxRationaleSize {
+		fmt.Fprintf(errOut, "mycelium edit: --rationale exceeds %d bytes\n", maxRationaleSize)
+		return ExitReservedPrefix
+	}
 	id := ReadIdentity()
 	// Check _-prefix reservation before entering transactional edit.
 	if _, resErr := resolveAgentWritable(id.Mount, positional[0]); resErr != nil {
@@ -129,7 +139,7 @@ func runEdit(_ io.Reader, out, errOut io.Writer, args []string) int {
 			return ExitReservedPrefix
 		}
 	}
-	version, rc := transactionalEdit(errOut, id, positional[0], *oldStr, *newStr, *expectedVersion, *includeContent)
+	version, rc := transactionalEdit(errOut, id, positional[0], *oldStr, *newStr, *expectedVersion, *includeContent, *rationaleFlag)
 	if rc != ExitOK {
 		return rc
 	}
@@ -203,6 +213,7 @@ func runRm(_ io.Reader, out, errOut io.Writer, args []string) int {
 	fs.SetOutput(errOut)
 	expectedVersion := fs.String("expected-version", "", "current version token for CAS")
 	includeContent := fs.Bool("include-current-content", false, "include current file content in conflict envelope")
+	rationaleFlag := fs.String("rationale", "", "optional reasoning captured to the activity log (≤64 KiB)")
 	positional, err := parseInterspersed(fs, args)
 	if err != nil {
 		return ExitUsage
@@ -210,6 +221,10 @@ func runRm(_ io.Reader, out, errOut io.Writer, args []string) int {
 	if len(positional) < 1 {
 		fmt.Fprintln(errOut, "mycelium rm: PATH required")
 		return ExitUsage
+	}
+	if len(*rationaleFlag) > maxRationaleSize {
+		fmt.Fprintf(errOut, "mycelium rm: --rationale exceeds %d bytes\n", maxRationaleSize)
+		return ExitReservedPrefix
 	}
 	id := ReadIdentity()
 	// Check _-prefix reservation before entering transactional remove.
@@ -219,7 +234,7 @@ func runRm(_ io.Reader, out, errOut io.Writer, args []string) int {
 			return ExitReservedPrefix
 		}
 	}
-	_, rc := transactionalRemove(errOut, id, positional[0], *expectedVersion, *includeContent)
+	_, rc := transactionalRemove(errOut, id, positional[0], *expectedVersion, *includeContent, *rationaleFlag)
 	if rc != ExitOK {
 		return rc
 	}
@@ -231,6 +246,7 @@ func runMv(_ io.Reader, out, errOut io.Writer, args []string) int {
 	fs.SetOutput(errOut)
 	expectedVersion := fs.String("expected-version", "", "current version token for CAS")
 	includeContent := fs.Bool("include-current-content", false, "include current file content in conflict envelope")
+	rationaleFlag := fs.String("rationale", "", "optional reasoning captured to the activity log (≤64 KiB)")
 	positional, err := parseInterspersed(fs, args)
 	if err != nil {
 		return ExitUsage
@@ -238,6 +254,10 @@ func runMv(_ io.Reader, out, errOut io.Writer, args []string) int {
 	if len(positional) < 2 {
 		fmt.Fprintln(errOut, "mycelium mv: SRC and DST required")
 		return ExitUsage
+	}
+	if len(*rationaleFlag) > maxRationaleSize {
+		fmt.Fprintf(errOut, "mycelium mv: --rationale exceeds %d bytes\n", maxRationaleSize)
+		return ExitReservedPrefix
 	}
 	id := ReadIdentity()
 	src, dst := positional[0], positional[1]
@@ -254,7 +274,7 @@ func runMv(_ io.Reader, out, errOut io.Writer, args []string) int {
 			return ExitReservedPrefix
 		}
 	}
-	_, rc := transactionalMove(errOut, id, src, dst, *expectedVersion, *includeContent)
+	_, rc := transactionalMove(errOut, id, src, dst, *expectedVersion, *includeContent, *rationaleFlag)
 	if rc != ExitOK {
 		return rc
 	}
@@ -267,6 +287,7 @@ func runLog(in io.Reader, _ io.Writer, errOut io.Writer, args []string) int {
 	pathFlag := fs.String("path", "", "path to record on the entry")
 	payloadJSON := fs.String("payload-json", "", "inline JSON payload")
 	fromStdin := fs.Bool("stdin", false, "read payload from stdin")
+	rationaleFlag := fs.String("rationale", "", "optional reasoning captured to the activity log (≤64 KiB)")
 	positional, err := parseInterspersed(fs, args)
 	if err != nil {
 		return ExitUsage
@@ -279,6 +300,10 @@ func runLog(in io.Reader, _ io.Writer, errOut io.Writer, args []string) int {
 		fmt.Fprintln(errOut, "mycelium log: --payload-json and --stdin are mutually exclusive")
 		return ExitUsage
 	}
+	if len(*rationaleFlag) > maxRationaleSize {
+		fmt.Fprintf(errOut, "mycelium log: --rationale exceeds %d bytes\n", maxRationaleSize)
+		return ExitReservedPrefix
+	}
 	op := positional[0]
-	return appendLog(in, errOut, ReadIdentity(), op, *pathFlag, *payloadJSON, *fromStdin, time.Now())
+	return appendLog(in, errOut, ReadIdentity(), op, *pathFlag, *payloadJSON, *fromStdin, *rationaleFlag, time.Now())
 }

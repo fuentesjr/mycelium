@@ -141,18 +141,27 @@ It survives sessions and may be shared with other agents mounted concurrently.
 
 Use these subcommands via the \`bash\` tool:
 - \`mycelium read <path> [--format text|json]\` — read a file; JSON includes UTF-8 content plus version for CAS
-- \`mycelium write <path>\` — write or overwrite (content via stdin)
-- \`mycelium edit <path> --old <str> --new <str>\` — find/replace a unique substring
+- \`mycelium write <path> [--rationale STR]\` — write or overwrite (content via stdin)
+- \`mycelium edit <path> --old <str> --new <str> [--rationale STR]\` — find/replace a unique substring
 - \`mycelium ls <path> [--recursive]\` — list entries
 - \`mycelium glob <pattern>\` — paths matching a glob (e.g. \`learnings/*.md\`)
 - \`mycelium grep --pattern <str> [--path P] [--format json] [--limit N]\` — search content
-- \`mycelium rm <path>\` — delete
-- \`mycelium mv <src> <dst>\` — atomic rename (fails if \`<dst>\` exists)
-- \`mycelium log <op> [--path PATH] [--payload-json STR | --stdin]\` — append a non-mutation signal
+- \`mycelium rm <path> [--rationale STR]\` — delete
+- \`mycelium mv <src> <dst> [--rationale STR]\` — atomic rename (fails if \`<dst>\` exists)
+- \`mycelium log <op> [--path PATH] [--payload-json STR | --stdin] [--rationale STR]\` — append a non-mutation signal
 
 Conventions for organizing this store live in \`MYCELIUM_MEMORY.md\` at the root.
 Read it once at session start; revise it whenever you find a better way to
 organize what you're working with — it's yours.
+
+Operational rationale: \`write\`, \`edit\`, \`rm\`, \`mv\`, and \`log\` accept an
+optional \`--rationale "..."\` flag (≤64 KiB). Supply it when the operation
+carries reasoning a future reviewer would need — what triggered the change,
+what alternative you rejected, why this and not that. Captured into the
+activity log line as a top-level \`rationale\` field and into the CAS
+conflict envelope on conflicts. Skip it for routine appends, status
+updates, and saved artifacts where no separable reasoning exists; a
+forced placeholder is worse than no field.
 
 Concurrency: \`write\`, \`edit\`, \`rm\`, and \`mv\` accept an optional
 \`--expected-version <sha>\` flag for optimistic concurrency. On a stale token

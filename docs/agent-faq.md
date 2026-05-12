@@ -63,9 +63,15 @@ Your call. Choose paths that reflect content — `auth/session-token-rotation.md
 
 ### When do I use log vs evolve vs just writing a note?
 
-Write a **note** for content. Use **`evolve`** for structural decisions you'll want to query later by kind (`--active`, `--list`). Use **`log`** to emit observability signals with arbitrary op names — it's typically called by adapters, not directly by agents. If you're unsure between `log` and `evolve`, prefer `evolve` for anything you'll want to recall by kind.
+Write a **note** for content. Use **`evolve`** for structural decisions you'll want to query later by kind (`--active`, `--list`). Use **`log`** to emit observability signals with arbitrary op names — it's typically called by adapters, not directly by agents, though `mycelium log decision --rationale "..."` is a legitimate direct use for a point-in-time operational decision that doesn't merit a full `evolve` record. If you're unsure between `log` and `evolve`, prefer `evolve` for anything you'll want to recall by kind.
 
 See [portable-activity-events.md](portable-activity-events.md) for the `log` event vocabulary and [self-evolution.md](self-evolution.md) for `evolve` patterns.
+
+### When should I supply --rationale on write/edit/rm/mv/log?
+
+Whenever the operation has separable operational reasoning — why this mutation, why now. Routine appends, status updates, artifact saves, and cleanups need no rationale; omit the flag. Mutations that close a decision window (diagnosing an incident, removing a file because its successor was confirmed, renaming on hypothesis confirmation) benefit from it. The pi-mycelium system prompt will nudge you when it's appropriate.
+
+When supplied, rationale appears as a top-level field on the activity log entry. On a CAS conflict it also surfaces in the conflict envelope on stderr. Maximum 64 KiB; oversize input is rejected with exit 65 before any mutation runs. `evolve` always requires `--rationale`; no change there.
 
 ---
 

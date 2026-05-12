@@ -88,15 +88,15 @@ agent writes from clobbering system metadata.
 | Command | Group | Purpose |
 |---|---|---|
 | `read` | content | Read a note (optionally with version metadata) |
-| `write` | content | Atomic write; returns version, supports CAS via `--expected-version` |
-| `edit` | content | In-place edit with the same CAS semantics as `write` |
-| `rm` | content | Remove a note |
-| `mv` | content | Move/rename a note |
+| `write` | content | Atomic write; returns version, supports CAS via `--expected-version` and optional `--rationale` |
+| `edit` | content | In-place edit with the same CAS semantics as `write`; accepts `--rationale` |
+| `rm` | content | Remove a note; accepts `--rationale` |
+| `mv` | content | Move/rename a note; accepts `--rationale` |
 | `ls` | discovery | List entries under a path |
 | `glob` | discovery | Match notes by glob pattern |
 | `grep` | discovery | Content search across the mount |
-| `log` | meta | Read the per-agent activity log |
-| `evolve` | meta | Record or query self-evolution events (conventions, indices, archives) |
+| `log` | meta | Append a signal entry to the activity log; accepts `--rationale` |
+| `evolve` | meta | Record or query self-evolution events (conventions, indices, archives); `--rationale` is required |
 
 ## Concurrent writes
 
@@ -220,23 +220,46 @@ A log entry — the keys are self-describing; the annotations explain the
 value formats:
 
 ```
-{"id":"01HXKP4Z9M","ts":"2026-05-09T15:32Z","kind":"write","path":"notes/inc.md","version":"sha256:abc..."}
-       │                 │                          │              │                        │
-       └─ ULID           └─ ISO timestamp           └─ event kind  └─ mount-relative        └─ post-write version
+{"id":"01HXKP4Z9M","ts":"2026-05-09T15:32Z","kind":"write","path":"notes/inc.md","version":"sha256:abc...","rationale":"Capturing initial symptoms before mitigation closes the window."}
+       │                 │                          │              │                        │                        │
+       └─ ULID           └─ ISO timestamp           └─ event kind  └─ mount-relative        └─ post-write version    └─ optional; omitted when not supplied
 ```
 
 ## What agents record
 
 A note's *what* is the cheap part — the file content, the diff. The
 *why* is what survives across sessions and travels between agents.
-Mycelium has two recording surfaces, and the discipline for both is:
-**capture the rationale at the moment of decision, and name what was
-rejected, not just what was chosen.**
+Mycelium has three recording surfaces, and the discipline for all of
+them is: **capture the rationale at the moment of decision, and name
+what was rejected, not just what was chosen.**
 
 **File contents** carry the per-note reasoning. Incident notes name
 the trigger. Investigation notes name the hypothesis being tested.
 Plan files name the alternatives considered and rejected. The same
-craft as a good commit message, applied to every note.
+craft as a good commit message, applied to every note. This is a
+convention; the binary does not enforce it.
+
+**Operational rationale** can now be captured on the activity log line
+itself, at the moment of the mutation or signal, via `--rationale`:
+
+```bash
+mycelium write notes/incident-2026-05-12.md \
+  --rationale "API began returning 503 at 14:22; recording symptoms before mitigation closes the window."
+
+mycelium rm notes/spikes/2026-Q1/deprecated.md \
+  --rationale "Spike concluded; superseded by notes/decisions/2026-04-cache-layer.md."
+
+mycelium log decision \
+  --rationale "Choosing Redis over Memcached for the cache layer; cluster mode and persistence outweigh the marginal latency cost." \
+  --payload-json '{"chosen":"redis","rejected":["memcached","dragonfly"]}'
+```
+
+When supplied, `rationale` appears as a top-level field on the
+activity log entry (`omitempty` — absent when not supplied). On a CAS
+conflict, it also appears in the conflict envelope on stderr so the
+retrying agent sees both sides' intent. Maximum 64 KiB. The note-body
+discipline and operational `--rationale` are complementary: note bodies
+hold *why-this-thing*, the flag holds *why-this-operation*.
 
 **Self-evolution events** carry structural decisions — conventions
 adopted, indices built, patterns archived — each recorded as a

@@ -38,7 +38,7 @@ func writeFile(in io.Reader, errOut io.Writer, mount, requested, expectedVersion
 	defer release()
 	if expectedVersion != "" {
 		mountRel := relForwardSlash(mount, abs)
-		if rc := checkExpectedVersion(errOut, "write", mountRel, abs, expectedVersion, includeContent); rc != ExitOK {
+		if rc := checkExpectedVersion(errOut, "write", mountRel, abs, expectedVersion, includeContent, ""); rc != ExitOK {
 			return "", rc
 		}
 	}
@@ -62,13 +62,15 @@ type conflictEnvelope struct {
 	CurrentVersion  string `json:"current_version"`
 	ExpectedVersion string `json:"expected_version,omitempty"`
 	CurrentContent  string `json:"current_content,omitempty"`
+	Rationale       string `json:"rationale,omitempty"`
 }
 
 // checkExpectedVersion checks whether expected matches the on-disk version of
 // abs. mountRel is the forward-slash path relative to mount (for the envelope).
 // If includeContent is true and the file exists and contains valid UTF-8, the
-// envelope will include a current_content field.
-func checkExpectedVersion(errOut io.Writer, op, mountRel, abs, expected string, includeContent bool) int {
+// envelope will include a current_content field. rationale, when non-empty, is
+// propagated to the conflict envelope.
+func checkExpectedVersion(errOut io.Writer, op, mountRel, abs, expected string, includeContent bool, rationale string) int {
 	if !strings.HasPrefix(expected, versionPrefix) {
 		fmt.Fprintf(errOut, "mycelium %s: expected-version must start with %q\n", op, versionPrefix)
 		return ExitUsage
@@ -85,6 +87,7 @@ func checkExpectedVersion(errOut io.Writer, op, mountRel, abs, expected string, 
 			Path:            mountRel,
 			CurrentVersion:  current,
 			ExpectedVersion: expected,
+			Rationale:       rationale,
 		}
 		if includeContent && current != versionPrefix+"absent" {
 			fileBytes, readErr := os.ReadFile(abs)

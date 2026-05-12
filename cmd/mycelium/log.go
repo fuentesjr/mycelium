@@ -23,6 +23,7 @@ type LogEntry struct {
 	From         string          `json:"from,omitempty"`
 	Recovered    bool            `json:"recovered,omitempty"`
 	Payload      json.RawMessage `json:"payload,omitempty"`
+	Rationale    string          `json:"rationale,omitempty"`
 }
 
 // MutationLog carries the typed fields for a mutation log entry.
@@ -159,6 +160,7 @@ func appendLog(
 	id Identity,
 	op, path, payloadJSON string,
 	fromStdin bool,
+	rationale string,
 	now time.Time,
 ) int {
 	if id.Mount == "" {
@@ -200,9 +202,10 @@ func appendLog(
 
 	// Build entry with payload inlined.
 	entry := LogEntry{
-		Op:      op,
-		Path:    path,
-		Payload: json.RawMessage(payloadBytes),
+		Op:        op,
+		Path:      path,
+		Payload:   json.RawMessage(payloadBytes),
+		Rationale: rationale,
 	}
 	return appendActivity(errOut, id, entry, now)
 }

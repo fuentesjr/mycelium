@@ -54,7 +54,7 @@ func editFile(errOut io.Writer, mount, requested, oldStr, newStr, expectedVersio
 
 	if expectedVersion != "" {
 		mountRel := relForwardSlash(mount, abs)
-		if rc := checkExpectedVersion(errOut, "edit", mountRel, abs, expectedVersion, includeContent); rc != ExitOK {
+		if rc := checkExpectedVersion(errOut, "edit", mountRel, abs, expectedVersion, includeContent, ""); rc != ExitOK {
 			return "", rc
 		}
 	}

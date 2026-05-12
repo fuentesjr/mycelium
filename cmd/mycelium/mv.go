@@ -59,7 +59,7 @@ func moveFile(errOut io.Writer, mount, src, dst, expectedVersion string, include
 
 	// Refuse to overwrite an existing dst.
 	if _, err := os.Stat(dstAbs); err == nil {
-		if rc := emitDestinationExists(errOut, mount, dstAbs, includeContent); rc != ExitOK {
+		if rc := emitDestinationExists(errOut, mount, dstAbs, includeContent, ""); rc != ExitOK {
 			return "", rc
 		}
 	} else if !errors.Is(err, fs.ErrNotExist) {
@@ -69,7 +69,7 @@ func moveFile(errOut io.Writer, mount, src, dst, expectedVersion string, include
 
 	if expectedVersion != "" {
 		srcRel := relForwardSlash(mount, srcAbs)
-		if rc := checkExpectedVersion(errOut, "mv", srcRel, srcAbs, expectedVersion, includeContent); rc != ExitOK {
+		if rc := checkExpectedVersion(errOut, "mv", srcRel, srcAbs, expectedVersion, includeContent, ""); rc != ExitOK {
 			return "", rc
 		}
 	}
@@ -97,7 +97,7 @@ func moveFile(errOut io.Writer, mount, src, dst, expectedVersion string, include
 	return ver, ExitOK
 }
 
-func emitDestinationExists(errOut io.Writer, mount, dstAbs string, includeContent bool) int {
+func emitDestinationExists(errOut io.Writer, mount, dstAbs string, includeContent bool, rationale string) int {
 	dstRel := relForwardSlash(mount, dstAbs)
 	dstVer, verErr := currentVersion(dstAbs)
 	if verErr != nil {
@@ -109,6 +109,7 @@ func emitDestinationExists(errOut io.Writer, mount, dstAbs string, includeConten
 		Op:             "mv",
 		Path:           dstRel,
 		CurrentVersion: dstVer,
+		Rationale:      rationale,
 	}
 	if includeContent {
 		fileBytes, readErr := os.ReadFile(dstAbs)

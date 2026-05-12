@@ -36,8 +36,10 @@ gets resolved.
   the extension runtime is torn down.
 - **`before_agent_start`** — appends a system-prompt block describing the
   `mycelium` subcommands, conventions, identity, and conflict semantics,
-  plus the project's evolution kinds and any active evolution. Chains off
-  `event.systemPrompt` so other extensions' contributions are preserved.
+  plus the project's evolution kinds and any active evolution. Includes a
+  rationale nudge recommending `--rationale` on `write`, `edit`, `rm`,
+  `mv`, and `log` when the operation carries reasoning worth preserving.
+  Chains off `event.systemPrompt` so other extensions' contributions are preserved.
 - **turn/tool/context events** — records `turn_start`, `turn_end`,
   `tool_start`, `tool_end`, `compaction`, and deduped `context_checkpoint`
   entries using the portable vocabulary in

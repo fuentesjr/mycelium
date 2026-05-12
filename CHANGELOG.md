@@ -1,4 +1,19 @@
-## [Unreleased]
+## [0.2.0] - 2026-05-12
+
+### Added (mycelium binary)
+
+- `--rationale "..."` flag on `write`, `edit`, `rm`, `mv`, and `log`. When supplied, the rationale is captured as a top-level `rationale` field (`omitempty`) on the corresponding activity log entry. When absent, behavior is unchanged and the field is omitted.
+- `rationale` field on `LogEntry` (`cmd/mycelium/log.go`) — `string`, `json:"rationale,omitempty"`.
+- `rationale` field on `conflictEnvelope` (`cmd/mycelium/write.go`) — when a CAS or destination-exists conflict occurs, the losing caller's rationale is included alongside `current_version` so retrying agents see both sides' intent.
+- Rationale size validation: input exceeding 64 KiB is rejected before the mutation runs with exit code 65 (`ExitReservedPrefix`) and message `mycelium <op>: --rationale exceeds N bytes`.
+
+### Added (pi-mycelium extension)
+
+- System-prompt block now includes a one-line recommendation urging agents to supply `--rationale` on rationale-bearing operations (`write`, `edit`, `rm`, `mv`, `log`) when operational reasoning exists.
+
+### Added (docs)
+
+- ADR-0003 records the decision to add optional `--rationale` to all rationale-bearing mutation and log verbs, document its propagation through the CAS conflict envelope, and keep the note-body discipline as a complementary convention.
 
 ## [0.1.8] - 2026-05-08
 
