@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 concurrency:
   group: release-${{ github.ref }}
@@ -27,13 +27,13 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.26.x'
+          go-version: "1.26.x"
 
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: '22.x'
-          registry-url: 'https://registry.npmjs.org'
+          node-version: "22.x"
+          registry-url: "https://registry.npmjs.org"
 
       - name: Verify version consistency
         run: |
@@ -64,7 +64,7 @@ jobs:
           echo "Version consistency check passed: $TAG_VER"
 
       - name: Run Go tests
-        run: cd cmd/mycelium && go test ./...
+        run: go test ./...
 
       - name: Run TypeScript tests
         # Use `npm install` rather than `npm ci`: optionalDependencies pin

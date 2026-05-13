@@ -6,17 +6,17 @@ CMD     := cmd/mycelium
 NPM_DIR := $(DIST)/npm
 
 build:
-	cd $(CMD) && go build -o mycelium .
+	go build -o $(CMD)/mycelium ./$(CMD)
 
 test:
-	cd $(CMD) && go test -count=1 ./...
+	go test -count=1 ./...
 
 dist: clean
 	mkdir -p $(DIST)
-	cd $(CMD) && GOOS=darwin GOARCH=amd64 go build -o $(CURDIR)/$(DIST)/mycelium-$(VERSION)-darwin-amd64 .
-	cd $(CMD) && GOOS=darwin GOARCH=arm64 go build -o $(CURDIR)/$(DIST)/mycelium-$(VERSION)-darwin-arm64 .
-	cd $(CMD) && GOOS=linux  GOARCH=amd64 go build -o $(CURDIR)/$(DIST)/mycelium-$(VERSION)-linux-amd64 .
-	cd $(CMD) && GOOS=linux  GOARCH=arm64 go build -o $(CURDIR)/$(DIST)/mycelium-$(VERSION)-linux-arm64 .
+	GOOS=darwin GOARCH=amd64 go build -o $(CURDIR)/$(DIST)/mycelium-$(VERSION)-darwin-amd64 ./$(CMD)
+	GOOS=darwin GOARCH=arm64 go build -o $(CURDIR)/$(DIST)/mycelium-$(VERSION)-darwin-arm64 ./$(CMD)
+	GOOS=linux  GOARCH=amd64 go build -o $(CURDIR)/$(DIST)/mycelium-$(VERSION)-linux-amd64 ./$(CMD)
+	GOOS=linux  GOARCH=arm64 go build -o $(CURDIR)/$(DIST)/mycelium-$(VERSION)-linux-arm64 ./$(CMD)
 	cd $(DIST) && for f in mycelium-$(VERSION)-*; do tar -czf $$f.tar.gz $$f && rm $$f; done
 	@ls -lh $(DIST)
 
@@ -34,8 +34,7 @@ npm-dist: dist
 	  mv $$pkg/mycelium-$(VERSION)-$$plat $$pkg/mycelium; \
 	  chmod +x $$pkg/mycelium; \
 	  ver=$$(echo $(VERSION) | sed 's/^v//'); \
-	  printf '{\n  "name": "@fuentesjr/mycelium-cli-%s",\n  "version": "%s",\n  "description": "Mycelium CLI binary for %s",\n  "license": "MIT",\n  "os": ["%s"],\n  "cpu": ["%s"],\n  "files": ["mycelium"],\n  "repository": "https://github.com/fuentesjr/mycelium"\n}\n' \
-	    $$plat $$ver $$plat $$os $$nodearch > $$pkg/package.json; \
+	  node -e 'const fs = require("fs"); const [plat, ver, os, cpu, file] = process.argv.slice(1); fs.writeFileSync(file, JSON.stringify({ name: "@fuentesjr/mycelium-cli-" + plat, version: ver, description: "Mycelium CLI binary for " + plat, license: "MIT", os: [os], cpu: [cpu], files: ["mycelium"], repository: "https://github.com/fuentesjr/mycelium" }, null, 2) + "\n");' $$plat $$ver $$os $$nodearch $$pkg/package.json; \
 	done
 	@ls -lh $(NPM_DIR)
 
