@@ -14,21 +14,21 @@
 Mycelium asks agents to capture rationale at the moment of decision. For
 structural decisions, the `evolve` command enforces this: `--rationale`
 is required, and the binary errors out (`mycelium evolve: --rationale is
-required`) when it is missing (`cmd/mycelium/evolve.go:295`).
+required`) when it is missing (`internal/mycelium/evolve.go`).
 
 For per-note content and other mutations, no such mechanism exists. The
 README's "What agents record" section frames rationale capture as a
-discipline that applies to both surfaces — file contents *and* `evolve`
-events — but `cmd/mycelium/write.go`, `edit.go`, `rm.go`, `mv.go`, and
-`log.go` contain no references to rationale. A note may be written, an
-edit applied, a file removed, or a path renamed with no reasoning at
-all, and the binary will accept it.
+discipline that applies to both surfaces — file contents _and_ `evolve`
+events — but at the time of this ADR, `internal/mycelium/write.go`,
+`mutate_tx.go`, `mv.go`, and `log.go` contained no references to rationale.
+A note may be written, an edit applied, a file removed, or a path renamed
+with no reasoning at all, and the binary will accept it.
 
 This creates an asymmetry:
 
-- *Why-this-pattern* (structural decisions) → guaranteed in the activity
+- _Why-this-pattern_ (structural decisions) → guaranteed in the activity
   log via `evolve`.
-- *Why-this-thing* (per-note reasoning, deletions, renames, signal
+- _Why-this-thing_ (per-note reasoning, deletions, renames, signal
   entries) → present only by convention, in the body of whatever note
   the agent happens to write.
 
@@ -37,7 +37,7 @@ any particular mutation happened. For long-running mounts and
 cross-agent handoff — the cases mycelium is built for — that gap is
 real.
 
-The naive fix is to *require* `--rationale` on every mutation. This was
+The naive fix is to _require_ `--rationale` on every mutation. This was
 rejected. Many legitimate operations have no separable rationale:
 appending to a running TODO list, updating a status file, saving a
 downloaded artifact, rebuilding an index, removing a clearly-obsolete
@@ -65,7 +65,7 @@ emitted to stderr includes the losing caller's `rationale` field
 alongside `current_version`. The reviewer or retrying agent sees both
 sides' intent, not just the winning version hash.
 
-The note-body discipline ("write the *why* into the note itself")
+The note-body discipline ("write the _why_ into the note itself")
 remains a documented convention. Documentation describes it as a craft
 norm — distinct from the operational rationale captured on the activity
 log line — and stops framing it as a property the binary guarantees.
@@ -77,20 +77,20 @@ injected system-prompt block beginning with v0.2.0.
 
 ### Schema
 
-`LogEntry` in `cmd/mycelium/log.go` gains:
+`LogEntry` in `internal/mycelium/log.go` gains:
 
 ```go
 Rationale string `json:"rationale,omitempty"`
 ```
 
-`conflictEnvelope` in `cmd/mycelium/write.go` gains:
+`conflictEnvelope` in `internal/mycelium/write.go` gains:
 
 ```go
 Rationale string `json:"rationale,omitempty"`
 ```
 
 - Maximum size: 64 KiB, matching `maxRationaleSize` from
-  `cmd/mycelium/evolve.go`. Oversize input is rejected before the
+  `internal/mycelium/evolve.go`. Oversize input is rejected before the
   mutation runs with exit code `ExitReservedPrefix` (65), matching
   `evolve`'s existing convention for rationale-validation failures.
 - `omitempty` ensures both fields are absent from log entries and
@@ -98,7 +98,7 @@ Rationale string `json:"rationale,omitempty"`
   JSONL fixtures remain valid without migration.
 - The activity log field appears on the same JSONL line as the
   mutation entry, so `tail -f`, `grep`, and `mycelium grep --path
-  _activity` surface it without indirection.
+_activity` surface it without indirection.
 
 ### CLI surface
 
@@ -123,7 +123,7 @@ mycelium log decision \
 
 ### Out of scope
 
-- A higher-level `mycelium note` verb that *requires* rationale for
+- A higher-level `mycelium note` verb that _requires_ rationale for
   rationale-bearing directories. Deferred until there is evidence of
   which directories want enforcement; this ADR does not preclude it.
 - Lint-style audits over rationale density in chosen directories
@@ -135,7 +135,7 @@ mycelium log decision \
 ### Positive
 
 - **Activity log becomes self-sufficient for many review tasks.** A
-  reader can reconstruct *why-this-operation* by reading the log line,
+  reader can reconstruct _why-this-operation_ by reading the log line,
   without opening every note. Operational reasoning travels with the
   operation.
 - **Symmetry across the CLI.** Every rationale-bearing op accepts the
@@ -208,16 +208,16 @@ mycelium log decision \
 The original Proposed draft included three open questions. They were
 resolved during acceptance:
 
-- **CAS conflict envelope:** *Yes*, propagate. Both sides' rationale
+- **CAS conflict envelope:** _Yes_, propagate. Both sides' rationale
   appears in the envelope so the retrying agent can merge intent, not
   just bytes. Implemented as an `omitempty` field on
   `conflictEnvelope`.
-- **`mycelium log` flag:** *Yes*, accept `--rationale` as a top-level
+- **`mycelium log` flag:** _Yes_, accept `--rationale` as a top-level
   flag on `mycelium log <op>` for symmetry with the mutation verbs.
   An adapter that wants structured rationale-adjacent metadata can
   still use `--payload-json`; the top-level flag avoids forcing every
   consumer through nested JSON.
-- **Harness adapter coordination:** *Yes*, encourage. `pi-mycelium`
+- **Harness adapter coordination:** _Yes_, encourage. `pi-mycelium`
   v0.2.0 adds a one-line recommendation to its injected system-prompt
   block urging agents to supply `--rationale` on rationale-bearing
   operations. Future adapters are encouraged to follow suit. This is

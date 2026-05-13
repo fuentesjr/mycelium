@@ -7,13 +7,13 @@
 
 Three detectors operating on activity-log content alone must distinguish a healthy trajectory from each of three named failure modes:
 
-| Detector | Fires when |
-|---|---|
-| `writes_without_reads` | `(write+edit) / read_signal` ratio >0.7 across ≥3 consecutive sessions |
+| Detector               | Fires when                                                                    |
+| ---------------------- | ----------------------------------------------------------------------------- |
+| `writes_without_reads` | `(write+edit) / read_signal` ratio >0.7 across ≥3 consecutive sessions        |
 | `near_duplicate_paths` | ≥3 Levenshtein-1 path collisions among `op=write` entries in a single session |
-| `thrashing` | ≥50 activity-log entries in a single session |
+| `thrashing`            | ≥50 activity-log entries in a single session                                  |
 
-Implementation in `cmd/mycelium/detect.go`. Fixtures under `cmd/mycelium/testdata/trajectories/`:
+Implementation in `internal/mycelium/detect.go`. Fixtures under `internal/mycelium/testdata/trajectories/`:
 
 - `healthy.jsonl` — two well-behaved sessions; trips no detector.
 - `unhealthy-writes-without-reads.jsonl` — four sessions with all-mutations, zero read signals; trips detector 1.
@@ -23,11 +23,10 @@ Implementation in `cmd/mycelium/detect.go`. Fixtures under `cmd/mycelium/testdat
 ## Run protocol
 
 ```
-cd cmd/mycelium
-go test -run TestDetectors -v
+go test -run TestDetectors -v ./internal/mycelium
 ```
 
-Pass condition: every fixture is classified as expected by all three detectors. The test table is in `cmd/mycelium/detect_test.go` (`expectedVerdicts`).
+Pass condition: every fixture is classified as expected by all three detectors. The test table is in `internal/mycelium/detect_test.go` (`expectedVerdicts`).
 
 ## Why no `task.md` or `held-out.md`
 
@@ -35,8 +34,8 @@ T3 has no agent under test. There's nothing for a model to do, no transcript to 
 
 ## Adding a new failure mode
 
-1. Add the detector function to `cmd/mycelium/detect.go`. Keep it a pure function over `[]LogEntry`.
+1. Add the detector function to `internal/mycelium/detect.go`. Keep it a pure function over `[]LogEntry`.
 2. Add it to `RunDetectors` in the same file.
-3. Add a fixture under `cmd/mycelium/testdata/trajectories/unhealthy-<mode>.jsonl` that trips the new detector and no others.
-4. Extend `expectedVerdicts` in `cmd/mycelium/detect_test.go` with one new column entry per fixture (existing fixtures should report `true` for the new detector).
+3. Add a fixture under `internal/mycelium/testdata/trajectories/unhealthy-<mode>.jsonl` that trips the new detector and no others.
+4. Extend `expectedVerdicts` in `internal/mycelium/detect_test.go` with one new column entry per fixture (existing fixtures should report `true` for the new detector).
 5. Update `docs/benchmarks/phase-1.md` T3 section and this harness doc.

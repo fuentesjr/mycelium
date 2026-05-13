@@ -150,19 +150,19 @@ For structured decisions — conventions the agent adopted, lessons distilled, r
 
 ### What does mycelium record so a future reviewer can understand why a change happened?
 
-The diff is the cheap part — any version control system can tell you *what* changed. The thing a future reviewer (or another agent) usually can't reconstruct is the *why*. Mycelium records that across two surfaces, both governed by the same discipline: capture the rationale at the moment of decision, and name what was rejected — not just what was chosen.
+The diff is the cheap part — any version control system can tell you _what_ changed. The thing a future reviewer (or another agent) usually can't reconstruct is the _why_. Mycelium records that across two surfaces, both governed by the same discipline: capture the rationale at the moment of decision, and name what was rejected — not just what was chosen.
 
-**File contents carry the per-note reasoning.** When the agent writes an incident note, an investigation log, or a plan file, the *why* lives in the note itself — the trigger, the hypothesis being tested, the alternatives considered and rejected. Same craft as a good commit message, applied to every note. A diff shows what changed; the note explains why. This is a convention; the binary does not enforce it.
+**File contents carry the per-note reasoning.** When the agent writes an incident note, an investigation log, or a plan file, the _why_ lives in the note itself — the trigger, the hypothesis being tested, the alternatives considered and rejected. Same craft as a good commit message, applied to every note. A diff shows what changed; the note explains why. This is a convention; the binary does not enforce it.
 
 **Operational rationale is now first-class on every rationale-bearing op.** `write`, `edit`, `rm`, `mv`, and `log` all accept an optional `--rationale "..."` flag. When supplied, rationale appears as a top-level field on the corresponding activity log entry (`omitempty` — absent when not supplied, so existing log readers are unaffected). On a CAS or destination-exists conflict, the losing caller's rationale also appears in the conflict envelope emitted to stderr, so the retrying agent can merge intent rather than just bytes. Maximum 64 KiB per rationale; oversize input is rejected with exit 65 before the mutation runs.
 
-The note-body discipline and `--rationale` are complementary: note bodies hold *why-this-thing* (per-note reasoning embedded in content), `--rationale` holds *why-this-operation* (the reason for the mutation or signal, captured on the activity log line). Both can coexist on the same write.
+The note-body discipline and `--rationale` are complementary: note bodies hold _why-this-thing_ (per-note reasoning embedded in content), `--rationale` holds _why-this-operation_ (the reason for the mutation or signal, captured on the activity log line). Both can coexist on the same write.
 
 **`evolve` events carry the structural decisions** — the patterns and rules the agent adopts for itself. When the agent picks a filename convention, builds an index, or archives a region, it records the choice with `mycelium evolve convention|index|archive --rationale "..."`. Rationale is required on `evolve`. `mycelium evolve --active` shows the rules currently in effect with their original reasoning attached; `mycelium evolve --list` gives the full timeline including superseded rules.
 
 **The activity log is the chain of custody.** Every mutation lands in `<mount>/_activity/YYYY/MM/DD/<agent>.jsonl` with `agent_id`, `session_id`, timestamp, op kind, path, version hash, and (when supplied) `rationale`. With session-boundary entries (`session_startup`/`session_shutdown`, and optionally `turn_start`/`turn_end` from richer harnesses), you can group a burst of writes as one turn of one session rather than as scattered events, then cross-reference the note content and any `evolve` entries to recover the reasoning.
 
-The split is deliberate: notes carry *why-this-thing*, the `--rationale` flag carries *why-this-operation*, `evolve` events carry *why-this-pattern*, and the activity log carries *who* and *when*. A reviewer typically reads the notes for per-decision rationale, checks the activity log for operational context attached to individual mutations, runs `mycelium evolve --active` for the workspace's current rules, and consults the activity log to reconstruct timelines or find which session a given change belonged to.
+The split is deliberate: notes carry _why-this-thing_, the `--rationale` flag carries _why-this-operation_, `evolve` events carry _why-this-pattern_, and the activity log carries _who_ and _when_. A reviewer typically reads the notes for per-decision rationale, checks the activity log for operational context attached to individual mutations, runs `mycelium evolve --active` for the workspace's current rules, and consults the activity log to reconstruct timelines or find which session a given change belonged to.
 
 ### Should I commit a mount to git?
 
@@ -200,7 +200,7 @@ The practical risk at this stage is not data loss — the core integrity primiti
 
 ### Has it been benchmarked?
 
-A rubric is fully defined in [benchmarks/phase-1.md](benchmarks/phase-1.md): three tasks (T1 multi-session research synthesis, T2 seeded self-evolution, T3 failure-mode detectors), target models (Claude Opus 4.7 and GPT-5.5), and pass/fail criteria. T3's failure-mode detectors are implemented and exercised by `go test -run TestDetectors`. T1 and T2 task definitions and grading rubrics are drafted and ready to run. Published model runs against Opus 4.7 and GPT-5.5 are pending — results will land in `docs/benchmarks/` as they complete.
+A rubric is fully defined in [benchmarks/phase-1.md](benchmarks/phase-1.md): three tasks (T1 multi-session research synthesis, T2 seeded self-evolution, T3 failure-mode detectors), target models (Claude Opus 4.7 and GPT-5.5), and pass/fail criteria. T3's failure-mode detectors are implemented and exercised by `go test -run TestDetectors ./internal/mycelium`. T1 and T2 task definitions and grading rubrics are drafted and ready to run. Published model runs against Opus 4.7 and GPT-5.5 are pending — results will land in `docs/benchmarks/` as they complete.
 
 ### What's on the roadmap?
 

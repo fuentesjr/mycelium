@@ -108,7 +108,7 @@ Rationale: model-run validation does not change the artifact, only the public cl
 
 ## Open issues
 
-T3 is executable: detectors implemented in `cmd/mycelium/detect.go`, fixtures under `cmd/mycelium/testdata/trajectories/`, harness at `docs/benchmarks/tasks/T3-failure-detectors/harness.md`. Run via `go test -run TestDetectors`.
+T3 is executable: detectors implemented in `internal/mycelium/detect.go`, fixtures under `internal/mycelium/testdata/trajectories/`, harness at `docs/benchmarks/tasks/T3-failure-detectors/harness.md`. Run via `go test -run TestDetectors ./internal/mycelium`.
 
 T1 is drafted: `task.md`, `harness.md`, `held-out.md` under `docs/benchmarks/tasks/T1-multi-session-research/`. Awaiting first runs against Opus 4.7 and GPT-5.5.
 
