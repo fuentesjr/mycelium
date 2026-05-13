@@ -40,7 +40,7 @@ jobs:
           TAG="${{ github.ref_name }}"
           TAG_VER="${TAG#v}"
 
-          MAKEFILE_VER=$(grep -E '^VERSION\s*\?=' Makefile | sed 's/VERSION\s*?=\s*//' | tr -d ' ' | sed 's/^v//')
+          MAKEFILE_VER=$(sed -n -E 's/^VERSION[[:space:]]*\?=[[:space:]]*v?([^[:space:]]+).*/\1/p' Makefile)
           PKG_VER=$(node -p "require('./extensions/pi-mycelium/package.json').version")
 
           echo "Tag version:      $TAG_VER"
