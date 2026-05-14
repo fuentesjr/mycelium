@@ -41,7 +41,7 @@
 
 ### What is mycelium and what problem does it solve?
 
-Mycelium is a CLI and on-disk format that gives agents a durable, inspectable store they own across sessions, processes, and concurrent runs. A mount is a plain directory. Agents read and write through ten subcommands (`read`, `write`, `edit`, `ls`, `glob`, `grep`, `rm`, `mv`, `log`, and `evolve` — mycelium's mechanism for recording structural decisions and conventions). The same files are readable with `cat`, searchable with `grep`, versionable with `git`, and shareable as a tarball — no special tooling required.
+Mycelium is a CLI and on-disk format that gives agents a durable, inspectable store they own across sessions, processes, and concurrent runs. A mount is a plain directory. Agents read and write through ten subcommands (`read`, `write`, `edit`, `ls`, `glob`, `grep`, `rm`, `mv`, `log`, and `evolve` (mycelium's mechanism for recording structural decisions and conventions)). The same files are readable with `cat`, searchable with `grep`, versionable with `git`, and shareable as a tarball — no special tooling required.
 
 AI coding agents lose all context when a session ends. The common workarounds — stuffing everything into the system prompt, ad-hoc scratch files, vector stores — either don't survive across processes or hide context behind opaque retrieval that no human can inspect.
 
@@ -128,7 +128,7 @@ That's it. Every mycelium invocation reads these and behaves consistently. Highe
 
 ### Can I use it without pi.dev, or with a custom harness?
 
-Yes. `pi-mycelium` is a convenience wrapper, not a requirement. Any agent harness that can run shell commands works at L0 (L0 = shell-command integration, the baseline level): set the three env vars and let the agent invoke `mycelium` subcommands through its existing shell tool. A minimal L1 shell wrapper that emits `session_startup` and `session_shutdown` log entries is shown in [portable activity events](portable-activity-events.md).
+Yes. `pi-mycelium` is a convenience wrapper, not a requirement. Any agent harness that can run shell commands works at L0 (the baseline shell-command integration level): set the three env vars and let the agent invoke `mycelium` subcommands through its existing shell tool. A minimal L1 shell wrapper that emits `session_startup` and `session_shutdown` log entries is shown in [portable activity events](portable-activity-events.md).
 
 ### Does it conflict with Claude Code, Cursor, or Codex built-in memory?
 
