@@ -29,7 +29,7 @@
   - [How do I delete or roll back something an agent wrote?](#how-do-i-delete-or-roll-back-something-an-agent-wrote)
 - [Status and maturity](#status-and-maturity)
   - [Is mycelium production-ready?](#is-mycelium-production-ready)
-  - [Has it been benchmarked?](#has-it-been-benchmarked)
+  - [Are benchmarks available yet?](#are-benchmarks-available-yet)
   - [What's on the roadmap?](#whats-on-the-roadmap)
 - [Why these design choices](#why-these-design-choices)
   - [Why a directory of files instead of a database?](#why-a-directory-of-files-instead-of-a-database)
@@ -41,9 +41,9 @@
 
 ### What is mycelium and what problem does it solve?
 
-AI coding agents lose all context when a session ends. The common workarounds — stuffing everything into the system prompt, ad-hoc scratch files, vector stores — either don't survive across processes or hide context behind opaque retrieval that no human can inspect.
+Mycelium is a CLI and on-disk format that gives agents a durable, inspectable store they own across sessions, processes, and concurrent runs. A mount is a plain directory. Agents read and write through ten subcommands (`read`, `write`, `edit`, `ls`, `glob`, `grep`, `rm`, `mv`, `log`, and `evolve` — mycelium's mechanism for recording structural decisions and conventions). The same files are readable with `cat`, searchable with `grep`, versionable with `git`, and shareable as a tarball — no special tooling required.
 
-Mycelium is a CLI and on-disk format that gives agents a durable, inspectable store they own across sessions, processes, and concurrent runs. A mount is a plain directory. Agents read and write through ten subcommands (`read`, `write`, `edit`, `ls`, `glob`, `grep`, `rm`, `mv`, `log`, `evolve`). The same files are readable with `cat`, searchable with `grep`, versionable with `git`, and shareable as a tarball — no special tooling required.
+AI coding agents lose all context when a session ends. The common workarounds — stuffing everything into the system prompt, ad-hoc scratch files, vector stores — either don't survive across processes or hide context behind opaque retrieval that no human can inspect.
 
 ### Who is this for?
 
@@ -59,7 +59,7 @@ These approaches are complementary, not mutually exclusive. A team could pair my
 
 ### Does it lock me into a particular model or harness?
 
-No. Mycelium itself is harness-neutral: any agent that can run shell commands and read files can use it. The `pi-mycelium` npm extension is one harness integration for pi.dev, but the core binary works from any shell. Identity is configured once via three environment variables (`MYCELIUM_MOUNT`, `MYCELIUM_AGENT_ID`, `MYCELIUM_SESSION_ID`); after that, every invocation is a plain CLI call. Portable activity events are documented conventions for observability signals, not schema enforced by the binary. See [portable activity events](portable-activity-events.md) and [ADR 0002](adr/0002-portable-activity-events-as-adapter-conventions.md).
+**No — mycelium is harness-neutral and does not lock you into a model or harness.** Any agent that can run shell commands and read files can use it. The `pi-mycelium` npm extension is one harness integration for pi.dev, but the core binary works from any shell. Identity is configured once via three environment variables (`MYCELIUM_MOUNT`, `MYCELIUM_AGENT_ID`, `MYCELIUM_SESSION_ID`); after that, every invocation is a plain CLI call. Portable activity events are documented conventions for observability signals, not schema enforced by the binary. See [portable activity events](portable-activity-events.md) and [ADR 0002](adr/0002-portable-activity-events-as-adapter-conventions.md).
 
 ---
 
@@ -67,11 +67,18 @@ No. Mycelium itself is harness-neutral: any agent that can run shell commands an
 
 ### Can a misbehaving agent escape the mount or trash my filesystem?
 
-Mycelium does not sandbox the agent. If an agent has shell access, it can touch files anywhere on the filesystem that its OS user permits — mycelium's `_` prefix reservation only prevents the agent from using `mycelium write` on reserved system paths inside the mount. The harness controls what commands the agent can run; mycelium's contract is integrity within the mount (atomic writes, conflict detection, durable log), not isolation from the broader system. Treat mount-level protection accordingly: scope the agent's shell permissions at the harness level, not at mycelium's level.
+**Mycelium does not sandbox the agent.** If an agent has shell access, it can touch files anywhere on the filesystem that its OS user permits — mycelium's `_` prefix reservation only prevents the agent from using `mycelium write` on reserved system paths inside the mount. The harness controls what commands the agent can run; mycelium's contract is integrity within the mount (atomic writes, conflict detection, durable log), not isolation from the broader system. Treat mount-level protection accordingly: scope the agent's shell permissions at the harness level, not at mycelium's level.
 
 ### What happens to a write if mycelium gets killed or the machine crashes?
 
-Every content mutation is a small transaction. Before changing a file, mycelium writes a pending record to `_tx/pending/`. After the content change and activity log append succeed, it removes the pending record. On the next invocation after a crash, mycelium scans `_tx/pending/` and completes or rolls back any interrupted transaction before allowing new mutations. The activity log is authoritative: a command returns success only after both the file and the log entry are durable on disk. See the [design doc](mycelium-design.md) section 5 for the full transaction protocol.
+Every content mutation is a small transaction:
+
+1. Before changing a file, mycelium writes a pending record to `_tx/pending/`.
+2. The content change and activity log append are performed.
+3. The pending record is removed — marking the transaction complete.
+4. On restart after a crash, any remaining pending records are replayed and cleaned up.
+
+The activity log is authoritative: a command returns success only after both the file and the log entry are durable on disk. See the [design doc](mycelium-design.md) section 5 for the full transaction protocol.
 
 ### Two agents writing the same file at the same instant — what happens?
 
@@ -89,7 +96,7 @@ The honest answer is: probably not reliably, and the recommendation is not to tr
 
 Two paths. Build from source (requires Go 1.26+):
 
-```
+```sh
 git clone https://github.com/fuentesjr/mycelium.git
 cd mycelium
 make build
@@ -98,7 +105,7 @@ sudo install cmd/mycelium/mycelium /usr/local/bin/
 
 Or via `go install ./cmd/mycelium`. For pi.dev, the `pi-mycelium` npm extension bundles the platform-matching binary and handles PATH setup automatically:
 
-```
+```sh
 pi install npm:pi-mycelium        # global
 pi install npm:pi-mycelium -l     # project-local
 ```
@@ -107,7 +114,7 @@ Full install instructions are in the [README](../README.md).
 
 ### Does it need a daemon, database, or network access?
 
-No. Mycelium is a single stateless binary. Every invocation opens the mount directory, does its work, and exits. There is no background process, no embedded database, and no network call. The entire system state is in a directory on your local disk.
+**No — mycelium is a single stateless binary with no daemon, database, or network access.** Every invocation opens the mount directory, does its work, and exits. The entire system state is in a directory on your local disk.
 
 ### What does an agent harness have to configure?
 
@@ -121,11 +128,13 @@ That's it. Every mycelium invocation reads these and behaves consistently. Highe
 
 ### Can I use it without pi.dev, or with a custom harness?
 
-Yes. `pi-mycelium` is a convenience wrapper, not a requirement. Any agent harness that can run shell commands works at L0: set the three env vars and let the agent invoke `mycelium` subcommands through its existing shell tool. A minimal L1 shell wrapper that emits `session_startup` and `session_shutdown` log entries is shown in [portable activity events](portable-activity-events.md).
+Yes. `pi-mycelium` is a convenience wrapper, not a requirement. Any agent harness that can run shell commands works at L0 (L0 = shell-command integration, the baseline level): set the three env vars and let the agent invoke `mycelium` subcommands through its existing shell tool. A minimal L1 shell wrapper that emits `session_startup` and `session_shutdown` log entries is shown in [portable activity events](portable-activity-events.md).
 
 ### Does it conflict with Claude Code, Cursor, or Codex built-in memory?
 
 No. They're orthogonal. Claude Code's `CLAUDE.md`, Cursor's rules, and Codex's session context are session-scoped prompt injections managed by those harnesses. Mycelium is a durable on-disk store the agent reads and writes. They coexist: the harness-level memory shapes how the agent behaves; mycelium preserves what the agent has written across sessions.
+
+> **See also:** [README](../README.md) for full install details · [agent-faq.md](agent-faq.md) for the operational reference · [portable activity events spec](portable-activity-events.md) for advanced observability configuration.
 
 ---
 
@@ -135,7 +144,7 @@ No. They're orthogonal. Claude Code's `CLAUDE.md`, Cursor's rules, and Codex's s
 
 The activity log is plain JSONL at `<mount>/_activity/YYYY/MM/DD/<agent_id>.jsonl`. Every write, edit, delete, move, and `evolve` event lands there automatically; the agent can also append manual signal entries with `mycelium log`. Read it with standard tools:
 
-```
+```sh
 # All activity today, all agents
 cat $MYCELIUM_MOUNT/_activity/2026/05/10/*.jsonl
 
@@ -151,6 +160,13 @@ For structured decisions — conventions the agent adopted, lessons distilled, r
 ### What does mycelium record so a future reviewer can understand why a change happened?
 
 The diff is the cheap part — any version control system can tell you _what_ changed. The thing a future reviewer (or another agent) usually can't reconstruct is the _why_. Mycelium records that across two surfaces, both governed by the same discipline: capture the rationale at the moment of decision, and name what was rejected — not just what was chosen.
+
+| Layer | What it captures | Where it lives |
+|---|---|---|
+| File content | Per-note reasoning — trigger, hypothesis, outcome | The note file itself |
+| `--rationale` flag | Why this specific operation was performed | Activity log entry (`reason` field) |
+| `evolve` events | Structural patterns/conventions the agent adopted | `_activity/` + evolve log |
+| Activity log | Who did what and when (chain of custody) | `_activity/YYYY/MM/DD/<agent>.jsonl` |
 
 **File contents carry the per-note reasoning.** When the agent writes an incident note, an investigation log, or a plan file, the _why_ lives in the note itself — the trigger, the hypothesis being tested, the alternatives considered and rejected. Same craft as a good commit message, applied to every note. A diff shows what changed; the note explains why. This is a convention; the binary does not enforce it.
 
@@ -172,7 +188,7 @@ It's a legitimate option, not a requirement. A mount is a directory of plain tex
 
 `tar` it:
 
-```
+```sh
 tar czf mount-backup.tar.gz .mycelium-store/
 ```
 
@@ -194,11 +210,11 @@ For self-evolution decisions — conventions adopted, regions archived — `myce
 
 ### Is mycelium production-ready?
 
-Not yet. Mycelium is pre-1.0, currently at v0.2.0 (early access). Phase 1 is feature-complete: atomic CAS, transaction-journal crash recovery, the activity log, `evolve`, and the on-disk format are all implemented and have property-based and concurrent-process test coverage. What is not yet complete is the full benchmark validation against frontier models (T1 multi-session synthesis and T2 self-evolution runs are drafted but awaiting published runs). The [roadmap](mycelium-phases.md) lays out what Phases 2 and 3 add.
+Not yet. Mycelium is pre-1.0, currently at v0.2.0 (early access). Phase 1 is feature-complete: atomic content-addressable storage (CAS), transaction-journal crash recovery, the activity log, `evolve`, and the on-disk format are all implemented and have property-based and concurrent-process test coverage. What is not yet complete is the full benchmark validation against frontier models (T1 multi-session synthesis and T2 self-evolution runs are drafted but awaiting published runs). The [roadmap](mycelium-phases.md) lays out what Phases 2 and 3 add.
 
 The practical risk at this stage is not data loss — the core integrity primitives are solid — but rather that the API surface, on-disk format details, or activity log schema may still shift before 1.0.
 
-### Has it been benchmarked?
+### Are benchmarks available yet?
 
 A rubric is fully defined in [benchmarks/phase-1.md](benchmarks/phase-1.md): three tasks (T1 multi-session research synthesis, T2 seeded self-evolution, T3 failure-mode detectors), target models (Claude Opus 4.7 and GPT-5.5), and pass/fail criteria. T3's failure-mode detectors are implemented and exercised by `go test -run TestDetectors ./internal/mycelium`. T1 and T2 task definitions and grading rubrics are drafted and ready to run. Published model runs against Opus 4.7 and GPT-5.5 are pending — results will land in `docs/benchmarks/` as they complete.
 
