@@ -47,6 +47,13 @@ This is the project's first principle and the one every other principle answers 
 
 The "but not simpler" half is load-bearing. A system that fakes simplicity by hiding necessary complexity behind opaque abstractions, or that drops a guarantee the bet depends on, has failed this principle as surely as one that piles on unnecessary layers. Atomicity, conflict visibility, reserved-prefix protection, authoritative activity logging, and crash recovery cannot be removed without breaking the bet — they're as simple as the bet allows, and no simpler.
 
+**Simplicity budget.** Any new command, flag, metadata path, persisted concept,
+or prompt requirement must either remove an equal or larger concept elsewhere or
+explicitly justify why the core bet fails without it. Features are grouped by
+mental-model tier: everyday surface first, occasional operations second,
+metadata/internals last. If a guarantee needs machinery, the machinery stays in
+implementation docs and diagnostics rather than the default agent/user model.
+
 ### General tools scale with intelligence; specialized infrastructure caps it
 
 A specialized memory API encodes assumptions: what gets saved, how it's indexed, what counts as "relevant," when to summarize. As models improve, those heuristics become drag — the system forces the agent into compression and ranking policies the model could now beat unaided.
@@ -83,13 +90,19 @@ The system records what the agent did. It does not act on what the agent did. Th
 
 ## 3. Architecture Overview
 
-Two layers, with system metadata inside the store under reserved `_` paths:
+Public model first: **a folder + safe mutations + a searchable activity log**.
+Agents and operators should not need to think about CAS, `flock`, fsync, or the
+transaction journal during normal use. Those details exist to make "safe
+mutations" true.
+
+Internally there are two layers, with system metadata inside the store under
+reserved `_` paths:
 
 ```
   Frontier-class agent
        │
        │  invokes `mycelium <sub>` via its existing shell tool
-       │  env: MYCELIUM_MOUNT, MYCELIUM_AGENT_ID, MYCELIUM_SESSION_ID
+       │  env: MYCELIUM_MOUNT required; MYCELIUM_AGENT_ID / MYCELIUM_SESSION_ID optional
        │
        │  raw reads are okay: cat, ls, rg, editor, tar
        │  raw writes are unsupported: all mutations go through mycelium
@@ -177,7 +190,7 @@ Four contract notes:
 
 **The `_` prefix is reserved at the store root.** `mycelium` rejects `write`, `edit`, `rm`, and `mv` whose target/source is under any path beginning with `_`. Currently `_activity/` and `_tx/`; future system paths inherit the same protection without code changes.
 
-**Identity travels via environment.** The harness sets `MYCELIUM_MOUNT` (the store directory), `MYCELIUM_AGENT_ID`, and (optionally) `MYCELIUM_SESSION_ID` once. Every invocation reads them; every log entry records the agent and session. Standard Unix request identity.
+**Identity travels via environment.** The harness sets `MYCELIUM_MOUNT` (the store directory) once. `MYCELIUM_AGENT_ID` is optional and defaults to `agent`; `MYCELIUM_SESSION_ID` is optional and auto-generated per CLI process when absent. Harnesses that can provide stable agent/session ids should still do so for clearer multi-agent timelines. Every invocation reads identity from the environment/defaults; every log entry records the agent and session. Standard Unix request identity.
 
 ---
 

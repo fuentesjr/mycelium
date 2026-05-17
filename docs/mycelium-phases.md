@@ -26,7 +26,7 @@ Mycelium is LocalFS/POSIX-native. The roadmap below keeps that guarantee set ins
 - Atomic single-file ops via write-to-temp-then-rename, atomic rename for `mv`, and destination-collision protection.
 - Authoritative activity log at `_activity/YYYY/MM/DD/{agent_id}.jsonl`. Every successful state-changing operation (`write`, `edit`, `rm`, `mv`, `log`, `evolve`) produces a durable JSONL entry. Reads are not logged.
 - Transaction journal at `_tx/pending/{tx_id}.json` so content mutations and activity entries recover together across crashes. A command returns success only after the content change, activity entry, and pending transaction cleanup are durable.
-- Mount, agent, and session identity via environment variables (`MYCELIUM_MOUNT`, `MYCELIUM_AGENT_ID`, `MYCELIUM_SESSION_ID`) set once by the harness.
+- Mount and identity via environment variables: `MYCELIUM_MOUNT` is required; `MYCELIUM_AGENT_ID` defaults to `agent`; `MYCELIUM_SESSION_ID` is auto-generated per CLI process when absent. Harnesses can set stable agent/session ids for clearer timelines.
 - Typed conflict errors. When `--expected-version` doesn't match, `mycelium` exits 64 and prints structured JSON to stderr containing the current version token and, opt-in via `--include-current-content`, current UTF-8 content.
 - Raw-read/raw-write boundary: raw filesystem reads are allowed; raw filesystem writes are unsupported. All live-store mutations go through `mycelium`.
 - Reserved `_` prefix. `mycelium` rejects agent mutations under any `_`-prefixed root path; currently `_activity/` and `_tx/`.

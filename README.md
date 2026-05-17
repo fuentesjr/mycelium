@@ -15,7 +15,7 @@ network, no database.
                     ┌───────▼───────┐
                     │ mycelium CLI  │
                     └───────┬───────┘
-                            │  atomic writes, CAS, _tx journal
+                            │  safe mutations + activity log
                     ┌───────▼───────┐
                     │    mount/     │  ◀── git, grep, tar, cat
                     │  plain files  │      read this directly
@@ -33,6 +33,18 @@ Mycelium gives agents a durable, inspectable filesystem they own:
 `cat` reads it, `grep` searches it, `git` versions it, and multiple
 agents can write to it concurrently without stepping on each other.
 
+## Public model
+
+For agents and operators, Mycelium is deliberately small:
+
+> **A folder + safe mutations + a searchable activity log.**
+
+The everyday loop is: list or grep paths, read the relevant files, write or
+edit a note, and inspect `_activity/` when you need the history. CAS tokens,
+locks, fsync, and the crash-recovery journal are implementation details of the
+"safe mutations" part; they are documented in the design doc for implementers
+and recovery debugging, not required for normal use.
+
 ## Features
 
 - **Atomic writes with optimistic concurrency.** Every write returns a
@@ -41,23 +53,24 @@ agents can write to it concurrently without stepping on each other.
   (and optionally the current content) so the caller can re-merge
   without re-reading.
 - **Crash-safe.** Content mutations and activity-log entries recover
-  together via `_tx/pending/` journal records.
+  together; interrupted operations are repaired before later mutations proceed.
 - **Multi-agent safe.** Mount-level `flock` plus CAS lets sibling
   processes share a mount without corruption.
 - **Append-only activity log per agent.** Plain JSONL at
   `<mount>/_activity/YYYY/MM/DD/<agent>.jsonl` — `tail -f` works.
-- **Self-evolution.** Agents record conventions and rationale with
-  `mycelium evolve`, then query the active rules at any time.
+- **Self-evolution.** Agents record structured activity-log entries for
+  conventions, lessons, and rationale with `mycelium evolve`, then query the
+  active rules at any time.
 - **Boring on disk.** Plain files in a directory you own. Inspect with
   `cat`, search with `grep`, version with `git`, back up with `tar`.
 
 ## How it fits together
 
-A *mount* is a directory that holds an agent's notes plus its
-`_activity/` log and `_tx/` journal. Agents — running in pi.dev,
-Claude Code, a script, whatever — invoke `mycelium <subcommand>` to
-read and write inside the mount. The reserved `_` path prefix keeps
-agent writes from clobbering system metadata.
+A _mount_ is a directory that holds an agent's notes plus the read-only
+`_activity/` log. Agents — running in pi.dev, Claude Code, a script,
+whatever — invoke `mycelium <subcommand>` to read and write inside the
+mount. The reserved `_` path prefix keeps agent writes from clobbering system
+metadata; only `_activity/` is part of the daily mental model.
 
 ```
 .mycelium-store/
@@ -74,29 +87,26 @@ agent writes from clobbering system metadata.
 │   └── spikes/
 │       └── 2026-Q1/                              ← mycelium evolve archive (no file changes)
 │           └── caching-prototype.md
-├── _lock                                         ← mount-level flock target
-├── _activity/                                    ← append-only JSONL log per agent
-│   └── 2026/05/09/
-│       ├── coder.jsonl                           ← writes + evolve events
-│       └── reviewer.jsonl
-└── _tx/
-    └── pending/                                  ← crash-recovery journal
+└── _activity/                                    ← append-only JSONL log per agent
+    └── 2026/05/09/
+        ├── coder.jsonl                           ← writes + evolve events
+        └── reviewer.jsonl
 ```
 
 ## Subcommands
 
-| Command | Group | Purpose |
-|---|---|---|
-| `read` | content | Read a note (optionally with version metadata) |
-| `write` | content | Atomic write; returns version, supports CAS via `--expected-version` and optional `--rationale` |
-| `edit` | content | In-place edit with the same CAS semantics as `write`; accepts `--rationale` |
-| `rm` | content | Remove a note; accepts `--rationale` |
-| `mv` | content | Move/rename a note; accepts `--rationale` |
-| `ls` | discovery | List entries under a path |
-| `glob` | discovery | Match notes by glob pattern |
-| `grep` | discovery | Content search across the mount |
-| `log` | meta | Append a signal entry to the activity log; accepts `--rationale` |
-| `evolve` | meta | Record or query self-evolution events (conventions, indices, archives); `--rationale` is required |
+| Tier       | Command  | Purpose                                                                                                |
+| ---------- | -------- | ------------------------------------------------------------------------------------------------------ |
+| Everyday   | `read`   | Read a note (optionally with version metadata)                                                         |
+| Everyday   | `write`  | Safe write; returns version, supports CAS via `--expected-version` and optional `--rationale`          |
+| Everyday   | `edit`   | Safe find/replace of a unique substring; accepts `--rationale`                                         |
+| Everyday   | `ls`     | List entries in the mount                                                                              |
+| Everyday   | `grep`   | Search content across the mount                                                                        |
+| Occasional | `glob`   | Match paths by glob pattern when `ls`/`grep` are not enough                                            |
+| Occasional | `rm`     | Remove a note; accepts `--rationale`                                                                   |
+| Occasional | `mv`     | Move/rename a note; accepts `--rationale`                                                              |
+| Metadata   | `log`    | Append a signal entry to the activity log; mostly adapter-facing                                       |
+| Metadata   | `evolve` | Record/query structured activity-log entries for conventions, lessons, indices, archives, or questions |
 
 ## Concurrent writes
 
@@ -177,7 +187,8 @@ for the full install / scope-detection / identity story.
 
 ```
 export MYCELIUM_MOUNT=$(pwd)/.mycelium-store
-export MYCELIUM_AGENT_ID=coder
+# Optional: export MYCELIUM_AGENT_ID=coder        # defaults to "agent"
+# Optional: export MYCELIUM_SESSION_ID=session-1  # otherwise auto-generated per CLI process
 
 # Write a note (atomic, returns version)
 echo "incident: query latency spike correlates with deploys at 14:30" \
@@ -202,9 +213,9 @@ mycelium evolve convention \
 
 # View the current rules in effect across all kinds (NDJSON; one event per line)
 mycelium evolve --active --format json
-# {"ts":"2026-04-28T09:14:32Z","agent_id":"coder","session_id":"01HXJX2K7N9R5T2YQ8M3D1B6V4","op":"evolve","id":"01HXKP4Z9M8YV1W6E2RTSA9KFG","kind":"convention","target":"notes/incidents/","supersedes":"","kind_definition":"","rationale":"Adopting <date>-<slug>.md filenames so incidents sort chronologically without a separate index."}
-# {"ts":"2026-05-01T14:22:09Z","agent_id":"coder","session_id":"01HXKM5R8P2Q6V3Z9N4S1T0Y7K","op":"evolve","id":"01HXKP6F3J8C2YV1W6E2RTSA9K","kind":"index","target":"notes/services/","supersedes":"","kind_definition":"","rationale":"Built _index.md grouped by team owner; lookups were dominated by 'whose service is this?'"}
-# {"ts":"2026-05-05T16:08:51Z","agent_id":"coder","session_id":"01HXKQ8T9V3R5W4Y2N7Z1B6P0M","op":"evolve","id":"01HXKP9YQ7M2K8V1W6E2RTSA9F","kind":"archive","target":"notes/spikes/2026-Q1/","supersedes":"","kind_definition":"","rationale":"Archiving Q1 spikes; none referenced in 30+ days and they were drowning grep results for active work."}
+# {"ts":"2026-04-28T09:14:32Z","agent_id":"agent","session_id":"auto-01HXJX2K7N9R5T2YQ8M3D1B6V4","op":"evolve","id":"01HXKP4Z9M8YV1W6E2RTSA9KFG","kind":"convention","target":"notes/incidents/","supersedes":"","kind_definition":"","rationale":"Adopting <date>-<slug>.md filenames so incidents sort chronologically without a separate index."}
+# {"ts":"2026-05-01T14:22:09Z","agent_id":"agent","session_id":"auto-01HXKM5R8P2Q6V3Z9N4S1T0Y7K","op":"evolve","id":"01HXKP6F3J8C2YV1W6E2RTSA9K","kind":"index","target":"notes/services/","supersedes":"","kind_definition":"","rationale":"Built _index.md grouped by team owner; lookups were dominated by 'whose service is this?'"}
+# {"ts":"2026-05-05T16:08:51Z","agent_id":"agent","session_id":"auto-01HXKQ8T9V3R5W4Y2N7Z1B6P0M","op":"evolve","id":"01HXKP9YQ7M2K8V1W6E2RTSA9F","kind":"archive","target":"notes/spikes/2026-Q1/","supersedes":"","kind_definition":"","rationale":"Archiving Q1 spikes; none referenced in 30+ days and they were drowning grep results for active work."}
 
 # Concurrent-safe update via CAS — pass the prior version, retry on conflict (exit 64).
 # On conflict, mycelium emits a JSON envelope with current_version (and current_content
@@ -213,22 +224,22 @@ echo "updated content" | mycelium write notes/incident-2026-04-30.md \
   --expected-version sha256:abc123... --include-current-content
 
 # Inspect activity log directly — plain JSONL, no tooling required
-cat $MYCELIUM_MOUNT/_activity/*/*/*/coder.jsonl
+cat $MYCELIUM_MOUNT/_activity/*/*/*/*.jsonl
 ```
 
 A log entry — the keys are self-describing; the annotations explain the
 value formats:
 
 ```
-{"id":"01HXKP4Z9M","ts":"2026-05-09T15:32Z","kind":"write","path":"notes/inc.md","version":"sha256:abc...","rationale":"Capturing initial symptoms before mitigation closes the window."}
-       │                 │                          │              │                        │                        │
-       └─ ULID           └─ ISO timestamp           └─ event kind  └─ mount-relative        └─ post-write version    └─ optional; omitted when not supplied
+{"ts":"2026-05-09T15:32:00Z","agent_id":"agent","session_id":"auto-01HXKQ8T9V3R5W4Y2N7Z1B6P0M","op":"write","path":"notes/inc.md","version":"sha256:abc...","rationale":"Capturing initial symptoms before mitigation closes the window."}
+       │                         │                   │                   │            │                        │
+       └─ ISO timestamp          └─ agent id         └─ session group    └─ event op  └─ mount-relative        └─ optional; omitted when not supplied
 ```
 
 ## What agents record
 
-A note's *what* is the cheap part — the file content, the diff. The
-*why* is what survives across sessions and travels between agents.
+A note's _what_ is the cheap part — the file content, the diff. The
+_why_ is what survives across sessions and travels between agents.
 Mycelium has three recording surfaces, and the discipline for all of
 them is: **capture the rationale at the moment of decision, and name
 what was rejected, not just what was chosen.**
@@ -259,7 +270,7 @@ activity log entry (`omitempty` — absent when not supplied). On a CAS
 conflict, it also appears in the conflict envelope on stderr so the
 retrying agent sees both sides' intent. Maximum 64 KiB. The note-body
 discipline and operational `--rationale` are complementary: note bodies
-hold *why-this-thing*, the flag holds *why-this-operation*.
+hold _why-this-thing_, the flag holds _why-this-operation_.
 
 **Self-evolution events** carry structural decisions — conventions
 adopted, indices built, patterns archived — each recorded as a

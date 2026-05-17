@@ -41,9 +41,9 @@
 
 ### What is mycelium and what problem does it solve?
 
-Mycelium is a CLI and on-disk format that gives agents a durable, inspectable store they own across sessions, processes, and concurrent runs. A mount is a plain directory. Agents read and write through ten subcommands (`read`, `write`, `edit`, `ls`, `glob`, `grep`, `rm`, `mv`, `log`, and `evolve` (mycelium's mechanism for recording structural decisions and conventions)). The same files are readable with `cat`, searchable with `grep`, versionable with `git`, and shareable as a tarball — no special tooling required.
-
 AI coding agents lose all context when a session ends. The common workarounds — stuffing everything into the system prompt, ad-hoc scratch files, vector stores — either don't survive across processes or hide context behind opaque retrieval that no human can inspect.
+
+Mycelium is a CLI and on-disk format that gives agents a durable, inspectable store they own across sessions, processes, and concurrent runs. A mount is a plain directory plus a searchable `_activity/` log. The daily model is small: list or grep paths, read relevant files, safely write or edit notes, and inspect the log when you need history. The same files are readable with `cat`, searchable with `grep`, versionable with `git`, and shareable as a tarball — no special tooling required.
 
 ### Who is this for?
 
@@ -59,7 +59,7 @@ These approaches are complementary, not mutually exclusive. A team could pair my
 
 ### Does it lock me into a particular model or harness?
 
-**No — mycelium is harness-neutral and does not lock you into a model or harness.** Any agent that can run shell commands and read files can use it. The `pi-mycelium` npm extension is one harness integration for pi.dev, but the core binary works from any shell. Identity is configured once via three environment variables (`MYCELIUM_MOUNT`, `MYCELIUM_AGENT_ID`, `MYCELIUM_SESSION_ID`); after that, every invocation is a plain CLI call. Portable activity events are documented conventions for observability signals, not schema enforced by the binary. See [portable activity events](portable-activity-events.md) and [ADR 0002](adr/0002-portable-activity-events-as-adapter-conventions.md).
+**No — mycelium is harness-neutral and does not lock you into a model or harness.** Any agent that can run shell commands and read files can use it. The `pi-mycelium` npm extension is one harness integration for pi.dev, but the core binary works from any shell. Configure `MYCELIUM_MOUNT` once; `MYCELIUM_AGENT_ID` defaults to `agent`, and `MYCELIUM_SESSION_ID` is generated per CLI process when absent. After that, every invocation is a plain CLI call. Portable activity events are documented conventions for observability signals, not schema enforced by the binary. See [portable activity events](portable-activity-events.md) and [ADR 0002](adr/0002-portable-activity-events-as-adapter-conventions.md).
 
 ---
 
@@ -73,10 +73,10 @@ These approaches are complementary, not mutually exclusive. A team could pair my
 
 Every content mutation is a small transaction:
 
-1. Before changing a file, mycelium writes a pending record to `_tx/pending/`.
+1. Before changing a file, mycelium writes an internal pending record under the reserved `_` namespace.
 2. The content change and activity log append are performed.
 3. The pending record is removed — marking the transaction complete.
-4. On restart after a crash, any remaining pending records are replayed and cleaned up.
+4. On restart after a crash, any remaining pending records are replayed or cleaned up before later mutations proceed.
 
 The activity log is authoritative: a command returns success only after both the file and the log entry are durable on disk. See the [design doc](mycelium-design.md) section 5 for the full transaction protocol.
 
@@ -118,17 +118,20 @@ Full install instructions are in the [README](../README.md).
 
 ### What does an agent harness have to configure?
 
-Three environment variables, set once before the agent runs:
+One environment variable is required before the agent runs:
 
 - `MYCELIUM_MOUNT` — absolute path to the mount directory (created if absent on first write).
-- `MYCELIUM_AGENT_ID` — a stable identifier for the agent; appears on every activity log entry.
-- `MYCELIUM_SESSION_ID` — optional; used to group activity entries within a session.
 
-That's it. Every mycelium invocation reads these and behaves consistently. Higher-fidelity observability (session boundaries, turn/tool events) is optional and documented in [portable activity events](portable-activity-events.md).
+Two identity variables are optional:
+
+- `MYCELIUM_AGENT_ID` — stable identifier for the agent; defaults to `agent`.
+- `MYCELIUM_SESSION_ID` — session grouping id; auto-generated per CLI process when absent.
+
+That's it. Higher-fidelity observability (session boundaries, turn/tool events) is optional and documented in [portable activity events](portable-activity-events.md).
 
 ### Can I use it without pi.dev, or with a custom harness?
 
-Yes. `pi-mycelium` is a convenience wrapper, not a requirement. Any agent harness that can run shell commands works at L0 (the baseline shell-command integration level): set the three env vars and let the agent invoke `mycelium` subcommands through its existing shell tool. A minimal L1 shell wrapper that emits `session_startup` and `session_shutdown` log entries is shown in [portable activity events](portable-activity-events.md).
+Yes. `pi-mycelium` is a convenience wrapper, not a requirement. Any agent harness that can run shell commands works at L0 (the baseline shell-command integration level): set `MYCELIUM_MOUNT` and let the agent invoke `mycelium` subcommands through its existing shell tool. Set `MYCELIUM_AGENT_ID` and `MYCELIUM_SESSION_ID` only when you need stable multi-agent or cross-process session grouping. A minimal L1 shell wrapper that emits `session_startup` and `session_shutdown` log entries is shown in [portable activity events](portable-activity-events.md).
 
 ### Does it conflict with Claude Code, Cursor, or Codex built-in memory?
 
@@ -192,7 +195,7 @@ It's a legitimate option, not a requirement. A mount is a directory of plain tex
 tar czf mount-backup.tar.gz .mycelium-store/
 ```
 
-Copy the tarball to the other machine and extract it. Set `MYCELIUM_MOUNT` to the new path before running the agent. A cleanly-recovered mount (no pending `_tx/` entries) is fully portable. There is no registration, no daemon to inform, and no database to migrate.
+Copy the tarball to the other machine and extract it. Set `MYCELIUM_MOUNT` to the new path before running the agent. There is no registration, no daemon to inform, and no database to migrate.
 
 ### How big does the activity log get, and how do I prune it?
 

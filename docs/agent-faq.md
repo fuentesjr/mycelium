@@ -18,13 +18,13 @@
   - [When do I need --expected-version?](#when-do-i-need---expected-version)
   - [I got exit 64 — what now?](#i-got-exit-64--what-now)
   - [I don't know a file's current version — how do I get it cheaply?](#i-dont-know-a-files-current-version--how-do-i-get-it-cheaply)
-  - [Why does writing under _activity/ fail?](#why-does-writing-under-_activity-fail)
+  - [Why does writing under \_activity/ fail?](#why-does-writing-under-_activity-fail)
 - [Self-evolution](#self-evolution)
   - [--active vs --list — which do I want?](#--active-vs---list--which-do-i-want)
   - [Does my new evolve event automatically supersede a previous one?](#does-my-new-evolve-event-automatically-supersede-a-previous-one)
   - [I want to retire a question that's now a lesson — how?](#i-want-to-retire-a-question-thats-now-a-lesson--how)
 - [Recall](#recall)
-  - [Can I read _activity/ to recall what I did earlier?](#can-i-read-_activity-to-recall-what-i-did-earlier)
+  - [Can I read \_activity/ to recall what I did earlier?](#can-i-read-_activity-to-recall-what-i-did-earlier)
   - [How do I query the rules currently in effect?](#how-do-i-query-the-rules-currently-in-effect)
 
 ---
@@ -63,7 +63,7 @@ Your call. Choose paths that reflect content — `auth/session-token-rotation.md
 
 ### When do I use log vs evolve vs just writing a note?
 
-Write a **note** for content. Use **`evolve`** for structural decisions you'll want to query later by kind (`--active`, `--list`). Use **`log`** to emit observability signals with arbitrary op names — it's typically called by adapters, not directly by agents, though `mycelium log decision --rationale "..."` is a legitimate direct use for a point-in-time operational decision that doesn't merit a full `evolve` record. If you're unsure between `log` and `evolve`, prefer `evolve` for anything you'll want to recall by kind.
+Write a **note** for content. Use **`evolve`** for structured activity-log entries describing durable conventions, lessons, indices, archives, or questions you'll want to query later by kind (`--active`, `--list`). `evolve` is not a second memory system and never moves or edits files; it is a typed way to record why a pattern changed. Use **`log`** to emit observability signals with arbitrary op names — it's typically called by adapters, not directly by agents, though `mycelium log decision --rationale "..."` is a legitimate direct use for a point-in-time operational decision that doesn't merit a full `evolve` record. If you're unsure between `log` and `evolve`, prefer `evolve` for anything you'll want to recall by kind.
 
 See [portable-activity-events.md](portable-activity-events.md) for the `log` event vocabulary and [self-evolution.md](self-evolution.md) for `evolve` patterns.
 
@@ -99,9 +99,9 @@ mycelium read --format json notes/foo.md
 
 One call returns content and version together. You never need a separate stat round-trip.
 
-### Why does writing under _activity/ fail?
+### Why does writing under \_activity/ fail?
 
-`_activity/` and `_tx/` are reserved for system writes. Agent writes to any `_`-prefixed path return exit 65. To record an event, use `mycelium log` or `mycelium evolve` — the binary writes to `_activity/` on your behalf.
+All root paths beginning with `_` are reserved for system writes. Agent writes to any `_`-prefixed path return exit 65. `_activity/` is read-only history for you; other `_` paths are internal implementation details. To record an event, use `mycelium log` or `mycelium evolve` — the binary writes to `_activity/` on your behalf.
 
 ---
 
@@ -140,7 +140,7 @@ The question's ID comes from the `id` field in the original `evolve` response or
 
 ## Recall
 
-### Can I read _activity/ to recall what I did earlier?
+### Can I read \_activity/ to recall what I did earlier?
 
 Yes — it's plain JSONL. `cat`, `tail -f`, and `grep` all work directly. Filter by date using the path structure:
 
