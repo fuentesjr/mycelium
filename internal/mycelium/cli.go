@@ -50,11 +50,10 @@ func dispatch(in io.Reader, out, errOut io.Writer, args []string) int {
 }
 
 func printSubcommandList(w io.Writer) {
-	fmt.Fprint(w, "subcommands:")
-	for _, sc := range subcommands {
-		fmt.Fprintf(w, " %s", sc.name)
-	}
-	fmt.Fprintln(w)
+	fmt.Fprintln(w, "subcommands:")
+	fmt.Fprintln(w, "  everyday:   read write edit ls grep")
+	fmt.Fprintln(w, "  occasional: glob rm mv")
+	fmt.Fprintln(w, "  metadata:   log evolve")
 }
 
 func requirePositionalArgs(errOut io.Writer, command string, positional []string, want int, required string) int {

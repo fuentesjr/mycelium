@@ -1,6 +1,16 @@
 package mycelium
 
-import "os"
+import (
+	"os"
+	"sync"
+)
+
+const defaultAgentID = "agent"
+
+var (
+	defaultSessionOnce sync.Once
+	defaultSessionID   string
+)
 
 type Identity struct {
 	AgentID   string
@@ -9,9 +19,26 @@ type Identity struct {
 }
 
 func ReadIdentity() Identity {
+	agentID := os.Getenv("MYCELIUM_AGENT_ID")
+	if agentID == "" {
+		agentID = defaultAgentID
+	}
+
+	sessionID := os.Getenv("MYCELIUM_SESSION_ID")
+	if sessionID == "" {
+		sessionID = generatedDefaultSessionID()
+	}
+
 	return Identity{
-		AgentID:   os.Getenv("MYCELIUM_AGENT_ID"),
-		SessionID: os.Getenv("MYCELIUM_SESSION_ID"),
+		AgentID:   agentID,
+		SessionID: sessionID,
 		Mount:     os.Getenv("MYCELIUM_MOUNT"),
 	}
+}
+
+func generatedDefaultSessionID() string {
+	defaultSessionOnce.Do(func() {
+		defaultSessionID = "auto-" + newULID()
+	})
+	return defaultSessionID
 }

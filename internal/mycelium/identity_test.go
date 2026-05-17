@@ -1,6 +1,7 @@
 package mycelium
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -21,13 +22,31 @@ func TestReadIdentityFromEnv(t *testing.T) {
 	}
 }
 
-func TestReadIdentityEmptyWhenUnset(t *testing.T) {
+func TestReadIdentityDefaultsOptionalFieldsWhenUnset(t *testing.T) {
 	t.Setenv("MYCELIUM_AGENT_ID", "")
 	t.Setenv("MYCELIUM_SESSION_ID", "")
 	t.Setenv("MYCELIUM_MOUNT", "")
 
 	id := ReadIdentity()
-	if id.AgentID != "" || id.SessionID != "" || id.Mount != "" {
-		t.Errorf("expected empty identity when env unset, got %+v", id)
+	if id.AgentID != defaultAgentID {
+		t.Errorf("AgentID default: got %q, want %q", id.AgentID, defaultAgentID)
+	}
+	if !strings.HasPrefix(id.SessionID, "auto-") {
+		t.Errorf("SessionID default should be auto-generated, got %q", id.SessionID)
+	}
+	if id.Mount != "" {
+		t.Errorf("Mount: got %q, want empty", id.Mount)
+	}
+}
+
+func TestReadIdentityGeneratedSessionStableWithinProcess(t *testing.T) {
+	t.Setenv("MYCELIUM_AGENT_ID", "")
+	t.Setenv("MYCELIUM_SESSION_ID", "")
+	t.Setenv("MYCELIUM_MOUNT", "/tmp/mount")
+
+	first := ReadIdentity()
+	second := ReadIdentity()
+	if first.SessionID == "" || first.SessionID != second.SessionID {
+		t.Fatalf("generated session should be stable within a process: first=%q second=%q", first.SessionID, second.SessionID)
 	}
 }
