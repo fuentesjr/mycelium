@@ -164,12 +164,12 @@ For structured decisions — conventions the agent adopted, lessons distilled, r
 
 The diff is the cheap part — any version control system can tell you _what_ changed. The thing a future reviewer (or another agent) usually can't reconstruct is the _why_. Mycelium records that across two surfaces, both governed by the same discipline: capture the rationale at the moment of decision, and name what was rejected — not just what was chosen.
 
-| Layer | What it captures | Where it lives |
-|---|---|---|
-| File content | Per-note reasoning — trigger, hypothesis, outcome | The note file itself |
-| `--rationale` flag | Why this specific operation was performed | Activity log entry (`reason` field) |
-| `evolve` events | Structural patterns/conventions the agent adopted | `_activity/` + evolve log |
-| Activity log | Who did what and when (chain of custody) | `_activity/YYYY/MM/DD/<agent>.jsonl` |
+| Layer              | What it captures                                  | Where it lives                       |
+| ------------------ | ------------------------------------------------- | ------------------------------------ |
+| File content       | Per-note reasoning — trigger, hypothesis, outcome | The note file itself                 |
+| `--rationale` flag | Why this specific operation was performed         | Activity log entry (`reason` field)  |
+| `evolve` events    | Structural patterns/conventions the agent adopted | `_activity/` + evolve log            |
+| Activity log       | Who did what and when (chain of custody)          | `_activity/YYYY/MM/DD/<agent>.jsonl` |
 
 **File contents carry the per-note reasoning.** When the agent writes an incident note, an investigation log, or a plan file, the _why_ lives in the note itself — the trigger, the hypothesis being tested, the alternatives considered and rejected. Same craft as a good commit message, applied to every note. A diff shows what changed; the note explains why. This is a convention; the binary does not enforce it.
 
