@@ -93,7 +93,9 @@ function renderRecordingEvolutionSection(): string {
 	return `### Recording evolution
 
 Use \`mycelium evolve\` to record structured evolution decisions. This is
-metadata only — it never mutates the store.
+metadata only — it never mutates the store and is not a second memory system;
+it is typed activity-log history for conventions, lessons, indices, archives,
+and questions.
 
 When to call it:
 
@@ -139,16 +141,24 @@ export function systemPromptAvailable(c: AvailableContext): string {
 You have a persistent file-based memory store mounted at ${c.mountPath}.
 It survives sessions and may be shared with other agents mounted concurrently.
 
-Use these subcommands via the \`bash\` tool:
+Mental model: **a folder + safe mutations + a searchable activity log**.
+Most work uses the everyday commands; the rest are occasional or metadata-only.
+
+Everyday commands via the \`bash\` tool:
 - \`mycelium read <path> [--format text|json]\` — read a file; JSON includes UTF-8 content plus version for CAS
 - \`mycelium write <path> [--rationale STR]\` — write or overwrite (content via stdin)
 - \`mycelium edit <path> --old <str> --new <str> [--rationale STR]\` — find/replace a unique substring
-- \`mycelium ls <path> [--recursive]\` — list entries
-- \`mycelium glob <pattern>\` — paths matching a glob (e.g. \`learnings/*.md\`)
+- \`mycelium ls [--recursive]\` — list entries
 - \`mycelium grep --pattern <str> [--path P] [--format json] [--limit N]\` — search content
+
+Occasional commands:
+- \`mycelium glob <pattern>\` — match paths by glob when \`ls\`/\`grep\` are not enough
 - \`mycelium rm <path> [--rationale STR]\` — delete
 - \`mycelium mv <src> <dst> [--rationale STR]\` — atomic rename (fails if \`<dst>\` exists)
-- \`mycelium log <op> [--path PATH] [--payload-json STR | --stdin] [--rationale STR]\` — append a non-mutation signal
+
+Metadata commands:
+- \`mycelium evolve ...\` — record/query typed activity-log entries for durable conventions, lessons, indices, archives, and questions
+- \`mycelium log <op> [--path PATH] [--payload-json STR | --stdin] [--rationale STR]\` — append an arbitrary signal; mostly adapter-facing
 
 Conventions for organizing this store live in \`MYCELIUM_MEMORY.md\` at the root.
 Read it once at session start; revise it whenever you find a better way to
@@ -177,16 +187,11 @@ Add \`--include-current-content\` to also retrieve the current bytes inline
 (\`current_content\` field, UTF-8 only). Standard recovery: re-read with \`mycelium read <path> --format json\`, merge, retry.
 
 Reserved paths: \`mycelium\` rejects writes to any first-segment path beginning
-with \`_\`. Today this means:
-
-- \`_activity/YYYY/MM/DD/${c.agentId}.jsonl\` — auto-generated metadata for every
-  mutation you perform. Read-only to you, but greppable: try
-  \`mycelium grep --path _activity --format json --pattern <str>\` to look back across
-  sessions. Payloads from \`mycelium log\` are inlined on each entry as a \`payload\`
-  field — no separate file to look up.
-- \`_tx/pending/{tx_id}.json\` — internal recovery records that keep content
-  mutations and activity entries in sync across crashes. A cleanly recovered
-  store normally has no pending entries; do not edit this path manually.
+with \`_\`. \`_activity/YYYY/MM/DD/${c.agentId}.jsonl\` is auto-generated metadata for every
+mutation you perform. It is read-only to you, but greppable: try
+\`mycelium grep --path _activity --format json --pattern <str>\` to look back across
+sessions. Payloads from \`mycelium log\` are inlined on each entry as a \`payload\`
+field — no separate file to look up. Other \`_\` paths are internal; do not edit them.
 
 ${renderActivityEventsSection()}
 

@@ -34,21 +34,22 @@ gets resolved.
   bash invocations. Records a session-boundary entry in the activity log.
 - **`session_shutdown`** — records a portable `session_shutdown` entry before
   the extension runtime is torn down.
-- **`before_agent_start`** — appends a system-prompt block describing the
-  `mycelium` subcommands, conventions, identity, and conflict semantics,
-  plus the project's evolution kinds and any active evolution. Includes a
-  rationale nudge recommending `--rationale` on `write`, `edit`, `rm`,
-  `mv`, and `log` when the operation carries reasoning worth preserving.
-  Chains off `event.systemPrompt` so other extensions' contributions are preserved.
+- **`before_agent_start`** — appends a system-prompt block with the small public
+  model — a folder, safe mutations, and a searchable activity log — then tiers
+  the `mycelium` subcommands into everyday, occasional, and metadata commands.
+  It also includes conventions, identity, conflict recovery, the project's
+  evolution kinds, active evolution, and a rationale nudge for operations whose
+  reasoning is worth preserving. Chains off `event.systemPrompt` so other
+  extensions' contributions are preserved.
 - **turn/tool/context events** — records `turn_start`, `turn_end`,
   `tool_start`, `tool_end`, `compaction`, and deduped `context_checkpoint`
   entries using the portable vocabulary in
   [`docs/portable-activity-events.md`](https://github.com/fuentesjr/mycelium/blob/main/docs/portable-activity-events.md),
   without modifying the agent's message stream.
 
-The bundled binary writes system metadata under `_activity/` and `_tx/`: the
-activity log is the durable history, and `_tx/pending/` lets content mutations
-and log entries recover together after crashes.
+The bundled binary writes durable history under `_activity/`. Other `_` paths
+are internal implementation details used to keep content mutations and activity
+entries consistent across crashes.
 
 ## What it does not do
 
@@ -81,8 +82,10 @@ multiple concurrent agents against the same store:
 MYCELIUM_AGENT_ID=researcher pi
 ```
 
-`MYCELIUM_SESSION_ID` is always taken from `ctx.sessionManager.getLeafId()` —
-forks mint new ids automatically.
+`MYCELIUM_SESSION_ID` is taken from `ctx.sessionManager.getLeafId()` when pi
+provides one — forks mint new ids automatically. If pi does not provide one,
+the extension generates a `pi-auto-*` id; the core CLI also has an `auto-*`
+per-process fallback for non-pi shell use.
 
 ## Binary resolution
 
