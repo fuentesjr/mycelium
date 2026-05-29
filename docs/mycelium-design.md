@@ -142,7 +142,7 @@ A single binary, `mycelium`, invoked through the agent's shell. Ten subcommands:
 - **`mycelium edit <path> --old STR --new STR [--expected-version SHA] [--rationale STR]`** — find-and-replace a unique substring. Fails if `--old` is absent or non-unique. _Earns its complexity:_ token economy on large files, diff quality under git/jj, and the unique-substring constraint catches stale-view errors a full overwrite would silently paper over.
 - **`mycelium ls [--recursive]`** — list paths under the mount. _Earns its complexity:_ `glob` requires a pattern; `ls` is the unprefixed survey.
 - **`mycelium glob <pattern>`** — print paths matching a glob (`**/*.md`, `notes/2026-*/*.txt`, `_activity/2026/04/*/*.jsonl`).
-- **`mycelium grep --pattern STR [--path PATH] [--regex] [--file-type T] [--format text|json] [--limit N]`** — print matching lines with paths and line numbers. `--format=text` is `path:line:text`; `--format=json` returns `{matches: [{path, line, text}, ...], truncated}`. `--limit` caps results (default 1000, hard ceiling). Implementation prefers ripgrep, falls back to grep, then to a Go-native scan. _Earns its complexity:_ JSON and type filter make the activity log usable through general tools; the `--limit` cap keeps log-reflection from overflowing context.
+- **`mycelium grep --pattern STR [--path PATH] [--regex] [--file-type T] [--format text|json] [--limit N]`** — print matching lines with paths and line numbers. `--format=text` is `path:line:text`; `--format=json` returns `{matches: [{path, line, text}, ...], truncated}`. `--limit` caps results (default 1000, hard ceiling). Implementation is pure Go: one search path, one regex dialect, deterministic behavior across machines. _Earns its complexity:_ JSON and type filter make the activity log usable through general tools; the `--limit` cap keeps log-reflection from overflowing context.
 - **`mycelium rm <path> [--expected-version SHA] [--rationale STR]`** — remove. _Earns its complexity:_ not expressible as `write` — empty content creates an empty file, not a deletion.
 - **`mycelium mv <src> <dst> [--expected-version SHA] [--rationale STR]`** — atomic rename within the store. `--expected-version`, when supplied, checks the source version. The destination must not exist; destination collisions return a structured conflict. _Earns its complexity:_ read+write+delete is not atomic; emulating rename loses the guarantee.
 
@@ -169,6 +169,7 @@ A single binary, `mycelium`, invoked through the agent's shell. Ten subcommands:
 
 - exit 0 — success
 - exit 1 — generic error (path not found, malformed args, unrecoverable pending transaction)
+- exit 2 — usage error (bad flags, malformed args, invalid regex, invalid output format)
 - exit 64 — CAS conflict; stderr is JSON `{"error":"conflict","op":"write","path":"...","current_version":"sha256:...","expected_version":"sha256:..."}`. With `--include-current-content`, also `"current_content": "..."` for UTF-8 files.
 - exit 65 — protocol violation (reserved path/kind, invalid evolution payload, etc.)
 
@@ -214,7 +215,7 @@ Implementation shape:
 - `edit` reads, validates unique substring replacement, then uses the same atomic write path.
 - `rm` captures the prior version before deletion.
 - `mv` refuses destination collisions and uses atomic rename.
-- `grep` prefers ripgrep, falls back to grep, then to Go-native scanning.
+- `grep` is implemented in Go, using the same scanner and regex engine on every machine.
 
 There is no backend interface in the v1 design. A future storage adapter would need to re-prove every guarantee above rather than share this contract by assertion.
 

@@ -1,4 +1,4 @@
-package mycelium
+package t3detectors
 
 import (
 	"os"
@@ -6,17 +6,15 @@ import (
 	"testing"
 )
 
-// expectedVerdicts maps fixture filename to the expected (healthy bool) per
+// expectedVerdicts maps fixture filename to the expected healthy bool per
 // detector. Detector ordering matches RunDetectors:
 //
-//	[0] writes_without_reads
-//	[1] near_duplicate_paths
-//	[2] thrashing
-var expectedVerdicts = map[string][3]bool{
-	"healthy.jsonl":                        {true, true, true},
-	"unhealthy-writes-without-reads.jsonl": {false, true, true},
-	"unhealthy-duplicate-paths.jsonl":      {true, false, true},
-	"unhealthy-thrashing.jsonl":            {true, true, false},
+//	[0] near_duplicate_paths
+//	[1] thrashing
+var expectedVerdicts = map[string][2]bool{
+	"healthy.jsonl":                   {true, true},
+	"unhealthy-duplicate-paths.jsonl": {false, true},
+	"unhealthy-thrashing.jsonl":       {true, false},
 }
 
 func loadFixture(t *testing.T, name string) []LogEntry {
@@ -39,8 +37,8 @@ func TestDetectors_ClassifyHandcraftedTrajectories(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			entries := loadFixture(t, name)
 			got := RunDetectors(entries)
-			if len(got) != 3 {
-				t.Fatalf("RunDetectors returned %d verdicts, want 3", len(got))
+			if len(got) != 2 {
+				t.Fatalf("RunDetectors returned %d verdicts, want 2", len(got))
 			}
 			for i, v := range got {
 				if v.Healthy != want[i] {

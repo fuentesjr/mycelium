@@ -209,51 +209,6 @@ function resolveAdapterVersion(): string {
 	}
 }
 
-export async function recordContextCheckpoint(
-	pi: ExtensionAPI,
-	binaryPath: string,
-	event: ContextEvent,
-): Promise<void> {
-	await createActivityLogRecorder().recordContextCheckpoint(
-		pi,
-		binaryPath,
-		event,
-	);
-}
-
-/**
- * Legacy helper kept for older imports/tests. New adapters should emit
- * `context_checkpoint`; old `context_signal` entries remain readable in logs.
- */
-export async function recordContextSignal(
-	pi: ExtensionAPI,
-	binaryPath: string,
-	event: ContextEvent,
-): Promise<void> {
-	const messages = event.messages;
-	const payload: JsonObject = { messageCount: messages.length };
-	const lastRole = roleOf(messages[messages.length - 1]);
-	if (lastRole) payload.lastRole = lastRole;
-	await pi.exec(binaryPath, [
-		"log",
-		"context_signal",
-		"--payload-json",
-		JSON.stringify(payload),
-	]);
-}
-
-export async function recordSessionBoundary(
-	pi: ExtensionAPI,
-	binaryPath: string,
-	reason: SessionStartEvent["reason"],
-): Promise<void> {
-	await createActivityLogRecorder().recordSessionBoundary(
-		pi,
-		binaryPath,
-		reason,
-	);
-}
-
 function buildContextCheckpointPayload(
 	event: ContextEvent,
 	options: ContextCheckpointOptions,

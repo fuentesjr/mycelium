@@ -219,7 +219,7 @@ The practical risk at this stage is not data loss — the core integrity primiti
 
 ### Are benchmarks available yet?
 
-A rubric is fully defined in [benchmarks/phase-1.md](benchmarks/phase-1.md): three tasks (T1 multi-session research synthesis, T2 seeded self-evolution, T3 failure-mode detectors), target models (Claude Opus 4.7 and GPT-5.5), and pass/fail criteria. T3's failure-mode detectors are implemented and exercised by `go test -run TestDetectors ./internal/mycelium`. T1 and T2 task definitions and grading rubrics are drafted and ready to run. Published model runs against Opus 4.7 and GPT-5.5 are pending — results will land in `docs/benchmarks/` as they complete.
+A rubric is fully defined in [benchmarks/phase-1.md](benchmarks/phase-1.md): three tasks (T1 multi-session research synthesis, T2 seeded self-evolution, T3 failure-mode detectors), target models (Claude Opus 4.7 and GPT-5.5), and pass/fail criteria. T3's failure-mode detectors are implemented and exercised by `go test ./docs/benchmarks/tasks/T3-failure-detectors/tool`. T1 and T2 task definitions and grading rubrics are drafted and ready to run. Published model runs against Opus 4.7 and GPT-5.5 are pending — results will land in `docs/benchmarks/` as they complete.
 
 ### What's on the roadmap?
 

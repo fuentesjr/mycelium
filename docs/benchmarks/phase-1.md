@@ -56,7 +56,7 @@ Three sessions, not two: two sessions test "did the agent re-read its notes"; th
 **Seed.** A pre-populated store under `docs/benchmarks/tasks/T2-seeded-self-evolution/seed/` containing a recognizable failure pattern:
 
 - `notes/` with 6 files on a GLP-1 prescription-analytics theme, with subtly inconsistent paths: `glp1-pipeline.md`, `glp-1-pipeline.md` (hyphen drift), and `glp1_followup.md` (underscore drift) coexist alongside `semaglutide.md`, `tirzepatide-overview.md`, and `glp1-side-effects.md`.
-- Activity log preloaded with 30 entries across three days (2026-04-15, -16, -18) showing prior writes-without-reads — zero `read_signal` entries, and one near-duplicate the seed-agent created at `2026-04-16T14:33Z` (`glp-1-pipeline.md` written when `glp1-pipeline.md` already existed).
+- Activity log preloaded with 30 mutation entries across three days (2026-04-15, -16, -18), plus one near-duplicate the seed-agent created at `2026-04-16T14:33Z` (`glp-1-pipeline.md` written when `glp1-pipeline.md` already existed). The log intentionally has no reliable read/search signal; reads are not auto-logged.
 - Starter `MYCELIUM_MEMORY.md` describing the store contents without a search-before-writing rule, naming-convention guidance, or any anti-duplication advice.
 
 **Two sessions.** Per `docs/benchmarks/tasks/T2-seeded-self-evolution/task.md`:
@@ -72,13 +72,14 @@ Why seeded: self-evolution requires something to evolve in response to. A clean 
 
 **Detectors** operate on activity-log content alone:
 
-1. **Writes-without-reads ratio.** `op=write` + `op=edit` counts divided by explicit `op=read_signal` counts (since reads aren't auto-logged). Threshold: ratio >0.7 for ≥3 consecutive sessions = unhealthy. Sessions with mutations and zero read signals count as +∞ ratio.
-2. **Near-duplicate path count.** Levenshtein-1 path collisions per session across `op=write` entries. Threshold: ≥3 in a single session = unhealthy.
-3. **Thrashing.** Activity-log entries per session. Threshold: ≥50 in a single session = unhealthy. (The "too few entries" tail is deferred — hard to disambiguate from a quick-lookup session in practice.)
+1. **Near-duplicate path count.** Levenshtein-1 path collisions per session across `op=write` entries. Threshold: ≥3 in a single session = unhealthy.
+2. **Thrashing.** Activity-log entries per session. Threshold: ≥50 in a single session = unhealthy. (The "too few entries" tail is deferred — hard to disambiguate from a quick-lookup session in practice.)
 
-**Validation.** Hand-craft 4 trajectories — 1 healthy, 3 unhealthy (one per detector). The detectors must classify all 4 correctly. The 30-trajectory human-judgment validation is deferred to Phase 2 once we have real run data to calibrate against.
+The writes-without-reads detector was dropped: its denominator, `op=read_signal`, is not emitted by Mycelium and is absent from the portable activity vocabulary, so it only classified synthetic fixtures.
 
-**Pass.** Detectors classify the 4 hand-crafted trajectories correctly. Model-independent.
+**Validation.** Hand-craft 3 trajectories — 1 healthy, 2 unhealthy (one per remaining detector). The detectors must classify all 3 correctly. The 30-trajectory human-judgment validation is deferred to Phase 2 once we have real run data to calibrate against.
+
+**Pass.** Detectors classify the 3 hand-crafted trajectories correctly. Model-independent.
 
 ---
 
@@ -108,7 +109,7 @@ Rationale: model-run validation does not change the artifact, only the public cl
 
 ## Open issues
 
-T3 is executable: detectors implemented in `internal/mycelium/detect.go`, fixtures under `internal/mycelium/testdata/trajectories/`, harness at `docs/benchmarks/tasks/T3-failure-detectors/harness.md`. Run via `go test -run TestDetectors ./internal/mycelium`.
+T3 is executable as standalone benchmark tooling: detectors and fixtures live under `docs/benchmarks/tasks/T3-failure-detectors/tool/`, harness at `docs/benchmarks/tasks/T3-failure-detectors/harness.md`. Run via `go test ./docs/benchmarks/tasks/T3-failure-detectors/tool`.
 
 T1 is drafted: `task.md`, `harness.md`, `held-out.md` under `docs/benchmarks/tasks/T1-multi-session-research/`. Awaiting first runs against Opus 4.7 and GPT-5.5.
 

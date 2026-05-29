@@ -7,8 +7,6 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import {
 	createActivityLogRecorder,
-	recordContextSignal,
-	recordSessionBoundary,
 	type ToolExecutionEndEvent,
 	type ToolExecutionStartEvent,
 } from "../activity-log.js";
@@ -200,27 +198,7 @@ describe("ActivityLogRecorder tool events", () => {
 	});
 });
 
-describe("recordContextSignal", () => {
-	it("keeps the legacy context_signal helper for compatibility", async () => {
-		const exec = vi.fn(async () => execResult(0));
-		const pi = { exec } as unknown as ExtensionAPI;
-		await recordContextSignal(
-			pi,
-			BINARY_PATH,
-			makeContextEvent(sampleMessages),
-		);
-
-		expect(exec).toHaveBeenCalledTimes(1);
-		expect(exec).toHaveBeenCalledWith(BINARY_PATH, [
-			"log",
-			"context_signal",
-			"--payload-json",
-			JSON.stringify({ messageCount: 3, lastRole: "toolResult" }),
-		]);
-	});
-});
-
-describe("recordSessionBoundary", () => {
+describe("ActivityLogRecorder.recordSessionBoundary", () => {
 	const cases: ReadonlyArray<[SessionStartEvent["reason"], string]> = [
 		["new", "session_new"],
 		["resume", "session_resume"],
@@ -233,7 +211,8 @@ describe("recordSessionBoundary", () => {
 		it(`logs ${expectedOp} for reason=${reason}`, async () => {
 			const exec = vi.fn(async () => execResult(0));
 			const pi = { exec } as unknown as ExtensionAPI;
-			await recordSessionBoundary(pi, BINARY_PATH, reason);
+			const recorder = createActivityLogRecorder();
+			await recorder.recordSessionBoundary(pi, BINARY_PATH, reason);
 
 			expect(exec).toHaveBeenCalledTimes(1);
 			const args = argsFromCall(exec);

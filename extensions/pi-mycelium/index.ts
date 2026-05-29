@@ -1,6 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { resolveConfig } from "./config.js";
-import { resolveBinary, setupEnv } from "./env.js";
+import { resolveMyceliumBinary, setupEnv } from "./binary-resolver.js";
 import {
 	systemPromptAvailable,
 	systemPromptUnavailable,
@@ -22,7 +22,7 @@ export default function (pi: ExtensionAPI) {
 	pi.on("session_start", async (event, ctx) => {
 		const cfg = resolveConfig(ctx.cwd);
 		mountPath = cfg.mountPath;
-		binaryPath = await resolveBinary(pi);
+		binaryPath = await resolveMyceliumBinary(pi);
 		if (binaryPath) {
 			setupEnv(cfg, ctx.sessionManager.getLeafId(), binaryPath);
 			await activity.recordSessionBoundary(pi, binaryPath, event.reason);

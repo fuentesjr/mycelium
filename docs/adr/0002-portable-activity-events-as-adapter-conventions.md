@@ -1,6 +1,6 @@
 # ADR 0002: Portable activity events as adapter conventions
 
-- **Status:** Accepted
+- **Status:** Accepted; reference adapter behavior revised by ADR-0006
 - **Date:** 2026-05-07
 - **Deciders:** Sal Fuentes Jr.
 
@@ -72,7 +72,7 @@ agent-authored files referenced by `--path`.
 
 ## Implementation
 
-`pi-mycelium` now provides the reference L3 adapter behavior:
+At acceptance, `pi-mycelium` provided the reference L3 adapter behavior:
 
 - emits `context_checkpoint` instead of `context_signal` from the `context` hook;
 - fingerprints checkpoint metadata and suppresses duplicates;
@@ -80,8 +80,12 @@ agent-authored files referenced by `--path`.
   `session_shutdown` when pi.dev exposes those hooks;
 - enriches payloads with generic fields such as message counts, role counts,
   usage/cost, tool ids, durations, and output sizes;
-- keeps the exported `recordContextSignal` helper for legacy compatibility, but
-  no longer uses it from the extension entrypoint.
+- originally kept a legacy helper export for low-detail context signals, but no
+  longer used it from the extension entrypoint.
+
+ADR-0006 later narrows the reference adapter to memory-relevant events only and
+removes the legacy helper export. The portable vocabulary above remains
+unchanged.
 
 The adapter vocabulary and examples are documented in
 [`docs/portable-activity-events.md`](../portable-activity-events.md).

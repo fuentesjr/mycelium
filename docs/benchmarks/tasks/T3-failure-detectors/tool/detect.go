@@ -1,12 +1,20 @@
-package mycelium
+package t3detectors
 
 import (
 	"encoding/json"
 	"errors"
 	"io"
-	"math"
 	"sort"
 )
+
+// LogEntry is the subset of Mycelium activity JSONL fields used by the T3
+// benchmark detectors.
+type LogEntry struct {
+	TS        string `json:"ts"`
+	SessionID string `json:"session_id"`
+	Op        string `json:"op"`
+	Path      string `json:"path,omitempty"`
+}
 
 // Verdict is a detector's classification of a trajectory.
 type Verdict struct {
@@ -60,46 +68,6 @@ func sessionGroups(entries []LogEntry) [][]LogEntry {
 	return out
 }
 
-// DetectWritesWithoutReads flags trajectories where the (write+edit)/read_signal
-// ratio exceeds 0.7 across three or more consecutive sessions. A session with
-// mutations and no read signals counts as +∞ ratio.
-func DetectWritesWithoutReads(entries []LogEntry) Verdict {
-	consecutive := 0
-	for _, sess := range sessionGroups(entries) {
-		var muts, reads int
-		for _, e := range sess {
-			switch e.Op {
-			case "write", "edit":
-				muts++
-			case "read_signal":
-				reads++
-			}
-		}
-		var ratio float64
-		switch {
-		case muts == 0:
-			ratio = 0
-		case reads == 0:
-			ratio = math.Inf(1)
-		default:
-			ratio = float64(muts) / float64(reads)
-		}
-		if ratio > 0.7 {
-			consecutive++
-			if consecutive >= 3 {
-				return Verdict{
-					Detector: "writes_without_reads",
-					Healthy:  false,
-					Reason:   "ratio >0.7 across ≥3 consecutive sessions",
-				}
-			}
-		} else {
-			consecutive = 0
-		}
-	}
-	return Verdict{Detector: "writes_without_reads", Healthy: true}
-}
-
 // DetectNearDuplicatePaths flags trajectories where any single session
 // contains three or more Levenshtein-1 path collisions across write entries.
 func DetectNearDuplicatePaths(entries []LogEntry) Verdict {
@@ -144,10 +112,9 @@ func DetectThrashing(entries []LogEntry) Verdict {
 	return Verdict{Detector: "thrashing", Healthy: true}
 }
 
-// RunDetectors evaluates all three failure-mode detectors against a trajectory.
+// RunDetectors evaluates the T3 failure-mode detectors against a trajectory.
 func RunDetectors(entries []LogEntry) []Verdict {
 	return []Verdict{
-		DetectWritesWithoutReads(entries),
 		DetectNearDuplicatePaths(entries),
 		DetectThrashing(entries),
 	}

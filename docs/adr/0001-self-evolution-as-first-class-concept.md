@@ -1,6 +1,6 @@
 # ADR 0001: Self-evolution as a first-class concept
 
-- **Status:** Accepted
+- **Status:** Superseded by ADR-0004
 - **Date:** 2026-05-01
 - **Deciders:** Sal Fuentes Jr.
 

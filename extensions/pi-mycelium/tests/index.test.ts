@@ -18,17 +18,21 @@ vi.mock("../bootstrap.js", () => ({
   MEMORY_FILE: "MYCELIUM_MEMORY.md",
 }));
 
-vi.mock("../binary-resolver.js", () => ({
-  resolveBundledBinary: vi.fn(() => null),
-  resolveMyceliumBinary: vi.fn(async (pi) => {
+vi.mock("../binary-resolver.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../binary-resolver.js")>();
+  return {
+    ...actual,
+    resolveBundledBinary: vi.fn(() => null),
+    resolveMyceliumBinary: vi.fn(async (pi) => {
     const r = await pi.exec("which", ["mycelium"]);
     if (r.code === 0) {
       const out = r.stdout.trim();
       if (out) return out;
     }
     return null;
-  }),
-}));
+    }),
+  };
+});
 
 import register from "../index.js";
 import { execResult } from "./helpers.js";

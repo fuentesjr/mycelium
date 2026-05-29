@@ -21,7 +21,7 @@ Mycelium is LocalFS/POSIX-native. The roadmap below keeps that guarantee set ins
 - CLI surface: `mycelium read`, `write`, `edit`, `ls`, `glob`, `grep`, `rm`, `mv`, `log`, `evolve`. Ten subcommands invoked through the agent harness's existing shell tool.
 - `read --format json` for CAS-safe UTF-8 reads that return `path`, `version`, and `content` in one envelope. Raw `cat` remains fine for inspection, including non-UTF-8 bytes.
 - Every content-mutating subcommand accepts optional `--expected-version`; conflict recovery is first-class from v1.
-- `mycelium grep` flags: `--pattern`, optional `--path`, `--regex`, `--file-type`, `--format text|json`, and `--limit`. Implementation prefers ripgrep, falls back to grep, then to Go-native scan.
+- `mycelium grep` flags: `--pattern`, optional `--path`, `--regex`, `--file-type`, `--format text|json`, and `--limit`. Implementation is pure Go: one search implementation and one regex dialect across machines.
 - One storage contract: **LocalFS on a local POSIX filesystem**, with conditional writes implemented via `flock`-guarded version checks and content-hash version tokens.
 - Atomic single-file ops via write-to-temp-then-rename, atomic rename for `mv`, and destination-collision protection.
 - Authoritative activity log at `_activity/YYYY/MM/DD/{agent_id}.jsonl`. Every successful state-changing operation (`write`, `edit`, `rm`, `mv`, `log`, `evolve`) produces a durable JSONL entry. Reads are not logged.

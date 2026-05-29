@@ -1,7 +1,9 @@
 import { createRequire } from "node:module";
+import { randomUUID } from "node:crypto";
 import path from "node:path";
 import fs from "node:fs";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { MyceliumConfig } from "./config.js";
 
 const require = createRequire(import.meta.url);
 
@@ -48,4 +50,32 @@ export async function resolveMyceliumBinary(pi: ExtensionAPI): Promise<string | 
     if (out) return out;
   }
   return null;
+}
+
+export function setupEnv(
+  config: MyceliumConfig,
+  sessionLeafId: string | null,
+  binaryPath: string | null,
+): void {
+  process.env.MYCELIUM_AGENT_ID ??= "pi-agent";
+  if (sessionLeafId !== null) {
+    process.env.MYCELIUM_SESSION_ID = sessionLeafId;
+  } else {
+    process.env.MYCELIUM_SESSION_ID = `pi-auto-${randomUUID()}`;
+  }
+  process.env.MYCELIUM_MOUNT = config.mountPath;
+
+  // Make the bundled binary visible to the agent's bash invocations.
+  // The system prompt instructs the agent to call `mycelium <sub>`; if the
+  // binary lives only inside our optional-dep node_modules, that call would
+  // 127 without this prepend.
+  if (binaryPath) {
+    const binDir = path.dirname(binaryPath);
+    const current = process.env.PATH ?? "";
+    if (!current.split(path.delimiter).includes(binDir)) {
+      process.env.PATH = current
+        ? `${binDir}${path.delimiter}${current}`
+        : binDir;
+    }
+  }
 }
