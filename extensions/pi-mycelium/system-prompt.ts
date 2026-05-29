@@ -136,6 +136,8 @@ other normal file/search tools.`;
 }
 
 export function systemPromptAvailable(c: AvailableContext): string {
+	const memoryPath = `${c.mountPath}/MYCELIUM_MEMORY.md`;
+
 	return `## Mycelium memory
 
 You have a persistent file-based memory store mounted at ${c.mountPath}.
@@ -160,9 +162,11 @@ Metadata commands:
 - \`mycelium evolve ...\` — record/query typed activity-log entries for durable conventions, lessons, indices, archives, and questions
 - \`mycelium log <op> [--path PATH] [--payload-json STR | --stdin] [--rationale STR]\` — append an arbitrary signal; mostly adapter-facing
 
-Conventions for organizing this store live in \`MYCELIUM_MEMORY.md\` at the root.
-Read it once at session start; revise it whenever you find a better way to
-organize what you're working with — it's yours.
+Conventions for organizing this store live in \`${memoryPath}\`.
+Read that exact file once at session start. Do not broad-search to rediscover
+required files; if the path is missing, report it instead of guessing.
+Revise it whenever you find a better way to organize what you're working with
+— it's yours.
 
 Operational rationale: \`write\`, \`edit\`, \`rm\`, \`mv\`, and \`log\` accept an
 optional \`--rationale "..."\` flag (≤64 KiB). Supply it when the operation

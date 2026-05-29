@@ -1,6 +1,6 @@
 .PHONY: build test dist clean npm-dist npm-publish
 
-VERSION ?= v0.2.0
+VERSION ?= v0.2.1
 DIST    := dist
 CMD     := cmd/mycelium
 NPM_DIR := $(DIST)/npm
@@ -17,11 +17,13 @@ dist: clean
 	GOOS=darwin GOARCH=arm64 go build -o $(CURDIR)/$(DIST)/mycelium-$(VERSION)-darwin-arm64 ./$(CMD)
 	GOOS=linux  GOARCH=amd64 go build -o $(CURDIR)/$(DIST)/mycelium-$(VERSION)-linux-amd64 ./$(CMD)
 	GOOS=linux  GOARCH=arm64 go build -o $(CURDIR)/$(DIST)/mycelium-$(VERSION)-linux-arm64 ./$(CMD)
+	# shellcheck disable=SC1073,SC1061,SC1036,SC1062,SC1072
 	cd $(DIST) && for f in mycelium-$(VERSION)-*; do tar -czf $$f.tar.gz $$f && rm $$f; done
-	@ls -lh $(DIST)
+	ls -lh $(DIST)
 
 npm-dist: dist
-	@for plat in darwin-arm64 darwin-amd64 linux-arm64 linux-amd64; do \
+	# shellcheck disable=SC1073,SC1061,SC1036,SC1062,SC1072
+	for plat in darwin-arm64 darwin-amd64 linux-arm64 linux-amd64; do \
 	  os=$${plat%-*}; goarch=$${plat#*-}; \
 	  case $$goarch in \
 	    amd64) nodearch=x64;; \
@@ -36,10 +38,11 @@ npm-dist: dist
 	  ver=$$(echo $(VERSION) | sed 's/^v//'); \
 	  node -e 'const fs = require("fs"); const [plat, ver, os, cpu, file] = process.argv.slice(1); fs.writeFileSync(file, JSON.stringify({ name: "@fuentesjr/mycelium-cli-" + plat, version: ver, description: "Mycelium CLI binary for " + plat, license: "MIT", os: [os], cpu: [cpu], files: ["mycelium"], repository: "https://github.com/fuentesjr/mycelium" }, null, 2) + "\n");' $$plat $$ver $$os $$nodearch $$pkg/package.json; \
 	done
-	@ls -lh $(NPM_DIR)
+	ls -lh $(NPM_DIR)
 
 npm-publish: npm-dist
-	@for plat in darwin-arm64 darwin-amd64 linux-arm64 linux-amd64; do \
+	# shellcheck disable=SC1073,SC1061,SC1036,SC1062,SC1072
+	for plat in darwin-arm64 darwin-amd64 linux-arm64 linux-amd64; do \
 	  cd $(NPM_DIR)/cli-$$plat && npm publish --access=public && cd $(CURDIR); \
 	done
 	cd extensions/pi-mycelium && npm publish --access=public

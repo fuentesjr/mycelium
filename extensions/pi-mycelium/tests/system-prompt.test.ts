@@ -89,6 +89,12 @@ describe("systemPromptAvailable", () => {
 		expect(block).toContain("/test/store");
 	});
 
+	it("points at the exact memory file and forbids rediscovery search", () => {
+		expect(block).toContain("/test/store/MYCELIUM_MEMORY.md");
+		expect(block).toContain("Do not broad-search to rediscover");
+		expect(block).toContain("report it instead of guessing");
+	});
+
 	it("interpolates the agent and session ids", () => {
 		expect(block).toContain("MYCELIUM_AGENT_ID=test-agent");
 		expect(block).toContain("MYCELIUM_SESSION_ID=session-xyz");

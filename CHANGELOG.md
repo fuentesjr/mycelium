@@ -1,3 +1,9 @@
+## [0.2.1] - 2026-05-29
+
+### Fixed (pi-mycelium extension)
+
+- System prompt now points agents at the exact `<mount>/MYCELIUM_MEMORY.md` path and tells them not to broad-search for required files.
+
 ## [0.2.0] - 2026-05-12
 
 ### Added (mycelium binary)
