@@ -46,6 +46,8 @@ git tag vX.Y.Z && git push origin vX.Y.Z
 
 **Test failure on tag** — no artifacts are published. Fix the bug on `main`, bump to a new patch version, retag.
 
+**npm authentication/access failure** — errors like `E401`, `EOTP`, or a misleading `E404 Not Found - PUT https://registry.npmjs.org/<package>` usually mean the `production` environment's `NPM_TOKEN` is missing, expired, revoked, subject to OTP, or lacks read-write access to one of the packages. Rotate it to an npm automation/granular token with publish access to all five packages, then rerun or cut a clean patch release.
+
 **npm publish partial failure** — some platform packages published but others (or the meta package) did not. npm does not allow unpublishing within 72 hours of publish. Do not attempt to unpublish. Instead: bump to the next patch version (e.g. `0.1.0 → 0.1.1`), document the orphaned version in `CHANGELOG.md`, and run a clean release from scratch.
 
 **GitHub release created but npm publish failed** — delete the GitHub release manually (GitHub UI → Edit → Delete release, keep the tag or delete and recreate it), then bump the version and retry the whole release.
