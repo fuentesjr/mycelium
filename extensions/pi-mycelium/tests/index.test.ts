@@ -138,20 +138,24 @@ describe("pi extension factory", () => {
     process.env = { ...original };
   });
 
-  it("registers lifecycle, context, turn, tool, and compaction handlers", () => {
+  it("registers lifecycle, context, and compaction handlers", () => {
     const { handlers } = makeRegistration(async () => execResult(0));
     for (const eventName of [
       "session_start",
       "session_shutdown",
       "before_agent_start",
-      "turn_start",
-      "turn_end",
-      "tool_execution_start",
-      "tool_execution_end",
       "session_compact",
       "context",
     ]) {
       expect(handlers.has(eventName)).toBe(true);
+    }
+    for (const eventName of [
+      "turn_start",
+      "turn_end",
+      "tool_execution_start",
+      "tool_execution_end",
+    ]) {
+      expect(handlers.has(eventName)).toBe(false);
     }
   });
 
@@ -229,9 +233,6 @@ describe("pi extension factory", () => {
       message_count: 3,
       last_role: "user",
       role_counts: { user: 2, assistant: 1 },
-      provider: "anthropic",
-      model: "m",
-      stop_reason: "stop",
     });
     expect(payload.fingerprint).toMatch(/^sha256:/);
   });

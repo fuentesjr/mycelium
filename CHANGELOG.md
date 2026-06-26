@@ -9,6 +9,10 @@
 - Removed the `_tx/` transaction journal. Mutating commands now lock, check CAS, commit content, append the durable activity entry, and return success only after the append succeeds. If legacy `_tx/pending/*.json` records are present, v0.3 blocks mutations with instructions to recover the mount using the last v0.2 binary.
 - Mutation `tx_id` values now use stdlib time/randomness (`tx-<unix-nano>-<rand>`), and generated default session IDs use the matching `auto-<unix-nano>-<rand>` shape.
 
+### Changed (pi-mycelium extension)
+
+- Stopped emitting turn/tool telemetry from the reference adapter. It now records session boundaries, `session_shutdown`, `compaction`, and deduped `context_checkpoint` entries only; the portable vocabulary remains available for richer adapters.
+
 ## [0.2.1] - 2026-05-29
 
 ### Fixed (pi-mycelium extension)

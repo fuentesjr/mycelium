@@ -187,7 +187,8 @@ exit "$code"
 
 ### L3 pi.dev adapter
 
-`pi-mycelium` emits session boundary events, `turn_start`/`turn_end`,
-`tool_start`/`tool_end`, `compaction`, and deduped `context_checkpoint` entries
-using the vocabulary above. It still registers no tools: the agent invokes the
-portable `mycelium` CLI through pi's built-in shell tool.
+`pi-mycelium` emits session boundary events, `compaction`, and deduped
+`context_checkpoint` entries using the vocabulary above. It intentionally does
+not emit turn/tool telemetry; richer adapters may still use those documented
+op names when they are memory-relevant. It still registers no tools: the agent
+invokes the portable `mycelium` CLI through pi's built-in shell tool.

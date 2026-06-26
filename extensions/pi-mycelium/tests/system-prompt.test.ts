@@ -58,7 +58,7 @@ describe("systemPromptAvailable", () => {
 		expect(block).not.toContain("_tx/pending");
 		expect(block).toContain("### Activity events");
 		expect(block).toContain("context_checkpoint");
-		expect(block).toContain("tool_start");
+		expect(block).not.toContain("tool_start");
 		expect(block).toContain("context_signal");
 	});
 });

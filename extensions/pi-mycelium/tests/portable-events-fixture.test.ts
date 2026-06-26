@@ -40,7 +40,6 @@ describe("portable activity events fixture", () => {
 		expect(lines.length).toBeGreaterThan(0);
 
 		const entries = lines.map((line) => JSON.parse(line) as FixtureEntry);
-		const seenOps = new Set<string>();
 
 		for (const entry of entries) {
 			expect(typeof entry.ts).toBe("string");
@@ -49,7 +48,6 @@ describe("portable activity events fixture", () => {
 			expect(typeof entry.session_id).toBe("string");
 			expect(typeof entry.op).toBe("string");
 			expect(portableOps.has(entry.op as string)).toBe(true);
-			seenOps.add(entry.op as string);
 
 			expect(isRecord(entry.payload)).toBe(true);
 			const payload = entry.payload as Record<string, unknown>;
@@ -61,19 +59,6 @@ describe("portable activity events fixture", () => {
 			expect(payload).not.toHaveProperty("messageCount");
 			expect(payload).not.toHaveProperty("lastRole");
 		}
-
-		expect(seenOps).toEqual(
-			new Set([
-				"session_startup",
-				"turn_start",
-				"context_checkpoint",
-				"tool_start",
-				"tool_end",
-				"turn_end",
-				"compaction",
-				"session_shutdown",
-			]),
-		);
 
 		const checkpoint = entries.find((e) => e.op === "context_checkpoint")!
 			.payload as Record<string, unknown>;

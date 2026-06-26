@@ -12,7 +12,6 @@ export default function (pi: ExtensionAPI) {
 	const activity = createActivityLogRecorder();
 	let binaryPath: string | null = null;
 	let mountPath = "";
-	let currentTurnIndex: number | undefined;
 
 	pi.on("session_start", async (event, ctx) => {
 		const cfg = resolveConfig(ctx.cwd);
@@ -46,32 +45,13 @@ export default function (pi: ExtensionAPI) {
 		return { systemPrompt: event.systemPrompt + "\n\n" + block };
 	});
 
-	pi.on("turn_start", async (event, _ctx) => {
-		currentTurnIndex = event.turnIndex;
-		if (binaryPath) await activity.recordTurnStart(pi, binaryPath, event);
-	});
-
-	pi.on("turn_end", async (event, _ctx) => {
-		if (binaryPath) await activity.recordTurnEnd(pi, binaryPath, event);
-	});
-
-	pi.on("tool_execution_start", async (event, _ctx) => {
-		if (binaryPath) await activity.recordToolStart(pi, binaryPath, event);
-	});
-
-	pi.on("tool_execution_end", async (event, _ctx) => {
-		if (binaryPath) await activity.recordToolEnd(pi, binaryPath, event);
-	});
-
 	pi.on("session_compact", async (event, _ctx) => {
 		if (binaryPath) await activity.recordCompaction(pi, binaryPath, event);
 	});
 
 	pi.on("context", async (event, _ctx) => {
 		if (binaryPath) {
-			await activity.recordContextCheckpoint(pi, binaryPath, event, {
-				turnIndex: currentTurnIndex,
-			});
+			await activity.recordContextCheckpoint(pi, binaryPath, event);
 		}
 		return undefined;
 	});

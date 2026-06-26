@@ -5,11 +5,7 @@ import type {
 	ExtensionAPI,
 	SessionStartEvent,
 } from "@earendil-works/pi-coding-agent";
-import {
-	createActivityLogRecorder,
-	type ToolExecutionEndEvent,
-	type ToolExecutionStartEvent,
-} from "../activity-log.js";
+import { createActivityLogRecorder } from "../activity-log.js";
 import { execResult } from "./helpers.js";
 
 const require = createRequire(import.meta.url);
@@ -73,7 +69,6 @@ describe("ActivityLogRecorder.recordContextCheckpoint", () => {
 			pi,
 			BINARY_PATH,
 			makeContextEvent(sampleMessages),
-			{ turnIndex: 7 },
 		);
 
 		expect(exec).toHaveBeenCalledTimes(1);
@@ -87,20 +82,8 @@ describe("ActivityLogRecorder.recordContextCheckpoint", () => {
 			adapter_version: ADAPTER_VERSION,
 			seq: 1,
 			message_count: 3,
-			turn_index: 7,
 			last_role: "toolResult",
 			role_counts: { user: 1, assistant: 1, toolResult: 1 },
-			provider: "anthropic",
-			model: "m",
-			stop_reason: "stop",
-			usage: {
-				input: 1,
-				output: 2,
-				cache_read: 3,
-				cache_write: 4,
-				total_tokens: 10,
-			},
-			cost: { total: 0.5 },
 		});
 		expect(payload.fingerprint).toMatch(/^sha256:/);
 		expect(payload).not.toHaveProperty("message_delta");
@@ -143,58 +126,6 @@ describe("ActivityLogRecorder.recordContextCheckpoint", () => {
 		expect(payload.message_count).toBe(4);
 		expect(payload.message_delta).toBe(1);
 		expect(payload.suppressed_duplicates).toBe(1);
-	});
-});
-
-describe("ActivityLogRecorder tool events", () => {
-	it("emits tool_start/tool_end with duration and output metadata", async () => {
-		vi.useFakeTimers();
-		try {
-			const exec = vi.fn(async () => execResult(0));
-			const pi = { exec } as unknown as ExtensionAPI;
-			const recorder = createActivityLogRecorder();
-			const startEvent: ToolExecutionStartEvent = {
-				type: "tool_execution_start",
-				toolCallId: "call_1",
-				toolName: "bash",
-				args: { command: "echo hi" },
-			};
-			const endEvent: ToolExecutionEndEvent = {
-				type: "tool_execution_end",
-				toolCallId: "call_1",
-				toolName: "bash",
-				result: {
-					content: [{ type: "text", text: "hello" }],
-					details: { exitCode: 0 },
-				},
-				isError: false,
-			};
-
-			vi.setSystemTime(1000);
-			await recorder.recordToolStart(pi, BINARY_PATH, startEvent);
-			vi.setSystemTime(1384);
-			await recorder.recordToolEnd(pi, BINARY_PATH, endEvent);
-
-			expect(exec).toHaveBeenCalledTimes(2);
-			expect(argsFromCall(exec)[1]).toBe("tool_start");
-			expect(payloadFromCall(exec)).toMatchObject({
-				seq: 1,
-				tool_call_id: "call_1",
-				tool_name: "bash",
-			});
-			expect(argsFromCall(exec, 1)[1]).toBe("tool_end");
-			expect(payloadFromCall(exec, 1)).toMatchObject({
-				seq: 2,
-				tool_call_id: "call_1",
-				tool_name: "bash",
-				is_error: false,
-				duration_ms: 384,
-				output_chars: 5,
-				exit_code: 0,
-			});
-		} finally {
-			vi.useRealTimers();
-		}
 	});
 });
 

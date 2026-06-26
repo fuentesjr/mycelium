@@ -41,15 +41,13 @@ gets resolved.
   a rationale nudge for operations whose reasoning is worth preserving. Chains
   off `event.systemPrompt` so other
   extensions' contributions are preserved.
-- **turn/tool/context events** — records `turn_start`, `turn_end`,
-  `tool_start`, `tool_end`, `compaction`, and deduped `context_checkpoint`
-  entries using the portable vocabulary in
+- **memory-relevant activity events** — records `compaction` and deduped
+  `context_checkpoint` entries using the portable vocabulary in
   [`docs/portable-activity-events.md`](https://github.com/fuentesjr/mycelium/blob/main/docs/portable-activity-events.md),
   without modifying the agent's message stream.
 
 The bundled binary writes durable history under `_activity/`. Other `_` paths
-are internal implementation details used to keep content mutations and activity
-entries consistent across crashes.
+are internal implementation details; agents should not edit them directly.
 
 ## What it does not do
 
