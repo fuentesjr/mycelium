@@ -1,6 +1,6 @@
 # T2 — Seeded self-evolution
 
-**Acceptance criterion:** #4 (self-evolution via the activity log).
+**Acceptance criterion:** #4 (self-evolution through conventions-file edits and activity-log evidence).
 
 This task runs across two sessions, fresh process each, against a *pre-seeded* store. The seed contains a recognizable failure pattern — six notes with subtly inconsistent paths (`glp1-pipeline.md`, `glp-1-pipeline.md`, `glp1_followup.md`), an activity log of ~30 prior mutations with no read signals, and a starter `MYCELIUM_MEMORY.md` that does not mention searching before writing.
 

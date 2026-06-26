@@ -6,7 +6,7 @@
 This rubric operationalizes the three Phase 1 criteria that depend on real model runs:
 
 - **#1 Single-agent multi-session.** Validated by T1.
-- **#4 Self-evolution via the activity log.** Validated by T2.
+- **#4 Self-evolution through conventions-file edits and activity-log evidence.** Validated by T2.
 - **#5 Failure-mode observability.** Validated by T3.
 
 Criteria 2, 3, 6, 7, 8, and 9 are validated by the binary's property tests, concurrent-process tests, crash-recovery tests, and tarball inspection — not here.
@@ -64,7 +64,7 @@ Three sessions, not two: two sessions test "did the agent re-read its notes"; th
 1. The agent is told it is `glp1-researcher` continuing prior work, and asked to extend the analytics into cardiovascular outcomes for the same patient cohort.
 2. "Continue. Take a moment first to look at how the store is shaped."
 
-**Pass.** After session 2, the rubric grader judges that the agent recognized the seeded pattern and responded with at least one convention edit, `mycelium evolve` event, index file, or grep-before-write behavior visible in the post-run store or activity log. Single grader judgment; no signal-counting threshold. Per `harness.md`: run 5 instances per model; pass requires majority (≥3/5).
+**Pass.** After session 2, the rubric grader judges that the agent recognized the seeded pattern and responded with at least one convention-file edit, index file, reconciliation, or grep-before-write behavior visible in the post-run store or activity log. Single grader judgment; no signal-counting threshold. Per `harness.md`: run 5 instances per model; pass requires majority (≥3/5).
 
 Why seeded: self-evolution requires something to evolve in response to. A clean store has nothing for the agent to notice.
 

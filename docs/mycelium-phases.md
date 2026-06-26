@@ -18,19 +18,19 @@ Mycelium is LocalFS/POSIX-native. The roadmap below keeps that guarantee set ins
 
 **In scope.**
 
-- CLI surface: `mycelium read`, `write`, `edit`, `ls`, `grep`, `rm`, `mv`, `log`, `evolve`. Nine subcommands invoked through the agent harness's existing shell tool.
+- CLI surface: `mycelium read`, `write`, `edit`, `ls`, `grep`, `rm`, `mv`, `log`. Eight visible subcommands invoked through the agent harness's existing shell tool. A hidden transitional `evolve` stub points old callers at `MYCELIUM_MEMORY.md`.
 - `read --format json` for CAS-safe UTF-8 reads that return `path`, `version`, and `content` in one envelope. Raw `cat` remains fine for inspection, including non-UTF-8 bytes.
 - Every content-mutating subcommand accepts optional `--expected-version`; conflict recovery is first-class from v1.
 - `mycelium grep` flags: `--pattern`, optional `--path`, `--regex`, `--format text|json`, and `--limit`. Implementation is pure Go: one search implementation and one regex dialect across machines.
 - One storage contract: **LocalFS on a local POSIX filesystem**, with conditional writes implemented via `flock`-guarded version checks and content-hash version tokens.
 - Atomic single-file ops via write-to-temp-then-rename, atomic rename for `mv`, and destination-collision protection.
-- Authoritative activity log at `_activity/YYYY/MM/DD/{agent_id}.jsonl`. Every successful state-changing operation (`write`, `edit`, `rm`, `mv`, `log`, `evolve`) produces a durable JSONL entry. Reads are not logged.
+- Authoritative activity log at `_activity/YYYY/MM/DD/{agent_id}.jsonl`. Every successful state-changing operation (`write`, `edit`, `rm`, `mv`, `log`) produces a durable JSONL entry. Reads are not logged.
 - Transaction journal at `_tx/pending/{tx_id}.json` so content mutations and activity entries recover together across crashes. A command returns success only after the content change, activity entry, and pending transaction cleanup are durable.
 - Mount and identity via environment variables: `MYCELIUM_MOUNT` is required; `MYCELIUM_AGENT_ID` defaults to `agent`; `MYCELIUM_SESSION_ID` is auto-generated per CLI process when absent. Harnesses can set stable agent/session ids for clearer timelines.
 - Typed conflict errors. When `--expected-version` doesn't match, `mycelium` exits 64 and prints structured JSON to stderr containing the current version token. Recovery is re-read, merge, retry.
 - Raw-read/raw-write boundary: raw filesystem reads are allowed; raw filesystem writes are unsupported. All live-store mutations go through `mycelium`.
 - Reserved `_` prefix. `mycelium` rejects agent mutations under any `_`-prefixed root path; currently `_activity/` and `_tx/`.
-- Reference agent harness: pi.dev extension. It registers no tools — the agent invokes `mycelium` via pi's built-in `bash` tool — and contributes only env-var setup, a small system-prompt block, starter convention seeding, active-evolution metadata, and portable activity logging (`context_checkpoint`, turn/tool boundaries, compaction).
+- Reference agent harness: pi.dev extension. It registers no tools — the agent invokes `mycelium` via pi's built-in `bash` tool — and contributes only env-var setup, a small system-prompt block, starter convention seeding, and portable activity logging (`context_checkpoint`, turn/tool boundaries, compaction).
 - Documentation for starter conventions, self-evolution recipes, and conflict-resolution conventions.
 
 **Out of scope, with reasons.**
@@ -49,7 +49,7 @@ Mycelium is LocalFS/POSIX-native. The roadmap below keeps that guarantee set ins
 1. **Single-agent multi-session.** T1 task in `docs/benchmarks/phase-1.md` passes on target Frontier models.
 2. **Multi-agent concurrency.** Two agents on the same LocalFS store can update overlapping files concurrently without silent loss. A benchmark exercises adversarial timing.
 3. **Conflict recovery on real models.** When a conditional write fails, the model receives the typed conflict error and produces sensible recovery behavior (re-read, merge, retry) given only the error and no special prompting.
-4. **Self-evolution via the activity log.** T2 task passes. Self-evolution is the floor behavior the supported tier is defined by; failure here is a Phase 1 blocker.
+4. **Self-evolution through conventions-file edits and activity-log evidence.** T2 task passes. Self-evolution is the floor behavior the supported tier is defined by; failure here is a Phase 1 blocker.
 5. **Failure-mode observability.** T3 detectors distinguish dysfunctional traces from healthy use by reading the activity log alone.
 6. **Activity log integrity.** Every successful state-changing operation has a durable activity entry; crash tests show `_tx/` recovers missing log entries or safely aborts uncommitted operations before allowing further mutations.
 7. **Reserved-path protection.** Property-based tests cover every mutating subcommand against `_`-prefixed paths.
@@ -86,7 +86,7 @@ Mycelium is LocalFS/POSIX-native. The roadmap below keeps that guarantee set ins
 3. Recovery diagnostics are understandable to an operator using only the filesystem, JSON, and docs.
 4. Installation and update paths are repeatable on supported Linux/macOS platforms.
 
-**Decision gate after Phase 2.** Run the benchmark suite against the strongest then-current Frontier model family on a long-running multi-agent task. If the system shows signs of capping the Frontier model — including the activity log shape, active-evolution prompt block, or recovery metadata — that feature is revised before any new one goes in.
+**Decision gate after Phase 2.** Run the benchmark suite against the strongest then-current Frontier model family on a long-running multi-agent task. If the system shows signs of capping the Frontier model — including the activity log shape, conventions-file prompt block, or recovery metadata — that feature is revised before any new one goes in.
 
 ---
 

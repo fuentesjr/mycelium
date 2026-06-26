@@ -104,7 +104,6 @@ func TestDispatchRejectsExtraArgs(t *testing.T) {
 		{"rm", []string{"rm", "one.md", "two.md"}},
 		{"mv", []string{"mv", "one.md", "two.md", "three.md"}},
 		{"log", []string{"log", "event", "extra"}},
-		{"evolve", []string{"evolve", "convention", "extra", "--rationale", "why"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -135,10 +134,13 @@ func TestLogSubcommandShapeParity(t *testing.T) {
 
 func TestDispatchListsSubcommands(t *testing.T) {
 	_, errOut, _ := runDispatch(t, "nope")
-	for _, sc := range subcommands {
-		if !strings.Contains(errOut, sc.name) {
-			t.Errorf("stderr missing subcommand %q in listing: %q", sc.name, errOut)
+	for _, name := range []string{"read", "write", "edit", "ls", "grep", "rm", "mv", "log"} {
+		if !strings.Contains(errOut, name) {
+			t.Errorf("stderr missing subcommand %q in listing: %q", name, errOut)
 		}
+	}
+	if strings.Contains(errOut, "evolve") {
+		t.Errorf("hidden evolve stub should not appear in listing: %q", errOut)
 	}
 }
 
@@ -149,5 +151,21 @@ func TestEvolutionSubcommandRemoved(t *testing.T) {
 	}
 	if !strings.Contains(errOut, "unknown subcommand") {
 		t.Errorf("stderr should mention unknown subcommand, got %q", errOut)
+	}
+}
+
+func TestEvolveSubcommandIsDiagnosticStub(t *testing.T) {
+	out, errOut, rc := runDispatch(t, "evolve", "--active")
+	if rc != ExitGenericError {
+		t.Errorf("rc: got %d, want %d", rc, ExitGenericError)
+	}
+	if out != "" {
+		t.Errorf("stdout: got %q, want empty", out)
+	}
+	if !strings.Contains(errOut, "evolve was removed in 0.3.0") {
+		t.Errorf("stderr should mention removal, got %q", errOut)
+	}
+	if !strings.Contains(errOut, "MYCELIUM_MEMORY.md") {
+		t.Errorf("stderr should point to MYCELIUM_MEMORY.md, got %q", errOut)
 	}
 }

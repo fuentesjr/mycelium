@@ -1,230 +1,137 @@
 # Self-Evolution
 
-**Status:** Reference documentation. Concrete `mycelium` recipes for self-evolution. The design rationale lives in `mycelium-design.md` section 7; the activity-log schema and rationale live in [`docs/adr/0001-self-evolution-as-first-class-concept.md`](adr/0001-self-evolution-as-first-class-concept.md).
+**Status:** Reference documentation. Concrete recipes for agents revising their
+own memory practices through files. ADR-0004 supersedes the old `evolve`
+mechanism: current rules live in `MYCELIUM_MEMORY.md`; the activity log records
+the history of edits and rationale.
 
 ---
 
-## The mechanism: `mycelium evolve`
+## The mechanism
 
-One command records and queries self-evolution metadata.
+Self-evolution is now file-based:
 
-Record an evolution event:
+1. Read `MYCELIUM_MEMORY.md` at session start.
+2. Notice patterns by reading notes and grepping `_activity/`.
+3. Revise `MYCELIUM_MEMORY.md` or a sibling conventions file with
+   `mycelium write` / `edit` and a clear `--rationale`.
+4. Use `mycelium log decision|agent_note --rationale "..."` for point-in-time
+   decisions that should remain history but not become standing guidance.
 
-```sh
-mycelium evolve <kind> [--target <str>] [--supersedes <id>] \
-  [--kind-definition "..."] --rationale "..."
-```
+Be proactive. When a repeated pattern, mistake, durable user preference, naming
+rule, useful index, stale region, or open question emerges, update the
+conventions file in the same session. Do not leave the lesson implicit.
 
-This writes a structured `op: "evolve"` entry to the authoritative activity log with `kind`, optional `target`, `rationale`, a minted ULID `id`, and optional `supersedes`. The call is metadata-only: it records the decision but never mutates agent-authored files.
-
-Query evolution state:
-
-```sh
-# Current rules/lessons/questions in effect
-mycelium evolve --active
-mycelium evolve --active --format json
-
-# Full user-facing timeline
-mycelium evolve --list
-mycelium evolve --list --kind convention --since 2026-05-01 --format json
-
-# Available vocabulary: built-ins plus agent-introduced kinds
-mycelium evolve --kinds --format json
-```
-
----
-
-## Built-in kinds
-
-Five kinds ship by default. No `--kind-definition` required on first use.
-
-| kind         | definition                                                                                                               |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| `convention` | A naming, layout, structural, or behavioral pattern for organizing or operating on the store.                            |
-| `index`      | A derived or summary file the agent has built or regenerated over a region of the store.                                 |
-| `archive`    | A region of the store the agent has marked as no-longer-active and moved out of working scope.                           |
-| `lesson`     | A distilled insight from past work, intended to inform future behavior.                                                  |
-| `question`   | An open unknown the agent is tracking, expected to resolve into a `lesson` or be superseded as no-longer-relevant later. |
-
-Agents may introduce additional kinds by passing `--kind-definition` on first use. Built-in and agent-introduced kinds coexist on equal footing in the activity log.
-
----
-
-## Supersession rules
-
-Targeted evolution forms automatic chains:
-
-- If `target` is non-empty, a new event with the same `(kind, target)` as an active prior event supersedes that prior event automatically.
-- The new event prints `{"id":"...","supersedes":"..."}` so the agent sees the chain it extended.
-
-Targetless evolution is additive:
-
-- If `target` is omitted or empty, no implicit supersession occurs.
-- Use `--supersedes <id>` explicitly when a targetless event replaces a prior one.
-
-Explicit supersession is allowed when the agent is intentionally retiring another event, including across kinds. The common case is resolving a `question` into a `lesson`.
+Existing historical `op:"evolve"` entries remain valid activity-log history,
+but they are not the current source of truth.
 
 ---
 
 ## Pattern 1 — Convention bootstrap
 
-At session start, inherit the current conventions and lessons:
+At session start:
 
 ```sh
-mycelium evolve --active --format json
+mycelium read MYCELIUM_MEMORY.md --format json
 ```
 
-The pi-mycelium extension may pre-surface this active-evolution view in the `before_agent_start` system prompt. This is metadata, not retrieved memory content: a fresh session sees current rules without the harness prefetching arbitrary notes.
-
-If you're on a fresh mount with no evolution history, `--active` returns nothing and the built-in kinds are available from `--kinds`.
-
-`MYCELIUM_MEMORY.md` is a prose companion for editorialized summaries. When it diverges from the activity log, the activity log wins. See the ADR for the divergence policy.
+If the file is absent, report that instead of broad-searching for a replacement.
+The pi-mycelium extension seeds it for fresh mounts.
 
 ---
 
 ## Pattern 2 — Adopting or revising a convention
 
-After noticing a pattern in the activity log — duplicate filenames, violated naming rules, near-duplicate paths:
+After noticing duplicate filenames, violated naming rules, or near-duplicate
+paths:
 
 ```sh
 mycelium ls '_activity/2026/04/*/researcher-7.jsonl' --recursive
 mycelium grep --pattern '"op":"write"' --path _activity --format json --limit 200
 ```
 
-Record the new convention:
+Edit `MYCELIUM_MEMORY.md`:
 
 ```sh
-mycelium evolve convention \
-  --target notes/incidents/ \
-  --rationale "Adopting <date>-<slug>.md filenames so incidents sort chronologically without a separate index."
-# {"id":"01HXKP4Z9M8YV1W6E2RTSA9KFG"}
+mycelium edit MYCELIUM_MEMORY.md \
+  --old "## Conventions" \
+  --new "## Conventions
+
+- 2026-04-30: Use <date>-<slug>.md filenames under notes/incidents/ so incidents sort chronologically without a separate index." \
+  --rationale "Adopting incident filenames after index.md drifted from reality within a week."
 ```
 
-Revise it later by reusing the same non-empty target:
-
-```sh
-mycelium evolve convention \
-  --target notes/incidents/ \
-  --rationale "Switching to YYYY/MM/<slug>.md after the year wrapped — flat-date layout was getting unwieldy."
-# {"id":"01HXM2C0JD7H9ASBQYNV6XGGT2","supersedes":"01HXKP4Z9M8YV1W6E2RTSA9KFG"}
-```
-
-The old entry is now superseded and will not appear in `--active` output. The full chain remains in the activity log for archaeology.
+To revise the rule later, edit the same prose entry or add a dated replacement.
+The current file is the active rule; the activity log preserves history.
 
 ---
 
 ## Pattern 3 — Self-built indexes
 
-Triggered by repeated searches, repeated navigation to the same cluster of files, or recurring user questions. First, confirm the pattern is real from available evidence:
+Build indexes only after observed search/navigation friction:
 
 ```sh
 mycelium grep --path _activity --pattern 'glp1' --format json --limit 500
+mycelium write notes/_index/glp1.md \
+  --rationale "Creating a hand-built GLP-1 TOC after repeated searches across the same cluster."
 ```
 
-Build the index file:
+Then record the index location and refresh rule in `MYCELIUM_MEMORY.md`, for
+example:
 
-```sh
-mycelium write notes/_index/glp1.md   # contents map common queries to canonical paths
+```md
+- 2026-05-12: `notes/_index/glp1.md` maps common GLP-1 queries to canonical
+  files. Regenerate it when `notes/glp1-*` changes substantially.
 ```
-
-Then record the index as an evolution event so future sessions know it exists and when to regenerate it:
-
-```sh
-mycelium evolve index \
-  --target notes/_index/glp1.md \
-  --rationale "Hand-built TOC mapping GLP-1 queries to canonical files. Regenerate when notes/glp1-* changes significantly."
-```
-
-Don't create indexes preemptively. An index that isn't earned by observed search/navigation friction is just another file to maintain.
 
 ---
 
 ## Pattern 4 — Archiving and pruning
 
-Triggered by `mycelium ls --recursive` returning paths that haven't been touched recently or that the activity log shows are no longer active:
+Triggered by stale paths or activity that shows a region is no longer active:
 
 ```sh
 mycelium ls --recursive
 mycelium grep --pattern 'notes/old-protocol' --path _activity --format json --limit 100
+mycelium mv notes/old-protocol.md archive/2025-q4/old-protocol.md \
+  --rationale "Pre-2026 protocol note moved out of active notes; retained for reference."
 ```
 
-Move the stale content:
+If this establishes a durable policy, add it to `MYCELIUM_MEMORY.md`:
 
-```sh
-mycelium mv notes/old-protocol.md archive/2025-q4/old-protocol.md
+```md
+- 2026-05-12: Move inactive protocol notes older than one quarter to
+  `archive/<year>-q<quarter>/`; keep them searchable but out of active notes.
 ```
-
-Then record the archival decision:
-
-```sh
-mycelium evolve archive \
-  --target archive/2025-q4/ \
-  --rationale "Pre-2026 protocol notes moved to archive/2025-q4/. Not expected to change; keep for reference."
-```
-
-`evolve archive` and `mycelium mv` are separate calls. The `evolve` event records the reasoning; the `mv` performs the move. Neither implies the other.
 
 ---
 
-## Pattern 5 — Distilling lessons
+## Pattern 5 — Lessons and open questions
 
-After an incident or completed investigation, record the insight. Use a target when the lesson scopes to a file/topic and should replace future revisions automatically:
+For durable lessons, add prose to `MYCELIUM_MEMORY.md` or a linked lessons file:
 
-```sh
-mycelium evolve lesson \
-  --target notes/incidents/2026-04-30-latency-spike.md \
-  --rationale "Queries mentioning 'latency' correlate with deploy events 80% of the time. Check deploy calendar before investigating latency spikes."
+```md
+- 2026-05-12: For library-internals questions, prefer source permalinks over
+  secondary summaries.
 ```
 
-For broad standalone lessons where no natural target exists, omit `--target`. Targetless lessons are additive and will not accidentally supersede each other:
+For open questions, keep them in a visible section or file:
 
-```sh
-mycelium evolve lesson \
-  --rationale "For library-internals questions, prefer source permalinks over secondary summaries."
+```md
+## Open Questions
+
+- 2026-05-12: Does the GLP-1 cardio-protection effect generalize to
+  non-diabetic populations? Need 3+ independent studies before treating this as
+  a lesson.
 ```
 
-If a targetless lesson later needs replacement, pass `--supersedes <id>` explicitly.
-
----
-
-## Pattern 6 — Tracking open questions
-
-For unknowns that need resolution before you can close a thread:
-
-```sh
-mycelium evolve question \
-  --target hypotheses/glp1-cardio.md \
-  --rationale "Does the GLP-1 cardio-protection effect generalize to non-diabetic populations? Need 3+ independent studies before concluding."
-```
-
-When the question resolves, supersede it explicitly with a lesson because the kind changes:
-
-```sh
-mycelium evolve lesson \
-  --target hypotheses/glp1-cardio.md \
-  --supersedes <question-id> \
-  --rationale "GLP-1 cardio protection confirmed for non-diabetic populations across 4 independent studies."
-```
-
-Implicit supersession only matches the same `(kind, target)` pair. Cross-kind retirement is intentional and explicit.
-
----
-
-## Agent-introduced kinds
-
-When the built-in kinds don't fit your domain, introduce a new one:
-
-```sh
-mycelium evolve experiment \
-  --target hypotheses/glp1-cardio.md \
-  --kind-definition "An in-progress hypothesis I'm actively testing against new evidence. Distinct from 'lesson' (closed-out insight) and 'question' (passive unknown)." \
-  --rationale "Tracking the GLP-1 cardio-protection question as an open thread until I have N=3 independent supporting papers."
-```
-
-`--kind-definition` is required on the first use of any non-builtin kind. Subsequent uses may omit it. To redefine a kind, pass a new `--kind-definition`; mycelium records the taxonomy's evolution in the activity log.
+When a question resolves, edit the entry into a lesson with rationale. The file
+contains the current state; the activity log contains the transition.
 
 ---
 
 ## When this doc goes stale
 
-These recipes describe the current design. If the `--format json` envelope shape, flag names, or `_activity/` path layout change in a future release, update the recipes with them.
+These recipes assume the current public model: a folder, safe mutations, and a
+searchable activity log. If `MYCELIUM_MEMORY.md`, `--rationale`, or `_activity/`
+semantics change, update these recipes with the new mechanics.

@@ -52,7 +52,7 @@ func printSubcommandList(w io.Writer) {
 	fmt.Fprintln(w, "subcommands:")
 	fmt.Fprintln(w, "  everyday:   read write edit ls grep")
 	fmt.Fprintln(w, "  occasional: rm mv")
-	fmt.Fprintln(w, "  metadata:   log evolve")
+	fmt.Fprintln(w, "  metadata:   log")
 }
 
 func requirePositionalArgs(errOut io.Writer, command string, positional []string, want int, required string) int {

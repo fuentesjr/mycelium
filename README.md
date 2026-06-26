@@ -57,9 +57,9 @@ and recovery debugging, not required for normal use.
   processes share a mount without corruption.
 - **Append-only activity log per agent.** Plain JSONL at
   `<mount>/_activity/YYYY/MM/DD/<agent>.jsonl` — `tail -f` works.
-- **Self-evolution.** Agents record structured activity-log entries for
-  conventions, lessons, and rationale with `mycelium evolve`, then query the
-  active rules at any time.
+- **Self-evolution.** Agents revise `MYCELIUM_MEMORY.md` as conventions,
+  lessons, index locations, archive policy, and open questions emerge. The
+  activity log records every edit and its rationale.
 - **Boring on disk.** Plain files in a directory you own. Inspect with
   `cat`, search with `grep`, version with `git`, back up with `tar`.
 
@@ -75,20 +75,20 @@ metadata; only `_activity/` is part of the daily mental model.
 .mycelium-store/
 ├── notes/                                        ← agent-owned content
 │   ├── incidents/
-│   │   ├── 2026-04-30-query-latency-spike.md     ← mycelium evolve convention: <date>-<slug>.md
+│   │   ├── 2026-04-30-query-latency-spike.md     ← convention in MYCELIUM_MEMORY.md: <date>-<slug>.md
 │   │   └── 2026-05-02-checkout-503s.md
 │   ├── services/
-│   │   ├── _index.md                             ← mycelium evolve index: services by team
+│   │   ├── _index.md                             ← index location noted in MYCELIUM_MEMORY.md
 │   │   ├── checkout-api.md
 │   │   └── payments-worker.md
 │   ├── reviews/
 │   │   └── 2026-05-08-pr-1247.md
 │   └── spikes/
-│       └── 2026-Q1/                              ← mycelium evolve archive (no file changes)
+│       └── 2026-Q1/                              ← archive policy noted in MYCELIUM_MEMORY.md
 │           └── caching-prototype.md
 └── _activity/                                    ← append-only JSONL log per agent
     └── 2026/05/09/
-        ├── coder.jsonl                           ← writes + evolve events
+        ├── coder.jsonl                           ← writes + log events
         └── reviewer.jsonl
 ```
 
@@ -104,7 +104,6 @@ metadata; only `_activity/` is part of the daily mental model.
 | Occasional | `rm`     | Remove a note; accepts `--rationale`                                                                   |
 | Occasional | `mv`     | Move/rename a note; accepts `--rationale`                                                              |
 | Metadata   | `log`    | Append a signal entry to the activity log; mostly adapter-facing                                       |
-| Metadata   | `evolve` | Record/query structured activity-log entries for conventions, lessons, indices, archives, or questions |
 
 ## Concurrent writes
 
@@ -201,17 +200,13 @@ mycelium read notes/incident-2026-04-30.md --format json
 # Search
 mycelium grep --pattern latency --format json
 
-# Record a self-evolution event — the agent's reasoning at the moment of decision
-mycelium evolve convention \
-  --target notes/incidents/ \
-  --rationale "Adopting <date>-<slug>.md filenames so incidents sort chronologically without a separate index. Tried index.md first; it drifted from reality within a week."
-# {"id":"01HXKP4Z9M8YV1W6E2RTSA9KFG"}
+# Record a durable convention by editing the conventions file
+mycelium edit MYCELIUM_MEMORY.md \
+  --old "## Conventions" \
+  --new "## Conventions
 
-# View the current rules in effect across all kinds (NDJSON; one event per line)
-mycelium evolve --active --format json
-# {"ts":"2026-04-28T09:14:32Z","agent_id":"agent","session_id":"auto-01HXJX2K7N9R5T2YQ8M3D1B6V4","op":"evolve","id":"01HXKP4Z9M8YV1W6E2RTSA9KFG","kind":"convention","target":"notes/incidents/","supersedes":"","kind_definition":"","rationale":"Adopting <date>-<slug>.md filenames so incidents sort chronologically without a separate index."}
-# {"ts":"2026-05-01T14:22:09Z","agent_id":"agent","session_id":"auto-01HXKM5R8P2Q6V3Z9N4S1T0Y7K","op":"evolve","id":"01HXKP6F3J8C2YV1W6E2RTSA9K","kind":"index","target":"notes/services/","supersedes":"","kind_definition":"","rationale":"Built _index.md grouped by team owner; lookups were dominated by 'whose service is this?'"}
-# {"ts":"2026-05-05T16:08:51Z","agent_id":"agent","session_id":"auto-01HXKQ8T9V3R5W4Y2N7Z1B6P0M","op":"evolve","id":"01HXKP9YQ7M2K8V1W6E2RTSA9F","kind":"archive","target":"notes/spikes/2026-Q1/","supersedes":"","kind_definition":"","rationale":"Archiving Q1 spikes; none referenced in 30+ days and they were drowning grep results for active work."}
+- 2026-04-30: Use <date>-<slug>.md filenames under notes/incidents/ so incidents sort chronologically without a separate index." \
+  --rationale "Adopting incident filenames after index.md drifted from reality within a week."
 
 # Concurrent-safe update via CAS — pass the prior version, retry on conflict (exit 64).
 # On conflict, re-read with --format json, merge, and retry with the fresh version.
@@ -267,36 +262,29 @@ retrying agent sees both sides' intent. Maximum 64 KiB. The note-body
 discipline and operational `--rationale` are complementary: note bodies
 hold _why-this-thing_, the flag holds _why-this-operation_.
 
-**Self-evolution events** carry structural decisions — conventions
-adopted, indices built, patterns archived — each recorded as a
-first-class entry in the activity log:
+**The conventions file** carries durable structural decisions —
+conventions adopted, indices built, archive policy, lessons, and open
+questions. Revise `MYCELIUM_MEMORY.md` proactively when a repeated
+pattern, mistake, durable user preference, naming rule, or useful
+index emerges:
 
 ```bash
-# A decision with its alternative
-mycelium evolve convention \
-  --target notes/incidents/ \
-  --rationale "Using <date>-<slug>.md filenames instead of an index.md catalog; the catalog drifted from reality within a week. Filename sort gives chronology for free."
+mycelium edit MYCELIUM_MEMORY.md \
+  --old "## Conventions" \
+  --new "## Conventions
 
-# An index the agent built for itself
-mycelium evolve index \
-  --target notes/services/ \
-  --rationale "Built _index.md grouped by team owner; lookups were dominated by 'whose service is this?'"
-
-# An archive event with its threshold
-mycelium evolve archive \
-  --target notes/spikes/2026-Q1/ \
-  --rationale "Archiving Q1 spikes; none referenced in 30+ days and they were drowning grep results for active work."
+- 2026-05-12: `notes/services/_index.md` maps services by team owner. Regenerate it after substantial service-note changes." \
+  --rationale "Lookups were dominated by 'whose service is this?', so the index earned its maintenance cost."
 ```
 
 A future agent asking "why are incidents named this way?" gets the
-original reasoning, not a guess. The reasoning is queryable: `mycelium
-evolve --active` shows the rules currently in effect; the dated
-activity log preserves the full history of how those rules came to be.
+current rule by reading `MYCELIUM_MEMORY.md`, and the activity log
+preserves the full history of how that rule changed and why.
 
-See [`docs/self-evolution.md`](docs/self-evolution.md) for the full
-event vocabulary and
+See [`docs/self-evolution.md`](docs/self-evolution.md) for the file-based
+self-evolution recipes and
 [`docs/portable-activity-events.md`](docs/portable-activity-events.md)
-for the schema.
+for adapter event conventions.
 
 ## Documentation
 
@@ -318,9 +306,10 @@ for the schema.
 
 ## Repository layout
 
-- **`cmd/mycelium/`** — the Go binary. Nine subcommands: content
+- **`cmd/mycelium/`** — the Go binary. Eight visible subcommands: content
   (`read`, `write`, `edit`, `rm`, `mv`), discovery (`ls`, `grep`),
-  and meta (`log`, `evolve`).
+  and meta (`log`). A hidden transitional `evolve` stub points old
+  callers at `MYCELIUM_MEMORY.md`.
 - **`extensions/pi-mycelium/`** — pi.dev extension. Wires Mycelium
   into pi sessions: env vars, a system-prompt block, and portable
   activity events. Registers no tools; agents invoke `mycelium`

@@ -6,31 +6,18 @@ your work better.
 
 ## Conventions
 
-_(Empty. Append entries here as you adopt them — small, prose, dated.
-Use `mycelium evolve convention --target <path-or-scope> --rationale "..."`
-to also record the event in the activity log.)_
+_(Empty. Append dated prose entries here as you adopt conventions, lessons,
+index locations, archive policy, or open questions. Revise by editing this file
+with `--rationale`; the activity log records the change and why. Do this
+proactively when a repeated pattern, mistake, durable user preference, naming
+rule, or useful index emerges.)_
 
 ## Current rules in effect
 
-Run `mycelium evolve --active` for the canonical list of active conventions,
-indexes, archives, lessons, and questions. This file is a prose companion —
-when it diverges from the activity log, **the activity log wins**.
-
-For the divergence policy in full, see ADR-0001 in the mycelium repo:
-<https://github.com/fuentesjr/mycelium/blob/main/docs/adr/0001-self-evolution-as-first-class-concept.md>
-
-To record a self-evolution event:
-
-```sh
-mycelium evolve convention --target <path-or-scope> --rationale "..."
-mycelium evolve lesson     --target <source>        --rationale "..."
-mycelium evolve question   --target <topic>         --rationale "..."
-# See: mycelium evolve --kinds --format json      for all available kinds
-```
-
-Targeted entries supersede the prior active entry for the same `(kind, target)`.
-Targetless entries are additive and remain active unless you explicitly retire
-one with `--supersedes <id>`.
+This file is the canonical list of current rules in effect. To change a rule,
+edit the rule here. To record a point-in-time decision that should remain log
+history but not become a standing convention, use `mycelium log decision` or
+`mycelium log agent_note` with `--rationale`.
 
 ## What lives where
 
@@ -46,8 +33,7 @@ find better shapes:
 - `INDEX.md` — a hand-maintained map you build as patterns emerge
 
 You will likely invent your own directories ad-hoc — that's expected. When
-a new shape stabilizes, record it with `mycelium evolve convention` and
-update this file.
+a new shape stabilizes, update this file.
 
 ## Reading your own activity
 

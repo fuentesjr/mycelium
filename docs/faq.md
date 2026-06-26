@@ -145,7 +145,7 @@ No. They're orthogonal. Claude Code's `CLAUDE.md`, Cursor's rules, and Codex's s
 
 ### How do I see what an agent has been doing in a mount?
 
-The activity log is plain JSONL at `<mount>/_activity/YYYY/MM/DD/<agent_id>.jsonl`. Every write, edit, delete, move, and `evolve` event lands there automatically; the agent can also append manual signal entries with `mycelium log`. Read it with standard tools:
+The activity log is plain JSONL at `<mount>/_activity/YYYY/MM/DD/<agent_id>.jsonl`. Every write, edit, delete, move, and explicit `log` event lands there automatically. Read it with standard tools:
 
 ```sh
 # All activity today, all agents
@@ -158,7 +158,7 @@ tail -f $MYCELIUM_MOUNT/_activity/2026/05/10/coder.jsonl
 mycelium grep --pattern '"op":"write"' --path _activity --format json
 ```
 
-For structured decisions — conventions the agent adopted, lessons distilled, regions archived — query `mycelium evolve --active` to see what rules are currently in effect, or `mycelium evolve --list` for the full timeline.
+For structured decisions — conventions the agent adopted, lessons distilled, regions archived — read `MYCELIUM_MEMORY.md` to see what rules are currently in effect, then inspect `_activity/` to see how the file changed over time.
 
 ### What does mycelium record so a future reviewer can understand why a change happened?
 
@@ -168,7 +168,7 @@ The diff is the cheap part — any version control system can tell you _what_ ch
 | ------------------ | ------------------------------------------------- | -------------------------------------- |
 | File content       | Per-note reasoning — trigger, hypothesis, outcome | The note file itself                   |
 | `--rationale` flag | Why this specific operation was performed         | Activity log entry (`rationale` field) |
-| `evolve` events    | Structural patterns/conventions the agent adopted | `_activity/` + evolve log              |
+| Conventions file   | Structural patterns/conventions currently in use  | `MYCELIUM_MEMORY.md`                   |
 | Activity log       | Who did what and when (chain of custody)          | `_activity/YYYY/MM/DD/<agent>.jsonl`   |
 
 **File contents carry the per-note reasoning.** When the agent writes an incident note, an investigation log, or a plan file, the _why_ lives in the note itself — the trigger, the hypothesis being tested, the alternatives considered and rejected. Same craft as a good commit message, applied to every note. A diff shows what changed; the note explains why. This is a convention; the binary does not enforce it.
@@ -177,11 +177,11 @@ The diff is the cheap part — any version control system can tell you _what_ ch
 
 The note-body discipline and `--rationale` are complementary: note bodies hold _why-this-thing_ (per-note reasoning embedded in content), `--rationale` holds _why-this-operation_ (the reason for the mutation or signal, captured on the activity log line). Both can coexist on the same write.
 
-**`evolve` events carry the structural decisions** — the patterns and rules the agent adopts for itself. When the agent picks a filename convention, builds an index, or archives a region, it records the choice with `mycelium evolve convention|index|archive --rationale "..."`. Rationale is required on `evolve`. `mycelium evolve --active` shows the rules currently in effect with their original reasoning attached; `mycelium evolve --list` gives the full timeline including superseded rules.
+**`MYCELIUM_MEMORY.md` carries the structural decisions** — the patterns and rules the agent adopts for itself. When the agent picks a filename convention, builds an index, or archives a region, it edits that file with `--rationale`. The file shows the current rules; the activity log shows when and why they changed.
 
-**The activity log is the chain of custody.** Every mutation lands in `<mount>/_activity/YYYY/MM/DD/<agent>.jsonl` with `agent_id`, `session_id`, timestamp, op kind, path, version hash, and (when supplied) `rationale`. With session-boundary entries (`session_startup`/`session_shutdown`, and optionally `turn_start`/`turn_end` from richer harnesses), you can group a burst of writes as one turn of one session rather than as scattered events, then cross-reference the note content and any `evolve` entries to recover the reasoning.
+**The activity log is the chain of custody.** Every mutation lands in `<mount>/_activity/YYYY/MM/DD/<agent>.jsonl` with `agent_id`, `session_id`, timestamp, op kind, path, version hash, and (when supplied) `rationale`. With session-boundary entries (`session_startup`/`session_shutdown`, and optionally `turn_start`/`turn_end` from richer harnesses), you can group a burst of writes as one turn of one session rather than as scattered events, then cross-reference note content and convention-file edits to recover the reasoning.
 
-The split is deliberate: notes carry _why-this-thing_, the `--rationale` flag carries _why-this-operation_, `evolve` events carry _why-this-pattern_, and the activity log carries _who_ and _when_. A reviewer typically reads the notes for per-decision rationale, checks the activity log for operational context attached to individual mutations, runs `mycelium evolve --active` for the workspace's current rules, and consults the activity log to reconstruct timelines or find which session a given change belonged to.
+The split is deliberate: notes carry _why-this-thing_, the `--rationale` flag carries _why-this-operation_, `MYCELIUM_MEMORY.md` carries _what pattern is active now_, and the activity log carries _who_ and _when_. A reviewer typically reads the notes for per-decision rationale, checks the activity log for operational context attached to individual mutations, reads `MYCELIUM_MEMORY.md` for the workspace's current rules, and consults the activity log to reconstruct timelines or find which session a given change belonged to.
 
 ### Should I commit a mount to git?
 
@@ -205,7 +205,7 @@ The log partitions by `_activity/YYYY/MM/DD/<agent_id>.jsonl`. In practice, grow
 
 There is no native undo command. To revert a file to a prior state, you need its prior content — either from your own memory of what it contained, from the git history if the mount is versioned, or by reading a saved copy. The activity log records every mutation with before/after version hashes, so you can see what changed and when; it does not store full snapshots of prior content.
 
-For self-evolution decisions — conventions adopted, regions archived — `mycelium evolve --list` shows the full timeline, and `mycelium evolve --active` shows what's currently in effect. To retire a specific convention, record a superseding `evolve` event with `--supersedes <id>`.
+For self-evolution decisions — conventions adopted, regions archived — `MYCELIUM_MEMORY.md` shows what's currently in effect, and `_activity/` shows the timeline of edits. To retire a specific convention, edit the file with a rationale explaining what replaced it.
 
 ---
 
@@ -213,7 +213,7 @@ For self-evolution decisions — conventions adopted, regions archived — `myce
 
 ### Is mycelium production-ready?
 
-Not yet. Mycelium is pre-1.0, currently at v0.2.1 (early access). Phase 1 is feature-complete: atomic content-addressable storage (CAS), transaction-journal crash recovery, the activity log, `evolve`, and the on-disk format are all implemented and have property-based and concurrent-process test coverage. What is not yet complete is the full benchmark validation against frontier models (T1 multi-session synthesis and T2 self-evolution runs are drafted but awaiting published runs). The [roadmap](mycelium-phases.md) lays out what Phases 2 and 3 add.
+Not yet. Mycelium is pre-1.0, currently at v0.3.0-pre (early access). Phase 1 is feature-complete: atomic content-addressable storage (CAS), transaction-journal crash recovery, the activity log, conventions-as-files, and the on-disk format are all implemented and have property-based and concurrent-process test coverage. What is not yet complete is the full benchmark validation against frontier models (T1 multi-session synthesis and T2 self-evolution runs are drafted but awaiting published runs). The [roadmap](mycelium-phases.md) lays out what Phases 2 and 3 add.
 
 The practical risk at this stage is not data loss — the core integrity primitives are solid — but rather that the API surface, on-disk format details, or activity log schema may still shift before 1.0.
 
@@ -223,7 +223,7 @@ A rubric is fully defined in [benchmarks/phase-1.md](benchmarks/phase-1.md): thr
 
 ### What's on the roadmap?
 
-Three phases. Phase 1 (current, feature-complete): the core CLI, CAS, activity log, `evolve`, crash recovery, and the pi.dev extension. Phase 2 (distribution and operational polish): a versioned activity log schema, recovery diagnostics, Claude Code skill distribution, a second harness integration (Hermes plugin or equivalent), optional read-byte caps if benchmarks call for them, and install/troubleshooting docs. Phase 3 (workflow integration): opt-in git/jj integration with per-operation commits, historical reads via `mycelium read --version=...`, configurable activity log retention, a curated templates repository, and a `mycelium init` CLI for template-based mount setup. See [the roadmap](mycelium-phases.md) for acceptance criteria per phase.
+Three phases. Phase 1 (current, feature-complete): the core CLI, CAS, activity log, conventions-as-files, crash recovery, and the pi.dev extension. Phase 2 (distribution and operational polish): a versioned activity log schema, recovery diagnostics, Claude Code skill distribution, a second harness integration (Hermes plugin or equivalent), optional read-byte caps if benchmarks call for them, and install/troubleshooting docs. Phase 3 (workflow integration): opt-in git/jj integration with per-operation commits, historical reads via `mycelium read --version=...`, configurable activity log retention, a curated templates repository, and a `mycelium init` CLI for template-based mount setup. See [the roadmap](mycelium-phases.md) for acceptance criteria per phase.
 
 ---
 
@@ -233,7 +233,7 @@ Three phases. Phase 1 (current, feature-complete): the core CLI, CAS, activity l
 
 The core bet is that general file tools scale with model intelligence, while specialized memory infrastructure caps it. A database or embedding index encodes assumptions about what gets saved, how it's indexed, and what counts as relevant. As models improve, those assumptions become drag. A filesystem has no such ceiling: `read`, `write`, `ls`, `grep` are the same interface regardless of model generation, and a Frontier model uses them with the same judgment a thoughtful engineer brings to a working notebook.
 
-There are also practical benefits. Filesystems are durable, concurrent-safe with standard primitives (`flock`, atomic rename), inspectable with every text tool, and trivially exportable as a tarball. The agent owns the schema — directory structure, filenames, organization — and can revise it without a migration. See [ADR 0001](adr/0001-self-evolution-as-first-class-concept.md) and the [design doc](mycelium-design.md) section 2 for the full argument.
+There are also practical benefits. Filesystems are durable, concurrent-safe with standard primitives (`flock`, atomic rename), inspectable with every text tool, and trivially exportable as a tarball. The agent owns the schema — directory structure, filenames, organization — and can revise it without a migration. See [ADR 0004](adr/0004-conventions-as-files.md) and the [design doc](mycelium-design.md) section 2 for the full argument.
 
 ### Why JSONL for the activity log?
 

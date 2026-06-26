@@ -5,6 +5,7 @@
 - Folded `mycelium glob <pattern>` into `mycelium ls [pattern] [--recursive]`; `glob` is no longer a subcommand.
 - Removed `mycelium grep --file-type`; use `--path` to scope searches.
 - Removed `--include-current-content` from `write`, `edit`, `rm`, and `mv`. Conflict envelopes still include `current_version`; recover by re-reading with `mycelium read <path> --format json`, merging, and retrying with the fresh version token.
+- Removed functional `mycelium evolve`; conventions, lessons, index locations, archive policy, and open questions now live in `MYCELIUM_MEMORY.md`. A hidden transitional `evolve` stub exits with guidance for old prompts and templates.
 
 ## [0.2.1] - 2026-05-29
 

@@ -37,9 +37,9 @@ gets resolved.
 - **`before_agent_start`** — appends a system-prompt block with the small public
   model — a folder, safe mutations, and a searchable activity log — then tiers
   the `mycelium` subcommands into everyday, occasional, and metadata commands.
-  It also includes conventions, identity, conflict recovery, the project's
-  evolution kinds, active evolution, and a rationale nudge for operations whose
-  reasoning is worth preserving. Chains off `event.systemPrompt` so other
+  It also includes the conventions-file path, identity, conflict recovery, and
+  a rationale nudge for operations whose reasoning is worth preserving. Chains
+  off `event.systemPrompt` so other
   extensions' contributions are preserved.
 - **turn/tool/context events** — records `turn_start`, `turn_end`,
   `tool_start`, `tool_end`, `compaction`, and deduped `context_checkpoint`

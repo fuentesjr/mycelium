@@ -5,13 +5,8 @@ import {
 	systemPromptAvailable,
 	systemPromptUnavailable,
 } from "./system-prompt.js";
-import type {
-	EvolutionKindRow,
-	ActiveEvolutionEvent,
-} from "./system-prompt.js";
 import { createActivityLogRecorder } from "./activity-log.js";
 import { bootstrapMemoryFile } from "./bootstrap.js";
-import { runMyceliumJSON, runMyceliumNDJSON } from "./mycelium.js";
 
 export default function (pi: ExtensionAPI) {
 	const activity = createActivityLogRecorder();
@@ -42,27 +37,10 @@ export default function (pi: ExtensionAPI) {
 			};
 		}
 
-		const [kinds, activeEvolution] = await Promise.all([
-			runMyceliumJSON<EvolutionKindRow[]>(pi, binaryPath, [
-				"evolve",
-				"--kinds",
-				"--format",
-				"json",
-			]).then((r) => r ?? []),
-			runMyceliumNDJSON<ActiveEvolutionEvent>(pi, binaryPath, [
-				"evolve",
-				"--active",
-				"--format",
-				"json",
-			]),
-		]);
-
 		const block = systemPromptAvailable({
 			mountPath,
 			agentId: process.env.MYCELIUM_AGENT_ID!,
 			sessionId: process.env.MYCELIUM_SESSION_ID!,
-			kinds,
-			activeEvolution,
 		});
 
 		return { systemPrompt: event.systemPrompt + "\n\n" + block };

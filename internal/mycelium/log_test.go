@@ -1,7 +1,6 @@
 package mycelium
 
 import (
-	"bufio"
 	"encoding/json"
 	"io"
 	"os"
@@ -37,21 +36,15 @@ func readLogLines(t *testing.T, mount string) []LogEntry {
 
 	var entries []LogEntry
 	for _, path := range matches {
-		data, err := os.ReadFile(path)
-		if err != nil {
-			t.Fatalf("read %s: %v", path, err)
-		}
-		sc := bufio.NewScanner(strings.NewReader(string(data)))
-		for sc.Scan() {
-			line := sc.Text()
-			if line == "" {
-				continue
-			}
+		if err := scanJSONLinesFile(path, func(line []byte) error {
 			var e LogEntry
-			if err := json.Unmarshal([]byte(line), &e); err != nil {
+			if err := json.Unmarshal(line, &e); err != nil {
 				t.Fatalf("unmarshal log line %q: %v", line, err)
 			}
 			entries = append(entries, e)
+			return nil
+		}); err != nil {
+			t.Fatalf("scan %s: %v", path, err)
 		}
 	}
 	return entries
@@ -661,7 +654,7 @@ func TestLogNoPayloadAbsentOnEntry(t *testing.T) {
 	}
 }
 
-func TestLargePayloadLogDoesNotBreakEvolutionScan(t *testing.T) {
+func TestLargePayloadLogAccepted(t *testing.T) {
 	mount := t.TempDir()
 	t.Setenv("MYCELIUM_MOUNT", mount)
 
@@ -671,16 +664,14 @@ func TestLargePayloadLogDoesNotBreakEvolutionScan(t *testing.T) {
 		t.Fatalf("large log rc: got %d (stderr=%q)", rc, errOut)
 	}
 
-	_, errOut, rc = runDispatch(t, "evolve", "convention", "--target", "scanner", "--rationale", "large payload smoke")
-	if rc != ExitOK {
-		t.Fatalf("evolve after large log rc: got %d (stderr=%q)", rc, errOut)
+	entries := readLogLines(t, mount)
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
 	}
-
-	out, errOut, rc := runDispatch(t, "evolve", "--list")
-	if rc != ExitOK {
-		t.Fatalf("evolve --list rc: got %d (stderr=%q)", rc, errOut)
+	if entries[0].Op != "large_payload" {
+		t.Fatalf("op: got %q, want large_payload", entries[0].Op)
 	}
-	if !strings.Contains(out, "large payload smoke") {
-		t.Fatalf("evolve --list output missing evolution entry: %q", out)
+	if !strings.Contains(string(entries[0].Payload), strings.Repeat("x", 1024)) {
+		t.Fatalf("payload missing repeated blob")
 	}
 }

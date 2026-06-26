@@ -1,6 +1,6 @@
 # ADR 0003: Optional rationale on rationale-bearing operations
 
-- **Status:** Accepted
+- **Status:** Accepted; evolve-specific context superseded by ADR-0004
 - **Date:** 2026-05-12
 - **Deciders:** Sal Fuentes Jr.
 
@@ -8,13 +8,14 @@
 > stable linking. The accepted decision is broader than the original
 > proposal: rationale is captured on `write`, `edit`, `rm`, `mv`, and
 > `log` — and propagated through the CAS conflict envelope.
+> ADR-0004 later removed the functional `evolve` command; the rationale
+> decision for `write`, `edit`, `rm`, `mv`, and `log` remains active.
 
 ## Context
 
-Mycelium asks agents to capture rationale at the moment of decision. For
-structural decisions, the `evolve` command enforces this: `--rationale`
-is required, and the binary errors out (`mycelium evolve: --rationale is
-required`) when it is missing (`internal/mycelium/evolve.go`).
+Mycelium asks agents to capture rationale at the moment of decision. At the
+time this ADR was accepted, structural decisions used the now-superseded
+`evolve` command, which required `--rationale`.
 
 For per-note content and other mutations, no such mechanism exists. The
 README's "What agents record" section frames rationale capture as a
@@ -50,7 +51,7 @@ gives false confidence that reasoning is being captured when it isn't.
 Add an **optional** `--rationale` flag to every rationale-bearing CLI
 verb: `write`, `edit`, `rm`, `mv`, and `log`. When supplied, the
 rationale is captured into the corresponding activity log entry as a
-new top-level field, parallel to how `evolve` records rationale today.
+new top-level field, parallel to how `evolve` recorded rationale at the time.
 When absent, behavior is unchanged and the field is omitted from the
 log entry.
 
@@ -89,10 +90,8 @@ Rationale string `json:"rationale,omitempty"`
 Rationale string `json:"rationale,omitempty"`
 ```
 
-- Maximum size: 64 KiB, matching `maxRationaleSize` from
-  `internal/mycelium/evolve.go`. Oversize input is rejected before the
-  mutation runs with exit code `ExitReservedPrefix` (65), matching
-  `evolve`'s existing convention for rationale-validation failures.
+- Maximum size: 64 KiB. Oversize input is rejected before the mutation runs
+  with exit code `ExitReservedPrefix` (65).
 - `omitempty` ensures both fields are absent from log entries and
   envelopes when no rationale is supplied — existing log readers and
   JSONL fixtures remain valid without migration.

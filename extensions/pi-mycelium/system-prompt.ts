@@ -1,122 +1,27 @@
-/** Shape of one row returned by `mycelium evolve --kinds --format json`. */
-export interface EvolutionKindRow {
-	name: string;
-	definition: string;
-	defined_at_version?: string;
-	source: "builtin" | "agent";
-	event_count: number;
-}
-
-/** Shape of one entry returned by `mycelium evolve --active --format json`. */
-export interface ActiveEvolutionEvent {
-	ts: string;
-	agent_id: string;
-	session_id: string;
-	op: string;
-	id: string;
-	kind: string;
-	target?: string;
-	supersedes?: string;
-	rationale: string;
-}
-
 export interface AvailableContext {
 	mountPath: string;
 	agentId: string;
 	sessionId: string;
-	kinds: EvolutionKindRow[];
-	activeEvolution: ActiveEvolutionEvent[];
 }
 
 export interface UnavailableContext {
 	mountPath: string;
 }
 
-const ACTIVE_EVOLUTION_DISPLAY_LIMIT = 10;
-const RATIONALE_TRUNCATE_LENGTH = 200;
+function renderConventionsSection(memoryPath: string): string {
+	return `### Conventions file
 
-function renderKindsSection(kinds: EvolutionKindRow[]): string {
-	if (kinds.length === 0) {
-		return `### Evolution kinds
+Conventions for organizing and operating this store live in \`${memoryPath}\`.
+Read that exact file once at session start. Do not broad-search to rediscover
+required files; if the path is missing, report it instead of guessing.
 
-Evolution surface unavailable — \`mycelium evolve --kinds\` did not return data.`;
-	}
-
-	const rows = kinds
-		.map((k) => `| \`${k.name}\` | ${k.source} | ${k.definition} |`)
-		.join("\n");
-
-	return `### Evolution kinds
-
-The following kinds are available in this mount. Built-in kinds ship with
-mycelium; agent kinds were introduced by a prior session on this mount.
-
-| Kind | Source | Definition |
-|------|--------|------------|
-${rows}
-
-To introduce a new kind, pass \`--kind-definition "..."\` on first use.`;
-}
-
-function renderActiveEvolutionSection(active: ActiveEvolutionEvent[]): string {
-	if (active.length === 0) {
-		return `### Active evolution
-
-No active evolution recorded yet. Use \`mycelium evolve\` to record conventions, lessons, indices, archives, or open questions.`;
-	}
-
-	const displayItems = active.slice(0, ACTIVE_EVOLUTION_DISPLAY_LIMIT);
-	const overflow = active.length - displayItems.length;
-
-	const lines = displayItems.map((e) => {
-		const target = e.target ? ` ${e.target}` : "";
-		const rationale =
-			e.rationale.length > RATIONALE_TRUNCATE_LENGTH
-				? e.rationale.slice(0, RATIONALE_TRUNCATE_LENGTH) + "…"
-				: e.rationale;
-		return `- [${e.kind}]${target} — ${rationale}`;
-	});
-
-	const footer =
-		overflow > 0
-			? `\n\n...and ${overflow} more — run \`mycelium evolve --active\` for the full list.`
-			: "";
-
-	return `### Active evolution
-
-The conventions, lessons, and other evolution currently in force on this mount:
-
-${lines.join("\n")}${footer}`;
-}
-
-function renderRecordingEvolutionSection(): string {
-	return `### Recording evolution
-
-Use \`mycelium evolve\` to record structured evolution decisions. This is
-metadata only — it never mutates the store and is not a second memory system;
-it is typed activity-log history for conventions, lessons, indices, archives,
-and questions.
-
-When to call it:
-
-- Adopting or retiring a convention (covers structural *or* behavioral patterns):
-  \`mycelium evolve convention --target <path-or-glob-or-scope> --rationale "..."\`
-  Path-scoped example: \`--target notes/incidents/ --rationale "Use <date>-<slug>.md filenames."\`
-  Behavior-scoped example: \`--target memory-discipline --rationale "Record durable preferences proactively."\`
-- Building or regenerating a derived index:
-  \`mycelium evolve index --target <path> --rationale "..."\`
-- Archiving a region (run \`mycelium mv\` separately to move the files):
-  \`mycelium evolve archive --target <path> --rationale "..."\`
-- Distilling a lesson from past work:
-  \`mycelium evolve lesson --rationale "..."\`
-- Opening a tracked unknown:
-  \`mycelium evolve question --target <path-or-topic> --rationale "..."\`
-- When built-in kinds don't fit, introduce a new kind on first use:
-  \`mycelium evolve experiment --target ... --kind-definition "An in-progress hypothesis I'm actively testing." --rationale "..."\`
-
-The \`--target\` flag is optional for kinds that aren't path-scoped (e.g.
-\`lesson\`). When superseding a prior entry, the binary detects it automatically
-via non-empty \`(kind, target)\` matching — no need to pass \`--supersedes\` manually for targeted entries. Targetless entries are additive unless you pass \`--supersedes\` explicitly.`;
+Record durable rules by editing that file with \`--rationale\`. Use dated prose
+entries for conventions, lessons, index locations, archive policy, and open
+questions. Be proactive: when a repeated pattern, mistake, durable user
+preference, naming rule, or useful index emerges, update the conventions file in
+the same session instead of leaving the lesson implicit. For point-in-time
+signals that do not belong in the conventions file, use
+\`mycelium log decision|agent_note --rationale "..."\`.`;
 }
 
 function renderActivityEventsSection(): string {
@@ -158,14 +63,9 @@ Occasional commands:
 - \`mycelium mv <src> <dst> [--rationale STR]\` — atomic rename (fails if \`<dst>\` exists)
 
 Metadata commands:
-- \`mycelium evolve ...\` — record/query typed activity-log entries for durable conventions, lessons, indices, archives, and questions
 - \`mycelium log <op> [--path PATH] [--payload-json STR | --stdin] [--rationale STR]\` — append an arbitrary signal; mostly adapter-facing
 
-Conventions for organizing this store live in \`${memoryPath}\`.
-Read that exact file once at session start. Do not broad-search to rediscover
-required files; if the path is missing, report it instead of guessing.
-Revise it whenever you find a better way to organize what you're working with
-— it's yours.
+${renderConventionsSection(memoryPath)}
 
 Operational rationale: \`write\`, \`edit\`, \`rm\`, \`mv\`, and \`log\` accept an
 optional \`--rationale "..."\` flag (≤64 KiB). Supply it when the operation
@@ -203,16 +103,7 @@ automatically, so use \`mycelium log <op> --stdin\` only for signals you'd want
 to grep later — e.g. a \`decision\` or \`agent_note\` with rationale.
 
 This session's identity: MYCELIUM_AGENT_ID=${c.agentId}, MYCELIUM_SESSION_ID=${c.sessionId}.
-
----
-
-## Self-evolution
-
-${renderKindsSection(c.kinds)}
-
-${renderActiveEvolutionSection(c.activeEvolution)}
-
-${renderRecordingEvolutionSection()}`;
+`;
 }
 
 export function systemPromptUnavailable(c: UnavailableContext): string {
