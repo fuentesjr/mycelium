@@ -156,6 +156,21 @@ Or via `go install`:
 go install ./cmd/mycelium
 ```
 
+### Agent skill
+
+The portable skill lives at [`skills/mycelium/`](skills/mycelium/). Copy that
+directory into a Codex- or Claude-style skill directory when you want shell
+agents to receive Mycelium-specific operating guidance without the pi.dev
+adapter.
+
+```
+cp -R skills/mycelium ~/.codex/skills/mycelium
+# or: cp -R skills/mycelium ~/.claude/skills/mycelium
+```
+
+The skill expects a `mycelium` binary on `PATH` and `MYCELIUM_MOUNT` set. Run
+`skills/mycelium/scripts/doctor` to check a local setup.
+
 ### Pi extension
 
 The extension ships on npm and bundles the platform-matching

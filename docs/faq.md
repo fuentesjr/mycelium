@@ -103,7 +103,13 @@ make build
 sudo install cmd/mycelium/mycelium /usr/local/bin/
 ```
 
-Or via `go install ./cmd/mycelium`. For pi.dev, the `pi-mycelium` npm extension bundles the platform-matching binary and handles PATH setup automatically:
+Or via `go install ./cmd/mycelium`.
+
+For Codex- or Claude-style skill directories, copy `skills/mycelium/` into the
+harness's skill path and make sure `mycelium` is on `PATH` with
+`MYCELIUM_MOUNT` set. The skill's `scripts/doctor` helper checks that setup.
+
+For pi.dev, the `pi-mycelium` npm extension bundles the platform-matching binary and handles PATH setup automatically:
 
 ```sh
 pi install npm:pi-mycelium        # global

@@ -30,7 +30,7 @@ Mycelium is LocalFS/POSIX-native. The roadmap below keeps that guarantee set ins
 - Typed conflict errors. When `--expected-version` doesn't match, `mycelium` exits 64 and prints structured JSON to stderr containing the current version token. Recovery is re-read, merge, retry.
 - Raw-read/raw-write boundary: raw filesystem reads are allowed; raw filesystem writes are unsupported. All live-store mutations go through `mycelium`.
 - Reserved `_` prefix. `mycelium` rejects agent mutations under any `_`-prefixed root path; currently `_activity/` and `_lock` are system-owned, with legacy `_tx/` detected for compatibility.
-- Reference agent harness: pi.dev extension. It registers no tools — the agent invokes `mycelium` via pi's built-in `bash` tool — and contributes only env-var setup, a small system-prompt block, starter convention seeding, and portable activity logging (`context_checkpoint`, turn/tool boundaries, compaction).
+- Reference agent harness: pi.dev extension. It registers no tools — the agent invokes `mycelium` via pi's built-in `bash` tool — and contributes only env-var setup, a small system-prompt block, starter convention seeding, and memory-relevant portable activity logging (`session_*`, `context_checkpoint`, `compaction`).
 - Documentation for starter conventions, self-evolution recipes, and conflict-resolution conventions.
 
 **Out of scope, with reasons.**

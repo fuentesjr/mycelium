@@ -1,0 +1,4 @@
+interface:
+  display_name: "Mycelium"
+  short_description: "Persistent file memory for coding agents"
+  default_prompt: "Use $mycelium to work with the project's persistent Mycelium memory store."

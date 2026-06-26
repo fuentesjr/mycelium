@@ -11,16 +11,13 @@ export interface UnavailableContext {
 function renderConventionsSection(memoryPath: string): string {
 	return `### Conventions file
 
-Conventions for organizing and operating this store live in \`${memoryPath}\`.
-Read that exact file once at session start. Do not broad-search to rediscover
-required files; if the path is missing, report it instead of guessing.
+Read \`${memoryPath}\` once at session start. It is the active rule set for
+naming, user preferences, index locations, archive policy, lessons, and open
+questions. Do not broad-search for a substitute.
 
-Record durable rules by editing that file with \`--rationale\`. Use dated prose
-entries for conventions, lessons, index locations, archive policy, and open
-questions. Be proactive: when a repeated pattern, mistake, durable user
-preference, naming rule, or useful index emerges, update the conventions file in
-the same session instead of leaving the lesson implicit. For point-in-time
-signals that do not belong in the conventions file, use
+When a durable pattern, mistake, preference, index, or open question emerges,
+edit that file in the same session with \`--rationale\`. For point-in-time
+signals that should remain history but not become standing guidance, use
 \`mycelium log decision|agent_note --rationale "..."\`.`;
 }
 
@@ -33,11 +30,8 @@ The pi-mycelium adapter automatically records portable activity events under
 legacy \`context_signal\` entries; treat \`context_signal\` as a low-detail
 context checkpoint.
 
-These event names are adapter conventions, not binary-enforced schema. Payloads
-are metadata-only by default (counts, roles, fingerprints, duplicate counts),
-not full prompt/tool/file contents. Read them with
-\`mycelium grep --path _activity --pattern context_checkpoint --format json\` or
-other normal file/search tools.`;
+Payloads are metadata-only by default. Read them with normal file/search tools,
+for example \`mycelium grep --path _activity --pattern context_checkpoint --format json\`.`;
 }
 
 export function systemPromptAvailable(c: AvailableContext): string {
@@ -52,55 +46,42 @@ Mental model: **a folder + safe mutations + a searchable activity log**.
 Most work uses the everyday commands; the rest are occasional or metadata-only.
 
 Everyday commands via the \`bash\` tool:
-- \`mycelium read <path> [--format text|json]\` — read a file; JSON includes UTF-8 content plus version for CAS
-- \`mycelium write <path> [--rationale STR]\` — write or overwrite (content via stdin)
-- \`mycelium edit <path> --old <str> --new <str> [--rationale STR]\` — find/replace a unique substring
-- \`mycelium ls [pattern] [--recursive]\` — list entries, optionally filtered by glob pattern
-- \`mycelium grep --pattern <str> [--path P] [--format json] [--limit N]\` — search content
+- \`mycelium read <path> [--format text|json]\`
+- \`mycelium write <path> [--expected-version SHA] [--rationale STR]\`
+- \`mycelium edit <path> --old STR --new STR [--expected-version SHA] [--rationale STR]\`
+- \`mycelium ls [pattern] [--recursive]\`
+- \`mycelium grep --pattern STR [--path P] [--format json] [--limit N]\`
 
 Occasional commands:
-- \`mycelium rm <path> [--rationale STR]\` — delete
-- \`mycelium mv <src> <dst> [--rationale STR]\` — atomic rename (fails if \`<dst>\` exists)
+- \`mycelium rm <path> [--expected-version SHA] [--rationale STR]\`
+- \`mycelium mv <src> <dst> [--expected-version SHA] [--rationale STR]\`
 
 Metadata commands:
-- \`mycelium log <op> [--path PATH] [--payload-json STR | --stdin] [--rationale STR]\` — append an arbitrary signal; mostly adapter-facing
+- \`mycelium log <op> [--path PATH] [--payload-json STR | --stdin] [--rationale STR]\`
 
 ${renderConventionsSection(memoryPath)}
 
-Operational rationale: \`write\`, \`edit\`, \`rm\`, \`mv\`, and \`log\` accept an
-optional \`--rationale "..."\` flag (≤64 KiB). Supply it when the operation
-carries reasoning a future reviewer would need — what triggered the change,
-what alternative you rejected, why this and not that. Captured into the
-activity log line as a top-level \`rationale\` field and into the CAS
-conflict envelope on conflicts. Skip it for routine appends, status
-updates, and saved artifacts where no separable reasoning exists; a
-forced placeholder is worse than no field.
-
-Concurrency: \`write\`, \`edit\`, \`rm\`, and \`mv\` accept an optional
-\`--expected-version <sha>\` flag for optimistic concurrency. On a stale token
-or an \`mv\` destination collision, the command exits 64 and prints one line of
-JSON to stderr:
+Use \`--rationale\` when the operation carries reasoning a future reviewer
+would need. Use \`--expected-version\` for edits, content-based deletes, and
+revisions to files read this session. On a stale token or an \`mv\` destination
+collision, the command exits 64 and prints one JSON line:
 
 \`\`\`
 {"error":"conflict","op":"write","path":"foo.md","current_version":"sha256:...","expected_version":"sha256:..."}
 {"error":"destination_exists","op":"mv","path":"dst.md","current_version":"sha256:..."}
 \`\`\`
 
-Standard recovery: re-read with \`mycelium read <path> --format json\`,
-merge with the current content, and retry with the fresh version token.
+Recovery: re-read with \`mycelium read <path> --format json\`, merge, and retry
+with the fresh version token.
 
 Reserved paths: \`mycelium\` rejects writes to any first-segment path beginning
-with \`_\`. \`_activity/YYYY/MM/DD/${c.agentId}.jsonl\` is auto-generated metadata for every
-mutation you perform. It is read-only to you, but greppable: try
-\`mycelium grep --path _activity --format json --pattern <str>\` to look back across
-sessions. Payloads from \`mycelium log\` are inlined on each entry as a \`payload\`
-field — no separate file to look up. Other \`_\` paths are internal; do not edit them.
+with \`_\`. \`_activity/YYYY/MM/DD/${c.agentId}.jsonl\` is auto-generated,
+read-only history. Other \`_\` paths are internal; do not edit them.
 
 ${renderActivityEventsSection()}
 
-When to log explicitly: this extension already records portable activity events
-automatically, so use \`mycelium log <op> --stdin\` only for signals you'd want
-to grep later — e.g. a \`decision\` or \`agent_note\` with rationale.
+Use explicit \`mycelium log\` only for signals you'd want to grep later, such as
+\`decision\` or \`agent_note\` with rationale.
 
 This session's identity: MYCELIUM_AGENT_ID=${c.agentId}, MYCELIUM_SESSION_ID=${c.sessionId}.
 `;

@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+set -u
+
+status=0
+
+say_ok() { printf 'ok: %s\n' "$1"; }
+say_warn() { printf 'warn: %s\n' "$1"; }
+say_err() {
+  printf 'error: %s\n' "$1" >&2
+  status=1
+}
+
+if command -v mycelium >/dev/null 2>&1; then
+  binary="$(command -v mycelium)"
+  say_ok "mycelium found at $binary"
+else
+  say_err "mycelium is not on PATH"
+fi
+
+if [ -n "${MYCELIUM_MOUNT:-}" ]; then
+  say_ok "MYCELIUM_MOUNT=$MYCELIUM_MOUNT"
+  if [ -d "$MYCELIUM_MOUNT" ]; then
+    say_ok "mount directory exists"
+  else
+    say_warn "mount directory does not exist yet"
+  fi
+else
+  say_err "MYCELIUM_MOUNT is not set"
+fi
+
+if command -v mycelium >/dev/null 2>&1 && [ -n "${MYCELIUM_MOUNT:-}" ]; then
+  if mycelium ls >/dev/null 2>&1; then
+    say_ok "mycelium ls works against the mount"
+  else
+    say_err "mycelium ls failed against the mount"
+  fi
+
+  if mycelium read MYCELIUM_MEMORY.md --format json >/dev/null 2>&1; then
+    say_ok "MYCELIUM_MEMORY.md is readable"
+  else
+    say_warn "MYCELIUM_MEMORY.md is not readable; initialize or report this when needed"
+  fi
+fi
+
+exit "$status"

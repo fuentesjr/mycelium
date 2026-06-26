@@ -1,5 +1,9 @@
 ## [0.3.0] - Unreleased
 
+### Added
+
+- Added `skills/mycelium/`, a portable Agent Skill with concise operating guidance, command/conflict/activity references, and read-only setup diagnostics for shell-based harnesses.
+
 ### Changed (mycelium binary)
 
 - Folded `mycelium glob <pattern>` into `mycelium ls [pattern] [--recursive]`; `glob` is no longer a subcommand.

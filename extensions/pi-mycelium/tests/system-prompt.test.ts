@@ -37,9 +37,9 @@ describe("systemPromptAvailable", () => {
 
 	it("points agents at the conventions file instead of broad rediscovery", () => {
 		expect(block).toContain("### Conventions file");
-		expect(block).toContain("Read that exact file once at session start");
-		expect(block).toContain("Do not broad-search to rediscover");
-		expect(block).toContain("Record durable rules by editing that file");
+		expect(block).toContain("Read `/test/store/MYCELIUM_MEMORY.md` once at session start");
+		expect(block).toContain("Do not broad-search for a substitute");
+		expect(block).toContain("edit that file in the same session");
 		expect(block).toContain("mycelium log decision|agent_note");
 	});
 
