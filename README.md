@@ -297,10 +297,10 @@ A future agent asking "why are incidents named this way?" gets the
 current rule by reading `MYCELIUM_MEMORY.md`, and the activity log
 preserves the full history of how that rule changed and why.
 
-See [`docs/self-evolution.md`](docs/self-evolution.md) for the file-based
-self-evolution recipes and
-[`docs/portable-activity-events.md`](docs/portable-activity-events.md)
-for adapter event conventions.
+See [`skills/mycelium/references/memory-guidance.md`](skills/mycelium/references/memory-guidance.md)
+for file-based memory recipes and
+[`docs/portable-activity-events.md`](docs/portable-activity-events.md) for
+adapter event conventions.
 
 ## Documentation
 
@@ -308,12 +308,11 @@ for adapter event conventions.
 
 - [`docs/faq.md`](docs/faq.md) — common questions about adopting, integrating, and operating mycelium.
 - [`docs/mycelium-design.md`](docs/mycelium-design.md) — design rationale, architecture, principles.
-- [`docs/self-evolution.md`](docs/self-evolution.md) — convention bootstrap, self-built indices, archiving patterns.
+- [`skills/mycelium/`](skills/mycelium/) — portable agent-facing skill and operational references.
 
 **Reference:**
 
 - [`docs/mycelium-phases.md`](docs/mycelium-phases.md) — phasing roadmap; what's in scope when, and why.
-- [`docs/conflict-resolution.md`](docs/conflict-resolution.md) — multi-agent conflict-resolution conventions.
 - [`docs/portable-activity-events.md`](docs/portable-activity-events.md) — adapter event vocabulary and payload conventions.
 - [`docs/benchmarks/phase-1.md`](docs/benchmarks/phase-1.md) — validation rubric, target models, scoring.
 - [`docs/adr/`](docs/adr/) — architecture decision records.
@@ -330,8 +329,9 @@ for adapter event conventions.
   into pi sessions: env vars, a system-prompt block, and portable
   activity events. Registers no tools; agents invoke `mycelium`
   through pi's built-in `bash`.
-- **`docs/`** — design, phasing, conflict-resolution, self-evolution,
-  benchmarks, ADRs.
+- **`docs/`** — design, phasing, self-evolution, benchmarks, ADRs.
+- **`skills/mycelium/`** — portable agent-facing skill with command,
+  conflict, activity-log, and memory-guidance references.
 
 ## Development
 

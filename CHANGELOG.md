@@ -17,6 +17,10 @@
 
 - Stopped emitting turn/tool telemetry from the reference adapter. It now records session boundaries, `session_shutdown`, `compaction`, and deduped `context_checkpoint` entries only; the portable vocabulary remains available for richer adapters.
 
+### Changed (docs)
+
+- Consolidated agent-facing operational guidance into `skills/mycelium/`; removed the old `docs/agent-faq.md`, `docs/conflict-resolution.md`, and `docs/self-evolution.md` duplicates.
+
 ## [0.2.1] - 2026-05-29
 
 ### Fixed (pi-mycelium extension)

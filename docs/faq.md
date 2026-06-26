@@ -1,6 +1,6 @@
 # Mycelium FAQ
 
-> Quick answers for people considering, integrating, or operating mycelium. If you're an AI agent reading mycelium's docs, see [agent-faq.md](agent-faq.md) for the operational reference.
+> Quick answers for people considering, integrating, or operating mycelium. If you're an AI agent reading mycelium's docs, use the portable skill in [`../skills/mycelium/`](../skills/mycelium/).
 
 ## Table of contents
 
@@ -82,7 +82,7 @@ If the process dies before the content commit, the target file is unchanged. If 
 
 ### Two agents writing the same file at the same instant — what happens?
 
-One wins; the other gets a structured conflict rather than silent data loss. The winning write returns a new SHA-256 version token. The losing write — if it used `--expected-version` — exits with code 64 and a JSON envelope containing the winner's version token and, optionally, the winner's content. The losing agent re-reads, merges in memory, and retries with the fresh version. See [conflict resolution](conflict-resolution.md) for the re-read/merge/retry pattern and guidance on when unconditional writes are acceptable.
+One wins; the other gets a structured conflict rather than silent data loss. The winning write returns a new SHA-256 version token. The losing write — if it used `--expected-version` — exits with code 64 and a JSON envelope containing the winner's version token. The losing agent re-reads, merges in memory, and retries with the fresh version. The design doc's concurrency section and [`skills/mycelium/references/conflicts.md`](../skills/mycelium/references/conflicts.md) document the re-read/merge/retry pattern.
 
 ### Will it work on iCloud / Dropbox / NFS / Windows?
 
@@ -143,7 +143,7 @@ Yes. `pi-mycelium` is a convenience wrapper, not a requirement. Any agent harnes
 
 No. They're orthogonal. Claude Code's `CLAUDE.md`, Cursor's rules, and Codex's session context are session-scoped prompt injections managed by those harnesses. Mycelium is a durable on-disk store the agent reads and writes. They coexist: the harness-level memory shapes how the agent behaves; mycelium preserves what the agent has written across sessions.
 
-> **See also:** [README](../README.md) for full install details · [agent-faq.md](agent-faq.md) for the operational reference · [portable activity events spec](portable-activity-events.md) for advanced observability configuration.
+> **See also:** [README](../README.md) for full install details · [`skills/mycelium/`](../skills/mycelium/) for agent-facing operating guidance · [portable activity events spec](portable-activity-events.md) for advanced observability configuration.
 
 ---
 

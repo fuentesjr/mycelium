@@ -250,6 +250,31 @@ No user-facing multi-file transactions. If the agent wants atomicity across seve
 
 Locks are not exposed as the primary coordination mechanism. They introduce timeouts, deadlocks, and lifecycle questions at the agent layer. CAS via versioned writes degrades cleanly: a conflict is just an error to read, reason about, and handle.
 
+### Conflict recovery convention
+
+The conflict recovery pattern is **re-read, merge, retry**:
+
+1. Re-read the path with `mycelium read <path> --format json` so content and
+   version come from the same observation.
+2. Merge the intended change with the current state.
+3. Retry with the fresh `version` token, or deliberately omit
+   `--expected-version` only when last-writer-wins is acceptable.
+
+Operation-specific guidance:
+
+- `write`: apply the intended addition or rewrite against current bytes rather
+  than overwriting the stale view.
+- `edit`: re-locate the substring; if it is gone, decide whether the change is
+  still semantically correct.
+- `rm`: re-read before deleting when deletion is based on observed content.
+- `mv destination_exists`: read the destination first; choosing a new path,
+  deleting the destination, or aborting is a content decision.
+
+Stop instead of looping when repeated conflicts show another active writer, the
+current content contradicts the intended change, or a destination collision has
+valuable content. Agent-facing quick guidance lives in
+`skills/mycelium/references/conflicts.md`.
+
 **Identity** is set once by the harness via the env vars in section 4 and recorded on every log entry. By default it isn't used for access control — every mounted agent has equal permissions and the same view of the log.
 
 ---
@@ -280,7 +305,7 @@ Three primitives, all from section 4:
 2. **State awareness and modification via standard file tools.** Self-evolution adds no content mutation verbs; it gives the agent reasons to use existing ones differently.
 3. **Conventions as files.** Current rules live in editable text (`MYCELIUM_MEMORY.md`, `INDEX.md`, an agent-written `ARCHIVE_POLICY.md`). Changing the file is the supersession mechanism. The activity log records each edit and its rationale.
 
-Patterns that emerge — convention bootstrap, convention revision, self-built indexes, archiving and pruning — are documented as recipes in `docs/self-evolution.md`.
+Patterns that emerge — convention bootstrap, convention revision, self-built indexes, archiving and pruning — are documented for agents in `skills/mycelium/references/memory-guidance.md`.
 
 What the system does _not_ do: run a reflection step between turns; analyze patterns or detect drift for the agent; maintain or update convention files on the agent's behalf; enforce that conventions are read before acting. Doing any of these would re-introduce the capability coupling this principle exists to reject. The system makes self-evolution _possible_; the agent _does_ it.
 
