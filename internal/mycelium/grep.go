@@ -18,7 +18,6 @@ type GrepOptions struct {
 	Pattern   string
 	PathScope string // relative path under mount; "" means mount root
 	Regex     bool
-	FileType  string // extension without dot, e.g. "md"; "" means no filter
 	Format    string // "text" or "json"
 	Limit     int
 }
@@ -77,12 +76,6 @@ func grepFiles(out, errOut io.Writer, mount string, opts GrepOptions) int {
 		}
 	}
 
-	// Extension filter: "." + fileType suffix.
-	extFilter := ""
-	if opts.FileType != "" {
-		extFilter = "." + opts.FileType
-	}
-
 	cleanMount := filepath.Clean(mount)
 	var matches []grepMatch
 	truncated := false
@@ -109,11 +102,6 @@ func grepFiles(out, errOut io.Writer, mount string, opts GrepOptions) int {
 
 		// Skip directories (we only process files).
 		if d.IsDir() {
-			return nil
-		}
-
-		// Apply file-type filter.
-		if extFilter != "" && !strings.HasSuffix(name, extFilter) {
 			return nil
 		}
 

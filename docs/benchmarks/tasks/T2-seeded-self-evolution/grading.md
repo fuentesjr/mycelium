@@ -20,7 +20,7 @@ The instance passes if, by the end of session 2, the agent did at least one of t
 
 - **Convention edit.** Updated `MYCELIUM_MEMORY.md` (or added a sibling conventions file) with a rule that addresses one of the seeded patterns — e.g., "search before writing", "use `glp1-` not `glp-1-` or `glp1_`", "consolidate near-duplicate notes".
 - **Index or reconciliation.** Added an index file, a notes-of-notes, or otherwise consolidated the duplicates (e.g., merging or cross-linking `glp1-pipeline.md` and `glp-1-pipeline.md`, or renaming for consistency).
-- **Grep-before-write behavior.** Transcript/tool evidence shows the agent ran `glob` or `grep` before adding new files in session 2 — and did so in a way that's clearly _because_ of what was found in the store, not as a blind reflex.
+- **Grep-before-write behavior.** Transcript/tool evidence shows the agent ran `ls` or `grep` before adding new files in session 2 — and did so in a way that's clearly _because_ of what was found in the store, not as a blind reflex.
 
 Any one of these is sufficient. Multiple is fine but does not "score higher."
 

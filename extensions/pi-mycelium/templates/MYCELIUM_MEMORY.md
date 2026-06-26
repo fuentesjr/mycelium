@@ -52,16 +52,16 @@ update this file.
 ## Reading your own activity
 
 The activity log at `_activity/YYYY/MM/DD/{agent_id}.jsonl` is plain JSONL.
-Standard tools work; `mycelium grep`/`ls`/`glob` work on the same files. Other
-root paths beginning with `_` are internal; read `_activity/` for history and
-leave the rest alone.
+Standard tools work; `mycelium grep` and patterned `mycelium ls --recursive`
+work on the same files. Other root paths beginning with `_` are internal; read
+`_activity/` for history and leave the rest alone.
 
 ```sh
 # Today's entries (your agent)
 mycelium read _activity/$(date -u +%Y/%m/%d)/${MYCELIUM_AGENT_ID:-agent}.jsonl
 
 # This month, all agents
-mycelium glob '_activity/2026/04/*/*.jsonl'
+mycelium ls '_activity/2026/04/*/*.jsonl' --recursive
 
 # Find write ops
 mycelium grep --path _activity --pattern '"op":"write"' --format=json

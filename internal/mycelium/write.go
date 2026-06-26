@@ -11,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"unicode/utf8"
 )
 
 const versionPrefix = "sha256:"
@@ -28,16 +27,13 @@ type conflictEnvelope struct {
 	Path            string `json:"path"`
 	CurrentVersion  string `json:"current_version"`
 	ExpectedVersion string `json:"expected_version,omitempty"`
-	CurrentContent  string `json:"current_content,omitempty"`
 	Rationale       string `json:"rationale,omitempty"`
 }
 
 // checkExpectedVersion checks whether expected matches the on-disk version of
 // abs. mountRel is the forward-slash path relative to mount (for the envelope).
-// If includeContent is true and the file exists and contains valid UTF-8, the
-// envelope will include a current_content field. rationale, when non-empty, is
-// propagated to the conflict envelope.
-func checkExpectedVersion(errOut io.Writer, op, mountRel, abs, expected string, includeContent bool, rationale string) int {
+// rationale, when non-empty, is propagated to the conflict envelope.
+func checkExpectedVersion(errOut io.Writer, op, mountRel, abs, expected string, rationale string) int {
 	if !strings.HasPrefix(expected, versionPrefix) {
 		fmt.Fprintf(errOut, "mycelium %s: expected-version must start with %q\n", op, versionPrefix)
 		return ExitUsage
@@ -55,12 +51,6 @@ func checkExpectedVersion(errOut io.Writer, op, mountRel, abs, expected string, 
 			CurrentVersion:  current,
 			ExpectedVersion: expected,
 			Rationale:       rationale,
-		}
-		if includeContent && current != versionPrefix+"absent" {
-			fileBytes, readErr := os.ReadFile(abs)
-			if readErr == nil && utf8.Valid(fileBytes) {
-				env.CurrentContent = string(fileBytes)
-			}
 		}
 		line, _ := json.Marshal(env)
 		line = append(line, '\n')

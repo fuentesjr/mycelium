@@ -118,45 +118,6 @@ func TestMvDstExistsEnvelopeFields(t *testing.T) {
 	}
 }
 
-func TestMvDstExistsIncludeContentUTF8(t *testing.T) {
-	mount := t.TempDir()
-	t.Setenv("MYCELIUM_MOUNT", mount)
-	writeTestFile(t, mount, "src.md", "source\n")
-	dstContent := "existing utf8 dst\n"
-	writeTestFile(t, mount, "dst.md", dstContent)
-
-	_, errOut, rc := runDispatchWithStdin(t, "", "mv", "src.md", "dst.md", "--include-current-content")
-	if rc != ExitConflict {
-		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitConflict, errOut)
-	}
-	env := parseDstExistsEnvelope(t, errOut)
-	if env.CurrentContent == nil {
-		t.Fatal("current_content should be present for UTF-8 dst")
-	}
-	if *env.CurrentContent != dstContent {
-		t.Errorf("current_content: got %q, want %q", *env.CurrentContent, dstContent)
-	}
-}
-
-func TestMvDstExistsIncludeContentBinary(t *testing.T) {
-	mount := t.TempDir()
-	t.Setenv("MYCELIUM_MOUNT", mount)
-	writeTestFile(t, mount, "src.md", "source\n")
-	dstAbs := filepath.Join(mount, "dst.bin")
-	if err := os.WriteFile(dstAbs, []byte{0xff, 0xfe, 0x00}, 0o644); err != nil {
-		t.Fatalf("write binary dst: %v", err)
-	}
-
-	_, errOut, rc := runDispatchWithStdin(t, "", "mv", "src.md", "dst.bin", "--include-current-content")
-	if rc != ExitConflict {
-		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitConflict, errOut)
-	}
-	env := parseDstExistsEnvelope(t, errOut)
-	if env.CurrentContent != nil {
-		t.Errorf("current_content should be absent for binary dst, got %q", *env.CurrentContent)
-	}
-}
-
 // parseDstExistsEnvelope parses the first line of stderr as a destination_exists envelope.
 func parseDstExistsEnvelope(t *testing.T, stderr string) conflictResult {
 	t.Helper()
@@ -349,60 +310,4 @@ func TestMvLogEntryNotWrittenOnFailure(t *testing.T) {
 	if logExists(mount) {
 		t.Error("log file should not exist after failed mv")
 	}
-}
-
-func TestMvIncludeCurrentContentUTF8(t *testing.T) {
-	mount := t.TempDir()
-	t.Setenv("MYCELIUM_MOUNT", mount)
-	content := "source content\n"
-	writeTestFile(t, mount, "src.md", content)
-
-	_, errOut, rc := runDispatchWithStdin(t, "", "mv", "src.md", "dst.md",
-		"--expected-version", "sha256:deadbeef",
-		"--include-current-content")
-	if rc != ExitConflict {
-		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitConflict, errOut)
-	}
-	env := parseConflictEnvelope(t, errOut)
-	if env.CurrentContent == nil {
-		t.Fatal("current_content should be present for UTF-8 src")
-	}
-	if *env.CurrentContent != content {
-		t.Errorf("current_content: got %q, want %q", *env.CurrentContent, content)
-	}
-}
-
-func TestMvIncludeCurrentContentBinary(t *testing.T) {
-	mount := t.TempDir()
-	t.Setenv("MYCELIUM_MOUNT", mount)
-	abs := filepath.Join(mount, "bin.dat")
-	if err := os.WriteFile(abs, []byte{0xff, 0xfe, 0x00}, 0o644); err != nil {
-		t.Fatalf("write binary file: %v", err)
-	}
-
-	_, errOut, rc := runDispatchWithStdin(t, "", "mv", "bin.dat", "dst.dat",
-		"--expected-version", "sha256:deadbeef",
-		"--include-current-content")
-	if rc != ExitConflict {
-		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitConflict, errOut)
-	}
-	env := parseConflictEnvelope(t, errOut)
-	if env.CurrentContent != nil {
-		t.Errorf("current_content should be absent for binary src, got %q", *env.CurrentContent)
-	}
-}
-
-func TestMvIncludeCurrentContentAbsent(t *testing.T) {
-	// mv returns ExitGenericError when src is missing (checked before CAS).
-	// There is no conflict envelope in this case.
-	mount := t.TempDir()
-	t.Setenv("MYCELIUM_MOUNT", mount)
-
-	_, errOut, rc := runDispatchWithStdin(t, "", "mv", "missing.md", "dst.md",
-		"--expected-version", "sha256:deadbeef",
-		"--include-current-content")
-	if rc != ExitGenericError {
-		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitGenericError, errOut)
-	}
-	_ = errOut
 }

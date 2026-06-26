@@ -150,11 +150,10 @@ Everyday commands via the \`bash\` tool:
 - \`mycelium read <path> [--format text|json]\` — read a file; JSON includes UTF-8 content plus version for CAS
 - \`mycelium write <path> [--rationale STR]\` — write or overwrite (content via stdin)
 - \`mycelium edit <path> --old <str> --new <str> [--rationale STR]\` — find/replace a unique substring
-- \`mycelium ls [--recursive]\` — list entries
+- \`mycelium ls [pattern] [--recursive]\` — list entries, optionally filtered by glob pattern
 - \`mycelium grep --pattern <str> [--path P] [--format json] [--limit N]\` — search content
 
 Occasional commands:
-- \`mycelium glob <pattern>\` — match paths by glob when \`ls\`/\`grep\` are not enough
 - \`mycelium rm <path> [--rationale STR]\` — delete
 - \`mycelium mv <src> <dst> [--rationale STR]\` — atomic rename (fails if \`<dst>\` exists)
 
@@ -187,8 +186,8 @@ JSON to stderr:
 {"error":"destination_exists","op":"mv","path":"dst.md","current_version":"sha256:..."}
 \`\`\`
 
-Add \`--include-current-content\` to also retrieve the current bytes inline
-(\`current_content\` field, UTF-8 only). Standard recovery: re-read with \`mycelium read <path> --format json\`, merge, retry.
+Standard recovery: re-read with \`mycelium read <path> --format json\`,
+merge with the current content, and retry with the fresh version token.
 
 Reserved paths: \`mycelium\` rejects writes to any first-segment path beginning
 with \`_\`. \`_activity/YYYY/MM/DD/${c.agentId}.jsonl\` is auto-generated metadata for every

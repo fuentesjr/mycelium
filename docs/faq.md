@@ -51,7 +51,7 @@ Teams running Frontier-class AI agents (Claude Opus, GPT-5.5, and their successo
 
 ### How does this differ from a vector store, RAG service, or memory MCP server?
 
-The core differences are access model and observability. Mycelium is file-based, not embedding-based: the agent navigates with `ls`, `glob`, and `grep` and reads files directly — no opaque retrieval step, no relevance scoring, no index to maintain. Every byte is plain text you can read line by line; a vector store's internal state is not.
+The core differences are access model and observability. Mycelium is file-based, not embedding-based: the agent navigates with `ls` and `grep` and reads files directly — no opaque retrieval step, no relevance scoring, no index to maintain. Every byte is plain text you can read line by line; a vector store's internal state is not.
 
 Because it's a directory, standard tools work on it without any mycelium-specific tooling: `tail -f` for the activity log, `rg` for search, `git diff` for changes. And it needs no daemon or network — just a local POSIX filesystem.
 

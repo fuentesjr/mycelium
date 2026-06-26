@@ -87,7 +87,7 @@ If you're on a fresh mount with no evolution history, `--active` returns nothing
 After noticing a pattern in the activity log — duplicate filenames, violated naming rules, near-duplicate paths:
 
 ```sh
-mycelium glob '_activity/2026/04/*/researcher-7.jsonl'
+mycelium ls '_activity/2026/04/*/researcher-7.jsonl' --recursive
 mycelium grep --pattern '"op":"write"' --path _activity --format json --limit 200
 ```
 

@@ -8,7 +8,7 @@
 
 > **Re-read, merge, retry.**
 
-1. **Re-read** the path. Either parse `current_content` from the envelope (cheapest — requires `--include-current-content` on the original call), or call `mycelium read <path> --format json` to get current content and version from the same read.
+1. **Re-read** the path with `mycelium read <path> --format json` to get current content and version from the same read.
 
 2. **Merge** the agent's intended change with the current state. Semantics depend on the operation:
    - **`write`:** combine the new content with the current. Most "writes" are appends or section additions — apply that intent against the current bytes rather than the bytes the agent expected to overwrite.

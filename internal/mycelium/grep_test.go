@@ -193,25 +193,16 @@ func TestGrepPathScope(t *testing.T) {
 	}
 }
 
-func TestGrepFileTypeFilter(t *testing.T) {
+func TestGrepRejectsFileTypeFilter(t *testing.T) {
 	mount := t.TempDir()
-	mkfile(t, mount, "doc.md", "needle md\n")
-	mkfile(t, mount, "script.txt", "needle txt\n")
-	mkfile(t, mount, "data.json", "needle json\n")
 	t.Setenv("MYCELIUM_MOUNT", mount)
 
-	out, errOut, rc := runDispatch(t, "grep", "--pattern", "needle", "--file-type", "md")
-	if rc != ExitOK {
-		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitOK, errOut)
+	_, errOut, rc := runDispatch(t, "grep", "--pattern", "needle", "--file-type", "md")
+	if rc != ExitUsage {
+		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitUsage, errOut)
 	}
-	if !strings.Contains(out, "doc.md") {
-		t.Errorf("doc.md missing from output: %q", out)
-	}
-	if strings.Contains(out, "script.txt") {
-		t.Errorf("script.txt should be filtered out: %q", out)
-	}
-	if strings.Contains(out, "data.json") {
-		t.Errorf("data.json should be filtered out: %q", out)
+	if !strings.Contains(errOut, "flag provided but not defined") {
+		t.Errorf("stderr should mention unknown flag, got %q", errOut)
 	}
 }
 

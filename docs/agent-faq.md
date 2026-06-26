@@ -83,7 +83,7 @@ Always for `edit` — the substring being replaced is itself a claim about prior
 
 ### I got exit 64 — what now?
 
-CAS conflict. Read the JSON envelope on stderr — it carries `current_version` and, if you passed `--include-current-content`, `current_content`. Merge your intended change with the current state in memory, then retry with the new version token. See [conflict-resolution.md](conflict-resolution.md) for the full re-read/merge/retry pattern and cases where recovery doesn't apply.
+CAS conflict. Read the JSON envelope on stderr — it carries `current_version`. Re-read the path with `mycelium read <path> --format json`, merge your intended change with the current state in memory, then retry with the new version token. See [conflict-resolution.md](conflict-resolution.md) for the full re-read/merge/retry pattern and cases where recovery doesn't apply.
 
 ```bash
 # Retry after a conflict — use the current_version from the envelope
@@ -149,7 +149,7 @@ Yes — it's plain JSONL. `cat`, `tail -f`, and `grep` all work directly. Filter
 cat $MYCELIUM_MOUNT/_activity/2026/05/10/*.jsonl
 
 # Your agent's entries this month
-mycelium glob '_activity/2026/05/*/coder.jsonl'
+mycelium ls '_activity/2026/05/*/coder.jsonl' --recursive
 
 # Search for a specific path across the log
 mycelium grep --pattern 'notes/incidents' --path _activity --format json --limit 200

@@ -16,9 +16,13 @@ func isDotEntry(name string) bool {
 }
 
 // listFiles walks mount and collects relative paths of files, skipping dotfiles
-// and dot-directories.  When recursive is false only top-level files are
-// included.  The returned slice is sorted alphabetically (forward-slash paths).
-func listFiles(mount string, recursive bool) ([]string, error) {
+// and dot-directories. When pattern is non-empty, only matching files are
+// included. If the pattern contains "/" the full relative path is matched;
+// otherwise only the basename is matched. The returned slice is sorted
+// alphabetically (forward-slash paths).
+func listFiles(mount string, recursive bool, pattern string) ([]string, error) {
+	usePattern := pattern != ""
+	useFullPath := strings.Contains(pattern, "/")
 	var results []string
 
 	err := filepath.WalkDir(mount, func(absPath string, d fs.DirEntry, err error) error {
@@ -53,71 +57,22 @@ func listFiles(mount string, recursive bool) ([]string, error) {
 		if err != nil {
 			return err
 		}
-		results = append(results, filepath.ToSlash(rel))
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	sort.Strings(results)
-	return results, nil
-}
-
-// globMatches walks mount recursively and returns paths (relative, forward-slash)
-// that match pattern.  If pattern contains '/' the full relative path is matched;
-// otherwise only the basename is matched.  Dotfiles and dot-directories are
-// skipped.  The returned slice is sorted alphabetically.
-func globMatches(mount, pattern string) ([]string, error) {
-	useFullPath := strings.Contains(pattern, "/")
-
-	var results []string
-
-	err := filepath.WalkDir(mount, func(absPath string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-
-		name := d.Name()
-
-		// Skip the mount root itself.
-		if absPath == filepath.Clean(mount) {
-			return nil
-		}
-
-		// Skip dot entries.
-		if isDotEntry(name) {
-			if d.IsDir() {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-
-		if d.IsDir() {
-			return nil
-		}
-
-		rel, err := filepath.Rel(mount, absPath)
-		if err != nil {
-			return err
-		}
 		relSlash := filepath.ToSlash(rel)
 
-		var subject string
-		if useFullPath {
-			subject = relSlash
-		} else {
-			subject = path.Base(relSlash)
+		if usePattern {
+			subject := path.Base(relSlash)
+			if useFullPath {
+				subject = relSlash
+			}
+			matched, err := path.Match(pattern, subject)
+			if err != nil {
+				return err
+			}
+			if !matched {
+				return nil
+			}
 		}
-
-		matched, err := path.Match(pattern, subject)
-		if err != nil {
-			// path.ErrBadPattern — propagate so the caller can distinguish it.
-			return err
-		}
-		if matched {
-			results = append(results, relSlash)
-		}
+		results = append(results, relSlash)
 		return nil
 	})
 	if err != nil {
@@ -130,37 +85,18 @@ func globMatches(mount, pattern string) ([]string, error) {
 
 // listFilesAndPrint calls listFiles and writes results to out, one per line.
 // It returns an exit code suitable for returning from a subcommand handler.
-func listFilesAndPrint(out, errOut io.Writer, mount string, recursive bool) int {
+func listFilesAndPrint(out, errOut io.Writer, mount string, recursive bool, pattern string) int {
 	if mount == "" {
 		fmt.Fprintln(errOut, "mycelium ls: MYCELIUM_MOUNT is not set")
 		return ExitGenericError
 	}
-	files, err := listFiles(mount, recursive)
+	files, err := listFiles(mount, recursive, pattern)
 	if err != nil {
-		fmt.Fprintf(errOut, "mycelium ls: %v\n", err)
-		return ExitGenericError
-	}
-	for _, f := range files {
-		fmt.Fprintln(out, f)
-	}
-	return ExitOK
-}
-
-// globAndPrint calls globMatches and writes results to out, one per line.
-// It returns an exit code suitable for returning from a subcommand handler.
-func globAndPrint(out, errOut io.Writer, mount, pattern string) int {
-	if mount == "" {
-		fmt.Fprintln(errOut, "mycelium glob: MYCELIUM_MOUNT is not set")
-		return ExitGenericError
-	}
-	files, err := globMatches(mount, pattern)
-	if err != nil {
-		// Check whether the pattern itself was invalid.
 		if err == path.ErrBadPattern {
-			fmt.Fprintf(errOut, "mycelium glob: invalid pattern: %s\n", pattern)
+			fmt.Fprintf(errOut, "mycelium ls: invalid pattern: %s\n", pattern)
 			return ExitUsage
 		}
-		fmt.Fprintf(errOut, "mycelium glob: %v\n", err)
+		fmt.Fprintf(errOut, "mycelium ls: %v\n", err)
 		return ExitGenericError
 	}
 	for _, f := range files {

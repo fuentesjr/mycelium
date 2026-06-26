@@ -24,7 +24,7 @@ func mkfile(t *testing.T, dir, relPath, content string) {
 
 func TestListFilesEmptyMount(t *testing.T) {
 	mount := t.TempDir()
-	files, err := listFiles(mount, false)
+	files, err := listFiles(mount, false, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -37,7 +37,7 @@ func TestListFilesSingleTopLevel(t *testing.T) {
 	mount := t.TempDir()
 	mkfile(t, mount, "memory.md", "hi")
 
-	files, err := listFiles(mount, false)
+	files, err := listFiles(mount, false, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -52,7 +52,7 @@ func TestListFilesMultipleTopLevelAlphabetical(t *testing.T) {
 	mkfile(t, mount, "apple.md", "a")
 	mkfile(t, mount, "mango.md", "m")
 
-	files, err := listFiles(mount, false)
+	files, err := listFiles(mount, false, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -72,7 +72,7 @@ func TestListFilesNonRecursiveOmitsSubdirFiles(t *testing.T) {
 	mkfile(t, mount, "top.md", "top")
 	mkfile(t, mount, "notes/nested.md", "nested")
 
-	files, err := listFiles(mount, false)
+	files, err := listFiles(mount, false, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -87,7 +87,7 @@ func TestListFilesRecursiveIncludesNested(t *testing.T) {
 	mkfile(t, mount, "notes/today.md", "today")
 	mkfile(t, mount, "notes/archive/old.md", "old")
 
-	files, err := listFiles(mount, true)
+	files, err := listFiles(mount, true, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -108,7 +108,7 @@ func TestListFilesSkipsDotMyceliumDir(t *testing.T) {
 	mkfile(t, mount, ".mycelium/log.jsonl", "{}")
 
 	for _, recursive := range []bool{false, true} {
-		files, err := listFiles(mount, recursive)
+		files, err := listFiles(mount, recursive, "")
 		if err != nil {
 			t.Fatalf("recursive=%v unexpected error: %v", recursive, err)
 		}
@@ -128,7 +128,7 @@ func TestListFilesSkipsTopLevelDotfiles(t *testing.T) {
 	mkfile(t, mount, "real.md", "r")
 	mkfile(t, mount, ".DS_Store", "mac")
 
-	files, err := listFiles(mount, false)
+	files, err := listFiles(mount, false, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -146,7 +146,7 @@ func TestListFilesForwardSlashPaths(t *testing.T) {
 	mount := t.TempDir()
 	mkfile(t, mount, "a/b/c.md", "deep")
 
-	files, err := listFiles(mount, true)
+	files, err := listFiles(mount, true, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -161,16 +161,16 @@ func TestListFilesForwardSlashPaths(t *testing.T) {
 	}
 }
 
-// ---- globMatches unit tests ----
+// ---- patterned listFiles unit tests ----
 
-func TestGlobMatchesBasenamePattern(t *testing.T) {
+func TestListFilesBasenamePattern(t *testing.T) {
 	mount := t.TempDir()
 	mkfile(t, mount, "notes/today.md", "t")
 	mkfile(t, mount, "notes/today.txt", "t")
 	mkfile(t, mount, "archive/old.md", "o")
 	mkfile(t, mount, ".hidden.md", "h")
 
-	matches, err := globMatches(mount, "*.md")
+	matches, err := listFiles(mount, true, "*.md")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -185,13 +185,13 @@ func TestGlobMatchesBasenamePattern(t *testing.T) {
 	}
 }
 
-func TestGlobMatchesFullPathPattern(t *testing.T) {
+func TestListFilesFullPathPattern(t *testing.T) {
 	mount := t.TempDir()
 	mkfile(t, mount, "notes/today.md", "n")
 	mkfile(t, mount, "other/today.md", "o")
 	mkfile(t, mount, "notes/readme.txt", "r")
 
-	matches, err := globMatches(mount, "notes/*.md")
+	matches, err := listFiles(mount, true, "notes/*.md")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -200,11 +200,11 @@ func TestGlobMatchesFullPathPattern(t *testing.T) {
 	}
 }
 
-func TestGlobMatchesNoMatches(t *testing.T) {
+func TestListFilesPatternNoMatches(t *testing.T) {
 	mount := t.TempDir()
 	mkfile(t, mount, "readme.txt", "r")
 
-	matches, err := globMatches(mount, "*.md")
+	matches, err := listFiles(mount, true, "*.md")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -213,23 +213,23 @@ func TestGlobMatchesNoMatches(t *testing.T) {
 	}
 }
 
-func TestGlobMatchesInvalidPattern(t *testing.T) {
+func TestListFilesInvalidPattern(t *testing.T) {
 	mount := t.TempDir()
 	mkfile(t, mount, "file.md", "f")
 
-	_, err := globMatches(mount, "[")
+	_, err := listFiles(mount, true, "[")
 	if err == nil {
 		t.Fatal("expected error for invalid pattern, got nil")
 	}
 }
 
-func TestGlobMatchesSkipsDotfiles(t *testing.T) {
+func TestListFilesPatternSkipsDotfiles(t *testing.T) {
 	mount := t.TempDir()
 	mkfile(t, mount, "real.md", "r")
 	mkfile(t, mount, ".hidden.md", "h")
 	mkfile(t, mount, ".mycelium/log.jsonl", "{}")
 
-	matches, err := globMatches(mount, "*.md")
+	matches, err := listFiles(mount, true, "*.md")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -313,12 +313,12 @@ func TestLsE2EMountUnset(t *testing.T) {
 	}
 }
 
-func TestGlobE2EBasenamePattern(t *testing.T) {
+func TestLsE2EBasenamePattern(t *testing.T) {
 	mount := t.TempDir()
 	mkfile(t, mount, "notes/today.md", "t")
 	mkfile(t, mount, "readme.txt", "r")
 	t.Setenv("MYCELIUM_MOUNT", mount)
-	out, errOut, rc := runDispatch(t, "glob", "*.md")
+	out, errOut, rc := runDispatch(t, "ls", "*.md", "--recursive")
 	if rc != ExitOK {
 		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitOK, errOut)
 	}
@@ -327,12 +327,12 @@ func TestGlobE2EBasenamePattern(t *testing.T) {
 	}
 }
 
-func TestGlobE2EFullPathPattern(t *testing.T) {
+func TestLsE2EFullPathPattern(t *testing.T) {
 	mount := t.TempDir()
 	mkfile(t, mount, "notes/today.md", "n")
 	mkfile(t, mount, "other/today.md", "o")
 	t.Setenv("MYCELIUM_MOUNT", mount)
-	out, errOut, rc := runDispatch(t, "glob", "notes/*.md")
+	out, errOut, rc := runDispatch(t, "ls", "notes/*.md", "--recursive")
 	if rc != ExitOK {
 		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitOK, errOut)
 	}
@@ -341,11 +341,11 @@ func TestGlobE2EFullPathPattern(t *testing.T) {
 	}
 }
 
-func TestGlobE2ENoMatches(t *testing.T) {
+func TestLsE2EPatternNoMatches(t *testing.T) {
 	mount := t.TempDir()
 	mkfile(t, mount, "readme.txt", "r")
 	t.Setenv("MYCELIUM_MOUNT", mount)
-	out, errOut, rc := runDispatch(t, "glob", "*.md")
+	out, errOut, rc := runDispatch(t, "ls", "*.md", "--recursive")
 	if rc != ExitOK {
 		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitOK, errOut)
 	}
@@ -354,11 +354,11 @@ func TestGlobE2ENoMatches(t *testing.T) {
 	}
 }
 
-func TestGlobE2EInvalidPattern(t *testing.T) {
+func TestLsE2EInvalidPattern(t *testing.T) {
 	mount := t.TempDir()
 	mkfile(t, mount, "file.md", "f")
 	t.Setenv("MYCELIUM_MOUNT", mount)
-	_, errOut, rc := runDispatch(t, "glob", "[")
+	_, errOut, rc := runDispatch(t, "ls", "[", "--recursive")
 	if rc != ExitUsage {
 		t.Errorf("rc: got %d, want %d", rc, ExitUsage)
 	}
@@ -367,12 +367,12 @@ func TestGlobE2EInvalidPattern(t *testing.T) {
 	}
 }
 
-func TestGlobE2ESkipsDotfiles(t *testing.T) {
+func TestLsE2EPatternSkipsDotfiles(t *testing.T) {
 	mount := t.TempDir()
 	mkfile(t, mount, "real.md", "r")
 	mkfile(t, mount, ".hidden.md", "h")
 	t.Setenv("MYCELIUM_MOUNT", mount)
-	out, _, rc := runDispatch(t, "glob", "*.md")
+	out, _, rc := runDispatch(t, "ls", "*.md", "--recursive")
 	if rc != ExitOK {
 		t.Fatalf("rc: got %d, want %d", rc, ExitOK)
 	}
@@ -384,9 +384,9 @@ func TestGlobE2ESkipsDotfiles(t *testing.T) {
 	}
 }
 
-func TestGlobE2EMountUnset(t *testing.T) {
+func TestLsE2EPatternMountUnset(t *testing.T) {
 	t.Setenv("MYCELIUM_MOUNT", "")
-	_, errOut, rc := runDispatch(t, "glob", "*.md")
+	_, errOut, rc := runDispatch(t, "ls", "*.md", "--recursive")
 	if rc != ExitGenericError {
 		t.Errorf("rc: got %d, want %d", rc, ExitGenericError)
 	}

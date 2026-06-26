@@ -18,7 +18,6 @@ var subcommands = []subcommand{
 	{"write", runWrite},
 	{"edit", runEdit},
 	{"ls", runLs},
-	{"glob", runGlob},
 	{"grep", runGrep},
 	{"rm", runRm},
 	{"mv", runMv},
@@ -52,7 +51,7 @@ func dispatch(in io.Reader, out, errOut io.Writer, args []string) int {
 func printSubcommandList(w io.Writer) {
 	fmt.Fprintln(w, "subcommands:")
 	fmt.Fprintln(w, "  everyday:   read write edit ls grep")
-	fmt.Fprintln(w, "  occasional: glob rm mv")
+	fmt.Fprintln(w, "  occasional: rm mv")
 	fmt.Fprintln(w, "  metadata:   log evolve")
 }
 
@@ -86,7 +85,6 @@ func runWrite(in io.Reader, out, errOut io.Writer, args []string) int {
 	fs := flag.NewFlagSet("write", flag.ContinueOnError)
 	fs.SetOutput(errOut)
 	expectedVersion := fs.String("expected-version", "", "current version token for CAS")
-	includeContent := fs.Bool("include-current-content", false, "include current file content in conflict envelope")
 	rationaleFlag := fs.String("rationale", "", "optional reasoning captured to the activity log (≤64 KiB)")
 	positional, err := parseInterspersed(fs, args)
 	if err != nil {
@@ -113,7 +111,7 @@ func runWrite(in io.Reader, out, errOut io.Writer, args []string) int {
 		fmt.Fprintf(errOut, "mycelium write: read stdin: %v\n", err)
 		return ExitGenericError
 	}
-	version, rc := transactionalWrite(errOut, id, positional[0], content, *expectedVersion, *includeContent, *rationaleFlag)
+	version, rc := transactionalWrite(errOut, id, positional[0], content, *expectedVersion, *rationaleFlag)
 	if rc != ExitOK {
 		return rc
 	}
@@ -125,7 +123,6 @@ func runEdit(_ io.Reader, out, errOut io.Writer, args []string) int {
 	fs := flag.NewFlagSet("edit", flag.ContinueOnError)
 	fs.SetOutput(errOut)
 	expectedVersion := fs.String("expected-version", "", "current version token for CAS")
-	includeContent := fs.Bool("include-current-content", false, "include current file content in conflict envelope")
 	oldStr := fs.String("old", "", "string to replace")
 	newStr := fs.String("new", "", "replacement string")
 	rationaleFlag := fs.String("rationale", "", "optional reasoning captured to the activity log (≤64 KiB)")
@@ -152,7 +149,7 @@ func runEdit(_ io.Reader, out, errOut io.Writer, args []string) int {
 			return ExitReservedPrefix
 		}
 	}
-	version, rc := transactionalEdit(errOut, id, positional[0], *oldStr, *newStr, *expectedVersion, *includeContent, *rationaleFlag)
+	version, rc := transactionalEdit(errOut, id, positional[0], *oldStr, *newStr, *expectedVersion, *rationaleFlag)
 	if rc != ExitOK {
 		return rc
 	}
@@ -168,23 +165,15 @@ func runLs(_ io.Reader, out, errOut io.Writer, args []string) int {
 	if err != nil {
 		return ExitUsage
 	}
-	if rc := requirePositionalArgs(errOut, "ls", positional, 0, ""); rc != ExitOK {
-		return rc
-	}
-	return listFilesAndPrint(out, errOut, ReadIdentity().Mount, *recursive)
-}
-
-func runGlob(_ io.Reader, out, errOut io.Writer, args []string) int {
-	fs := flag.NewFlagSet("glob", flag.ContinueOnError)
-	fs.SetOutput(errOut)
-	positional, err := parseInterspersed(fs, args)
-	if err != nil {
+	if len(positional) > 1 {
+		fmt.Fprintf(errOut, "mycelium ls: unexpected argument: %s\n", positional[1])
 		return ExitUsage
 	}
-	if rc := requirePositionalArgs(errOut, "glob", positional, 1, "PATTERN"); rc != ExitOK {
-		return rc
+	pattern := ""
+	if len(positional) == 1 {
+		pattern = positional[0]
 	}
-	return globAndPrint(out, errOut, ReadIdentity().Mount, positional[0])
+	return listFilesAndPrint(out, errOut, ReadIdentity().Mount, *recursive, pattern)
 }
 
 func runGrep(_ io.Reader, out, errOut io.Writer, args []string) int {
@@ -193,7 +182,6 @@ func runGrep(_ io.Reader, out, errOut io.Writer, args []string) int {
 	pattern := fs.String("pattern", "", "search pattern")
 	pathScope := fs.String("path", "", "path to search under")
 	useRegex := fs.Bool("regex", false, "treat pattern as regex")
-	fileType := fs.String("file-type", "", "limit by file type")
 	format := fs.String("format", "text", "output format: text|json")
 	limit := fs.Int("limit", 1000, "max matches")
 	positional, err := parseInterspersed(fs, args)
@@ -221,7 +209,6 @@ func runGrep(_ io.Reader, out, errOut io.Writer, args []string) int {
 		Pattern:   *pattern,
 		PathScope: *pathScope,
 		Regex:     *useRegex,
-		FileType:  *fileType,
 		Format:    *format,
 		Limit:     *limit,
 	}
@@ -232,7 +219,6 @@ func runRm(_ io.Reader, out, errOut io.Writer, args []string) int {
 	fs := flag.NewFlagSet("rm", flag.ContinueOnError)
 	fs.SetOutput(errOut)
 	expectedVersion := fs.String("expected-version", "", "current version token for CAS")
-	includeContent := fs.Bool("include-current-content", false, "include current file content in conflict envelope")
 	rationaleFlag := fs.String("rationale", "", "optional reasoning captured to the activity log (≤64 KiB)")
 	positional, err := parseInterspersed(fs, args)
 	if err != nil {
@@ -253,7 +239,7 @@ func runRm(_ io.Reader, out, errOut io.Writer, args []string) int {
 			return ExitReservedPrefix
 		}
 	}
-	_, rc := transactionalRemove(errOut, id, positional[0], *expectedVersion, *includeContent, *rationaleFlag)
+	_, rc := transactionalRemove(errOut, id, positional[0], *expectedVersion, *rationaleFlag)
 	if rc != ExitOK {
 		return rc
 	}
@@ -264,7 +250,6 @@ func runMv(_ io.Reader, out, errOut io.Writer, args []string) int {
 	fs := flag.NewFlagSet("mv", flag.ContinueOnError)
 	fs.SetOutput(errOut)
 	expectedVersion := fs.String("expected-version", "", "current version token for CAS")
-	includeContent := fs.Bool("include-current-content", false, "include current file content in conflict envelope")
 	rationaleFlag := fs.String("rationale", "", "optional reasoning captured to the activity log (≤64 KiB)")
 	positional, err := parseInterspersed(fs, args)
 	if err != nil {
@@ -292,7 +277,7 @@ func runMv(_ io.Reader, out, errOut io.Writer, args []string) int {
 			return ExitReservedPrefix
 		}
 	}
-	_, rc := transactionalMove(errOut, id, src, dst, *expectedVersion, *includeContent, *rationaleFlag)
+	_, rc := transactionalMove(errOut, id, src, dst, *expectedVersion, *rationaleFlag)
 	if rc != ExitOK {
 		return rc
 	}

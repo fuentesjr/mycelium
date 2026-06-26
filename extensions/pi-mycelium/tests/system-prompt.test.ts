@@ -100,7 +100,7 @@ describe("systemPromptAvailable", () => {
 		expect(block).toContain("MYCELIUM_SESSION_ID=session-xyz");
 	});
 
-	it("documents all ten subcommands in tiers", () => {
+	it("documents all nine subcommands in tiers", () => {
 		expect(block).toContain("Everyday commands");
 		expect(block).toContain("Occasional commands");
 		expect(block).toContain("Metadata commands");
@@ -109,7 +109,6 @@ describe("systemPromptAvailable", () => {
 			"write",
 			"edit",
 			"ls",
-			"glob",
 			"grep",
 			"rm",
 			"mv",
@@ -129,7 +128,8 @@ describe("systemPromptAvailable", () => {
 	it("documents both conflict envelope variants", () => {
 		expect(block).toContain('"error":"conflict"');
 		expect(block).toContain('"error":"destination_exists"');
-		expect(block).toContain("--include-current-content");
+		expect(block).toContain("re-read with `mycelium read <path> --format json`");
+		expect(block).not.toContain("--include-current-content");
 	});
 
 	it("describes the reserved _ prefix and keeps recovery internals out of the default prompt", () => {

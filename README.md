@@ -50,8 +50,7 @@ and recovery debugging, not required for normal use.
 - **Atomic writes with optimistic concurrency.** Every write returns a
   SHA-256 version token. Pass it back as `--expected-version` for
   compare-and-swap; on conflict, Mycelium returns the current version
-  (and optionally the current content) so the caller can re-merge
-  without re-reading.
+  so the caller can re-read, merge, and retry.
 - **Crash-safe.** Content mutations and activity-log entries recover
   together; interrupted operations are repaired before later mutations proceed.
 - **Multi-agent safe.** Mount-level `flock` plus CAS lets sibling
@@ -100,9 +99,8 @@ metadata; only `_activity/` is part of the daily mental model.
 | Everyday   | `read`   | Read a note (optionally with version metadata)                                                         |
 | Everyday   | `write`  | Safe write; returns version, supports CAS via `--expected-version` and optional `--rationale`          |
 | Everyday   | `edit`   | Safe find/replace of a unique substring; accepts `--rationale`                                         |
-| Everyday   | `ls`     | List entries in the mount                                                                              |
+| Everyday   | `ls`     | List entries in the mount, optionally filtered by pattern                                               |
 | Everyday   | `grep`   | Search content across the mount                                                                        |
-| Occasional | `glob`   | Match paths by glob pattern when `ls`/`grep` are not enough                                            |
 | Occasional | `rm`     | Remove a note; accepts `--rationale`                                                                   |
 | Occasional | `mv`     | Move/rename a note; accepts `--rationale`                                                              |
 | Metadata   | `log`    | Append a signal entry to the activity log; mostly adapter-facing                                       |
@@ -113,8 +111,7 @@ metadata; only `_activity/` is part of the daily mental model.
 Two agents racing on the same file resolve via compare-and-swap. Each
 write returns a SHA-256 version; pass it back as `--expected-version`
 on the next write. On conflict, mycelium emits a JSON envelope with
-`current_version` (and `current_content` if requested) so the caller
-can re-merge in memory without a second read:
+`current_version`; the caller re-reads the file, merges, and retries:
 
 ```
 coder         mycelium         reviewer
@@ -124,9 +121,8 @@ coder         mycelium         reviewer
   │              │◀───write v1────│
   │              │─CONFLICT(64)──▶│
   │              │   current=v2   │   ← conflict envelope
-  │              │  content="..." │     (caller has both fields)
   │              │                │
-  │              │                │     re-merge in memory, no re-read
+  │              │                │     re-read, merge, retry
   │              │                │
   │              │◀───write v2────│
   │              │──ok, v3───────▶│
@@ -218,10 +214,9 @@ mycelium evolve --active --format json
 # {"ts":"2026-05-05T16:08:51Z","agent_id":"agent","session_id":"auto-01HXKQ8T9V3R5W4Y2N7Z1B6P0M","op":"evolve","id":"01HXKP9YQ7M2K8V1W6E2RTSA9F","kind":"archive","target":"notes/spikes/2026-Q1/","supersedes":"","kind_definition":"","rationale":"Archiving Q1 spikes; none referenced in 30+ days and they were drowning grep results for active work."}
 
 # Concurrent-safe update via CAS — pass the prior version, retry on conflict (exit 64).
-# On conflict, mycelium emits a JSON envelope with current_version (and current_content
-# when --include-current-content is set) so the caller can re-merge without re-reading.
+# On conflict, re-read with --format json, merge, and retry with the fresh version.
 echo "updated content" | mycelium write notes/incident-2026-04-30.md \
-  --expected-version sha256:abc123... --include-current-content
+  --expected-version sha256:abc123...
 
 # Inspect activity log directly — plain JSONL, no tooling required
 cat $MYCELIUM_MOUNT/_activity/*/*/*/*.jsonl
@@ -323,9 +318,9 @@ for the schema.
 
 ## Repository layout
 
-- **`cmd/mycelium/`** — the Go binary. Ten subcommands: content
-  (`read`, `write`, `edit`, `rm`, `mv`), discovery (`ls`, `glob`,
-  `grep`), and meta (`log`, `evolve`).
+- **`cmd/mycelium/`** — the Go binary. Nine subcommands: content
+  (`read`, `write`, `edit`, `rm`, `mv`), discovery (`ls`, `grep`),
+  and meta (`log`, `evolve`).
 - **`extensions/pi-mycelium/`** — pi.dev extension. Wires Mycelium
   into pi sessions: env vars, a system-prompt block, and portable
   activity events. Registers no tools; agents invoke `mycelium`

@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-func transactionalWrite(errOut io.Writer, id Identity, requested string, content []byte, expectedVersion string, includeContent bool, rationale string) (version string, rc int) {
+func transactionalWrite(errOut io.Writer, id Identity, requested string, content []byte, expectedVersion string, rationale string) (version string, rc int) {
 	abs, err := resolveUnderMount(id.Mount, requested)
 	if err != nil {
 		fmt.Fprintf(errOut, "mycelium write: %v\n", err)
@@ -39,7 +39,7 @@ func transactionalWrite(errOut io.Writer, id Identity, requested string, content
 	}
 	if expectedVersion != "" {
 		mountRel := relForwardSlash(id.Mount, abs)
-		if rc := checkExpectedVersion(errOut, "write", mountRel, abs, expectedVersion, includeContent, rationale); rc != ExitOK {
+		if rc := checkExpectedVersion(errOut, "write", mountRel, abs, expectedVersion, rationale); rc != ExitOK {
 			return "", rc
 		}
 	}
@@ -63,7 +63,7 @@ func transactionalWrite(errOut io.Writer, id Identity, requested string, content
 	return version, ExitOK
 }
 
-func transactionalEdit(errOut io.Writer, id Identity, requested, oldStr, newStr, expectedVersion string, includeContent bool, rationale string) (version string, rc int) {
+func transactionalEdit(errOut io.Writer, id Identity, requested, oldStr, newStr, expectedVersion string, rationale string) (version string, rc int) {
 	abs, err := resolveUnderMount(id.Mount, requested)
 	if err != nil {
 		fmt.Fprintf(errOut, "mycelium edit: %v\n", err)
@@ -108,7 +108,7 @@ func transactionalEdit(errOut io.Writer, id Identity, requested, oldStr, newStr,
 	prior := hashVersion(data)
 	if expectedVersion != "" {
 		mountRel := relForwardSlash(id.Mount, abs)
-		if rc := checkExpectedVersion(errOut, "edit", mountRel, abs, expectedVersion, includeContent, rationale); rc != ExitOK {
+		if rc := checkExpectedVersion(errOut, "edit", mountRel, abs, expectedVersion, rationale); rc != ExitOK {
 			return "", rc
 		}
 	}
@@ -134,7 +134,7 @@ func transactionalEdit(errOut io.Writer, id Identity, requested, oldStr, newStr,
 	return version, ExitOK
 }
 
-func transactionalRemove(errOut io.Writer, id Identity, requested, expectedVersion string, includeContent bool, rationale string) (priorVersion string, rc int) {
+func transactionalRemove(errOut io.Writer, id Identity, requested, expectedVersion string, rationale string) (priorVersion string, rc int) {
 	abs, err := resolveUnderMount(id.Mount, requested)
 	if err != nil {
 		fmt.Fprintf(errOut, "mycelium rm: %v\n", err)
@@ -167,7 +167,7 @@ func transactionalRemove(errOut io.Writer, id Identity, requested, expectedVersi
 
 	if expectedVersion != "" {
 		mountRel := relForwardSlash(id.Mount, abs)
-		if rc := checkExpectedVersion(errOut, "rm", mountRel, abs, expectedVersion, includeContent, rationale); rc != ExitOK {
+		if rc := checkExpectedVersion(errOut, "rm", mountRel, abs, expectedVersion, rationale); rc != ExitOK {
 			return "", rc
 		}
 	}
@@ -195,7 +195,7 @@ func transactionalRemove(errOut io.Writer, id Identity, requested, expectedVersi
 	return priorVersion, ExitOK
 }
 
-func transactionalMove(errOut io.Writer, id Identity, src, dst, expectedVersion string, includeContent bool, rationale string) (version string, rc int) {
+func transactionalMove(errOut io.Writer, id Identity, src, dst, expectedVersion string, rationale string) (version string, rc int) {
 	srcAbs, err := resolveUnderMount(id.Mount, src)
 	if err != nil {
 		fmt.Fprintf(errOut, "mycelium mv: %v\n", err)
@@ -239,7 +239,7 @@ func transactionalMove(errOut io.Writer, id Identity, src, dst, expectedVersion 
 	}
 
 	if _, err := os.Stat(dstAbs); err == nil {
-		if rc := emitDestinationExists(errOut, id.Mount, dstAbs, includeContent, rationale); rc != ExitOK {
+		if rc := emitDestinationExists(errOut, id.Mount, dstAbs, rationale); rc != ExitOK {
 			return "", rc
 		}
 	} else if !errors.Is(err, fs.ErrNotExist) {
@@ -249,7 +249,7 @@ func transactionalMove(errOut io.Writer, id Identity, src, dst, expectedVersion 
 
 	if expectedVersion != "" {
 		srcRel := relForwardSlash(id.Mount, srcAbs)
-		if rc := checkExpectedVersion(errOut, "mv", srcRel, srcAbs, expectedVersion, includeContent, rationale); rc != ExitOK {
+		if rc := checkExpectedVersion(errOut, "mv", srcRel, srcAbs, expectedVersion, rationale); rc != ExitOK {
 			return "", rc
 		}
 	}

@@ -58,7 +58,7 @@ implementation docs and diagnostics rather than the default agent/user model.
 
 A specialized memory API encodes assumptions: what gets saved, how it's indexed, what counts as "relevant," when to summarize. As models improve, those heuristics become drag — the system forces the agent into compression and ranking policies the model could now beat unaided.
 
-General tools (read, write, list, edit, glob, grep) have no such ceiling. The agent invokes them through its existing shell — `mycelium read` sits in the same Bash tool as `git log` and `rg` — and `mycelium` is the smallest adapter that earns its keep: atomic conditional writes, an authoritative activity log, a crash-recovery journal, no policy about what to save, how to name, or what's relevant. A Frontier model uses them with judgment indistinguishable from a thoughtful engineer keeping a working notebook, and the same surface gets _more_ useful — not less — as the next generation arrives. This is the central bet, and every other decision is downstream of it.
+General tools (read, write, list, edit, grep) have no such ceiling. The agent invokes them through its existing shell — `mycelium read` sits in the same Bash tool as `git log` and `rg` — and `mycelium` is the smallest adapter that earns its keep: atomic conditional writes, an authoritative activity log, a crash-recovery journal, no policy about what to save, how to name, or what's relevant. A Frontier model uses them with judgment indistinguishable from a thoughtful engineer keeping a working notebook, and the same surface gets _more_ useful — not less — as the next generation arrives. This is the central bet, and every other decision is downstream of it.
 
 ### Files are the unit. Directories are the structure. The agent owns both.
 
@@ -108,7 +108,7 @@ reserved `_` paths:
        │  raw writes are unsupported: all mutations go through mycelium
        ▼
   `mycelium` binary
-       read · write · edit · ls · glob · grep · rm · mv · log · evolve
+       read · write · edit · ls · grep · rm · mv · log · evolve
        — enforces _-prefix reservation for agent mutations
        — provides CAS and structured conflict errors
        — writes authoritative activity entries
@@ -126,7 +126,7 @@ Agents and operators share one readable surface — the filesystem. The binary i
 
 ## 4. CLI Surface
 
-A single binary, `mycelium`, invoked through the agent's shell. Ten subcommands: eight file/navigation operations plus two metadata operations.
+A single binary, `mycelium`, invoked through the agent's shell. Nine subcommands: seven file/navigation operations plus two metadata operations.
 
 ### File and navigation operations
 
@@ -140,9 +140,8 @@ A single binary, `mycelium`, invoked through the agent's shell. Ten subcommands:
 
 - **`mycelium write <path> [--expected-version SHA] [--rationale STR]`** — create or overwrite from stdin. With `--expected-version`, conditional on the current version; otherwise unconditional. Prints the new version on success. `--rationale` is captured as a top-level field on the activity log entry and in the conflict envelope on CAS failure.
 - **`mycelium edit <path> --old STR --new STR [--expected-version SHA] [--rationale STR]`** — find-and-replace a unique substring. Fails if `--old` is absent or non-unique. _Earns its complexity:_ token economy on large files, diff quality under git/jj, and the unique-substring constraint catches stale-view errors a full overwrite would silently paper over.
-- **`mycelium ls [--recursive]`** — list paths under the mount. _Earns its complexity:_ `glob` requires a pattern; `ls` is the unprefixed survey.
-- **`mycelium glob <pattern>`** — print paths matching a glob (`**/*.md`, `notes/2026-*/*.txt`, `_activity/2026/04/*/*.jsonl`).
-- **`mycelium grep --pattern STR [--path PATH] [--regex] [--file-type T] [--format text|json] [--limit N]`** — print matching lines with paths and line numbers. `--format=text` is `path:line:text`; `--format=json` returns `{matches: [{path, line, text}, ...], truncated}`. `--limit` caps results (default 1000, hard ceiling). Implementation is pure Go: one search path, one regex dialect, deterministic behavior across machines. _Earns its complexity:_ JSON and type filter make the activity log usable through general tools; the `--limit` cap keeps log-reflection from overflowing context.
+- **`mycelium ls [pattern] [--recursive]`** — list paths under the mount, optionally filtered by a glob pattern. Without `--recursive`, only top-level files are listed or matched. _Earns its complexity:_ one survey/path-discovery verb covers both browsing and pattern matching.
+- **`mycelium grep --pattern STR [--path PATH] [--regex] [--format text|json] [--limit N]`** — print matching lines with paths and line numbers. `--format=text` is `path:line:text`; `--format=json` returns `{matches: [{path, line, text}, ...], truncated}`. `--limit` caps results (default 1000, hard ceiling). Implementation is pure Go: one search path, one regex dialect, deterministic behavior across machines. _Earns its complexity:_ JSON output makes the activity log usable through general tools; the `--limit` cap keeps log-reflection from overflowing context.
 - **`mycelium rm <path> [--expected-version SHA] [--rationale STR]`** — remove. _Earns its complexity:_ not expressible as `write` — empty content creates an empty file, not a deletion.
 - **`mycelium mv <src> <dst> [--expected-version SHA] [--rationale STR]`** — atomic rename within the store. `--expected-version`, when supplied, checks the source version. The destination must not exist; destination collisions return a structured conflict. _Earns its complexity:_ read+write+delete is not atomic; emulating rename loses the guarantee.
 
@@ -170,14 +169,14 @@ A single binary, `mycelium`, invoked through the agent's shell. Ten subcommands:
 - exit 0 — success
 - exit 1 — generic error (path not found, malformed args, unrecoverable pending transaction)
 - exit 2 — usage error (bad flags, malformed args, invalid regex, invalid output format)
-- exit 64 — CAS conflict; stderr is JSON `{"error":"conflict","op":"write","path":"...","current_version":"sha256:...","expected_version":"sha256:..."}`. With `--include-current-content`, also `"current_content": "..."` for UTF-8 files.
+- exit 64 — CAS conflict; stderr is JSON `{"error":"conflict","op":"write","path":"...","current_version":"sha256:...","expected_version":"sha256:..."}`.
 - exit 65 — protocol violation (reserved path/kind, invalid evolution payload, etc.)
 
 A successful `write` or `edit` prints `{"version":"sha256:..."}` on stdout. `read --format json` prints a read envelope. `rm`, `mv`, and `log` are silent on success. `evolve` query modes print their requested projection.
 
 What's _not_ here:
 
-- **No specialized content query DSL.** Reading the activity log uses the same tools as reading any file: `mycelium read` (or `cat`), `mycelium glob` (or `ls`) for time windows, `mycelium grep --format=json` (or `rg --json`) for filtering. The one intentional projection is `mycelium evolve`, which reads system-owned evolution metadata for cross-session continuity.
+- **No specialized content query DSL.** Reading the activity log uses the same tools as reading any file: `mycelium read` (or `cat`), `mycelium ls [pattern] --recursive` (or `ls`) for time windows, `mycelium grep --format=json` (or `rg --json`) for filtering. The one intentional projection is `mycelium evolve`, which reads system-owned evolution metadata for cross-session continuity.
 - **No `summarize`, `index`, `embed`, `tag`, `pin`, `archive`, `recall`.** If the agent wants any of those, it implements them by writing files and may record the decision with `mycelium evolve`.
 - **No `exists` subcommand.** `mycelium read` exits non-zero with a typed not-found message.
 
@@ -287,7 +286,7 @@ Crash recovery examples:
 Multiple agents may mount the same local store simultaneously. Guarantees:
 
 1. **No silent loss.** Concurrent writes to the same path don't silently overwrite each other when conditional writes are used. Unconditional writes are documented as last-writer-wins.
-2. **Visible conflicts.** A failed conditional write returns a typed error with the current version and, optionally, current content; the agent re-reads, merges, retries.
+2. **Visible conflicts.** A failed conditional write returns a typed error with the current version; the agent re-reads, merges, retries.
 3. **Atomic single-file ops.** `write`, `edit`, `rm`, `mv` either fully apply or fail. No half-written files, no partial renames.
 4. **Authoritative mutation log.** Every committed mutation has a durable activity entry. If a crash interrupts the content/log boundary, `_tx/` makes the missing entry recoverable before further mutations.
 5. **Per-agent log files.** Each agent writes its daily activity stream at `_activity/YYYY/MM/DD/{agent_id}.jsonl`. Cross-agent order can be reconstructed by sorting on `ts` or `tx_id`.
@@ -324,7 +323,7 @@ The binary does own one piece of structured metadata: evolution events in the ac
 
 Three primitives, all from section 4:
 
-1. **Behavioral awareness via the activity log.** Mutations and explicit signals are JSONL at `_activity/YYYY/MM/DD/{agent_id}.jsonl`. Time windows scope with `mycelium glob`; filter with `mycelium grep --format=json` or raw `rg --json`. Patterns obvious in retrospect — duplicate creation, abandoned naming schemes, conventions edited but unfollowed, repeated writes into stale regions — become visible without a specialized memory API. Reads are not logged, so the log does not claim to know what the agent looked at.
+1. **Behavioral awareness via the activity log.** Mutations and explicit signals are JSONL at `_activity/YYYY/MM/DD/{agent_id}.jsonl`. Time windows scope with `mycelium ls [pattern] --recursive`; filter with `mycelium grep --format=json` or raw `rg --json`. Patterns obvious in retrospect — duplicate creation, abandoned naming schemes, conventions edited but unfollowed, repeated writes into stale regions — become visible without a specialized memory API. Reads are not logged, so the log does not claim to know what the agent looked at.
 2. **State awareness and modification via standard file tools.** Self-evolution adds no content mutation verbs; it gives the agent reasons to use existing ones differently.
 3. **Conventions-as-files plus `evolve` records.** Prose schemes live in editable text (`MYCELIUM_MEMORY.md`, `INDEX.md`, an agent-written `ARCHIVE_POLICY.md`). Structured decisions live as `op: "evolve"` entries with rationale and supersession metadata.
 
@@ -388,7 +387,7 @@ Observability is plain JSONL files at a reserved path. No sidecar service, no au
 
 ### The activity log
 
-Three paths produce entries in `_activity/YYYY/MM/DD/{agent_id}.jsonl`: every content-mutating subcommand (`write`, `edit`, `rm`, `mv`) appends automatically on commit, `mycelium log` appends explicit signal entries, and `mycelium evolve` appends evolution entries. Reads (`read`, `ls`, `glob`, `grep`) aren't logged; the log records what changed and what was observed, not what was looked at.
+Three paths produce entries in `_activity/YYYY/MM/DD/{agent_id}.jsonl`: every content-mutating subcommand (`write`, `edit`, `rm`, `mv`) appends automatically on commit, `mycelium log` appends explicit signal entries, and `mycelium evolve` appends evolution entries. Reads (`read`, `ls`, `grep`) aren't logged; the log records what changed and what was observed, not what was looked at.
 
 The activity log is authoritative for state-changing Mycelium operations: no mutating command returns success unless its activity entry is durable. If content changes but logging cannot complete, the command fails and leaves a pending `_tx/` record that recovery must resolve before future mutations.
 
@@ -475,11 +474,11 @@ An evolution entry:
 }
 ```
 
-**Path layout: `_activity/YYYY/MM/DD/{agent_id}.jsonl`.** Each agent writes its own daily file; cross-agent order is reconstructed by sorting on `ts` or `tx_id`. Time-windowed queries collapse to glob: `_activity/2026/04/*/*.jsonl` (this month, all agents); `_activity/2026/04/26/*.jsonl` (today, all agents); `_activity/2026/04/26/glp1-research.jsonl` (today, one agent). Payloads from `mycelium log` are inlined on the entry; larger signals belong in a regular file referenced via `--path`.
+**Path layout: `_activity/YYYY/MM/DD/{agent_id}.jsonl`.** Each agent writes its own daily file; cross-agent order is reconstructed by sorting on `ts` or `tx_id`. Time-windowed queries use path patterns with `mycelium ls --recursive`: `_activity/2026/04/*/*.jsonl` (this month, all agents); `_activity/2026/04/26/*.jsonl` (today, all agents); `_activity/2026/04/26/glp1-research.jsonl` (today, one agent). Payloads from `mycelium log` are inlined on the entry; larger signals belong in a regular file referenced via `--path`.
 
 **Same files, two readers, one mutation path:**
 
-- **The agent** reads the log with `mycelium glob` / `mycelium grep --format=json` / `mycelium read` — or raw `ls` / `rg --json` / `cat`. This is the substrate self-evolution runs on.
+- **The agent** reads the log with `mycelium ls --recursive` / `mycelium grep --format=json` / `mycelium read` — or raw `ls` / `rg --json` / `cat`. This is the substrate self-evolution runs on.
 - **Operators** tail the same files with standard tools — `tail -f`, log shippers, text editors, shell scripts. Plain JSONL; standard tools work without Mycelium-specific config.
 - **Mutations** go through `mycelium`. The binary writes `_activity/` and `_tx/`; callers do not write those paths directly.
 

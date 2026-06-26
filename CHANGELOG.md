@@ -1,3 +1,11 @@
+## [0.3.0] - Unreleased
+
+### Changed (mycelium binary)
+
+- Folded `mycelium glob <pattern>` into `mycelium ls [pattern] [--recursive]`; `glob` is no longer a subcommand.
+- Removed `mycelium grep --file-type`; use `--path` to scope searches.
+- Removed `--include-current-content` from `write`, `edit`, `rm`, and `mv`. Conflict envelopes still include `current_version`; recover by re-reading with `mycelium read <path> --format json`, merging, and retrying with the fresh version token.
+
 ## [0.2.1] - 2026-05-29
 
 ### Fixed (pi-mycelium extension)
