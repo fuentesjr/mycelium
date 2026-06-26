@@ -37,7 +37,7 @@ Compatibility behavior:
 
 To support mounts still mentioning evolve, Stage 3 adds a hidden transitional diagnostic stub:
 
-- `mycelium evolve` exits 1 with exactly one line: `evolve was removed in 0.3.0; record conventions in your conventions file (see MYCELIUM_MEMORY.md)`.
+- `mycelium evolve` exits 1 with exactly one line: `evolve was removed in 0.4.0; record conventions in your conventions file (see MYCELIUM_MEMORY.md)`.
 - the stub is hidden from normal help output.
 - it is removed at 1.0.
 

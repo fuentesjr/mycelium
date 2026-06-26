@@ -162,7 +162,7 @@ func TestEvolveSubcommandIsDiagnosticStub(t *testing.T) {
 	if out != "" {
 		t.Errorf("stdout: got %q, want empty", out)
 	}
-	if !strings.Contains(errOut, "evolve was removed in 0.3.0") {
+	if !strings.Contains(errOut, "evolve was removed in 0.4.0") {
 		t.Errorf("stderr should mention removal, got %q", errOut)
 	}
 	if !strings.Contains(errOut, "MYCELIUM_MEMORY.md") {

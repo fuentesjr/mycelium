@@ -40,7 +40,7 @@ There is a bounded power-loss gap:
 - if power fails after durable content write and before log append, the mount stays mutated with a missing event line.
 - this gap is bounded to the single microsecond-to-millisecond ordering window, and is now documented as the durable-history contract instead of being hidden by transaction recovery.
 
-v0.3 compatibility for leftover `_tx/pending/*.json` is required:
+Compatibility for leftover `_tx/pending/*.json` is required:
 
 - a preflight compatibility check must block mutations on mounts that still contain pending records,
 - the CLI must fail with actionable instructions to run documented recovery before normal operations,
@@ -58,7 +58,7 @@ v0.3 compatibility for leftover `_tx/pending/*.json` is required:
 ### Negative
 
 - operators now see occasional loud failures in the narrow post-commit append gap and must tolerate one unlogged but completed mutation in crash windows.
-- compatibility work for legacy `_tx` artifacts is required at v0.3 boundary.
+- compatibility work for legacy `_tx` artifacts is required at the simplification release boundary.
 
 ### Neutral
 

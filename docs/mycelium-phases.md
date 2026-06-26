@@ -67,7 +67,7 @@ Mycelium is LocalFS/POSIX-native. The roadmap below keeps that guarantee set ins
 **In scope.**
 
 - Documented activity log schema. A versioned `_activity/SCHEMA.md` declares the entry shape and compatibility expectations.
-- Legacy recovery diagnostics. A documented procedure explains how to handle pre-v0.3 `_tx/pending/*.json` records before using the current binary.
+- Legacy recovery diagnostics. A documented procedure explains how to handle leftover `_tx/pending/*.json` records before using the current binary.
 - Optional read-byte caps with explicit override, if benchmarks show large reads causing practical failures.
 - Claude Code skill distribution bundling platform-specific binaries and the starter `MYCELIUM_MEMORY.md` template.
 - Hermes memory plugin or equivalent harness integration that shells out to the binary and avoids auto-acting memory hooks.

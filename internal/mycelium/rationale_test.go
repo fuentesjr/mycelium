@@ -411,8 +411,8 @@ func TestLogRationaleOversizeRejected(t *testing.T) {
 	}
 }
 
-// Legacy _tx recovery was removed in v0.3. Rationale-bearing mutations still
-// block before content changes when a pre-v0.3 mount has pending records.
+// Legacy _tx recovery was removed before v0.4. Rationale-bearing mutations
+// still block before content changes when a legacy mount has pending records.
 func TestRationaleWriteBlockedByLegacyPendingTx(t *testing.T) {
 	mount := t.TempDir()
 	t.Setenv("MYCELIUM_MOUNT", mount)

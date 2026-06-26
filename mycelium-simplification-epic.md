@@ -1,6 +1,6 @@
 # Mycelium Simplification Epic
 
-**Status:** Proposed (decisions approved in review session 2026-06-11)
+**Status:** Implemented through Stage 7; release prep in progress for v0.4.0 (2026-06-26)
 **Theme:** Collapse the system onto its own public model — "a folder + safe mutations + a searchable activity log." Everything below either makes that sentence truer or deletes something that is not in it.
 
 ## Summary
@@ -40,14 +40,14 @@ Each stage is one reviewable jj change, independently shippable, in this order. 
 - Fold `glob` into `ls`: `mycelium ls [pattern] [--recursive]` — no pattern lists as today; with a pattern, matches it (`**/*.md` etc.). One WalkDir loop instead of two near-identical ones in `listing.go`.
 - Drop `--file-type` from grep (`--path` covers the real cases).
 - Drop `--include-current-content` from write/edit/rm/mv. By the project's own razor it should not have shipped, but this is explicitly a weaker conflict-recovery loop: `read --format json` one command later can observe a newer version under concurrency, not the same-conflict bytes. Stage 2 updates conflict docs/tests around re-read/merge/retry semantics; if same-conflict content remains required, defer removal by one release instead.
-- CHANGELOG entries marking the breaking changes for v0.3.0 (pre-1.0; README already warns the surface may shift).
+- CHANGELOG entries marking the breaking changes for the simplification release (pre-1.0; README already warns the surface may shift).
 
 ### Stage 3 — Conventions-as-files (ADR-0004; 9 → 8 functional verbs)
 
 Binary:
 
 - Delete `evolve.go`, `evolution.go`, `kinds.go`, their tests (~770 production, ~1,600 test lines), and the `evolve` handler in `cli.go`. Keep `appendActivityLineDurable` through Stage 3 because `_tx` recovery still needs `appendActivityEntryDurable`; final deletion/cleanup moves to Stage 4 if unused.
-- Add a hidden transitional `evolve` diagnostic stub: exit 1 with one line — "evolve was removed in 0.3.0; record conventions in your conventions file (see MYCELIUM_MEMORY.md)". It is not a functional verb and should not appear in the normal help surface; remove it at 1.0. This prevents confusing failures in mounts whose seeded templates still mention evolve.
+- Add a hidden transitional `evolve` diagnostic stub: exit 1 with one line — "evolve was removed in 0.4.0; record conventions in your conventions file (see MYCELIUM_MEMORY.md)". It is not a functional verb and should not appear in the normal help surface; remove it at 1.0. This prevents confusing failures in mounts whose seeded templates still mention evolve.
 - Move shared constants (for example `maxRationaleSize`) that evolve callers still need before deleting the evolve files.
 - Restate `activity_scan.go` ownership so Stage 3 can ship: keep it while `_tx` recovery still needs it, and perform the final delete sweep after Stage 4 when tx recovery scan is removed.
 
@@ -72,7 +72,7 @@ Compatibility: existing logs keep their `op:"evolve"` lines as valid, tolerated 
 - The reserved `_` prefix stays (still protects `_activity/` and `_lock`).
 - Preserve JSONL schema shape while removing `_tx`: `tx_id` remains on mutation entries, and generation switches from ULID to stdlib time/randomness (`tx-<zero-padded-unix-nano>-<rand>`), preserving timestamp sortability.
 - Replace the remaining default-session ULID generator in `identity.go` with stdlib time/randomness (`auto-<zero-padded-unix-nano>-<rand>`) before deleting `ulid.go` and the `oklog/ulid` entries from `go.mod`/`go.sum`.
-- v0.3.0 legacy compatibility for `_tx/pending/*.json`: preflight reject with loud instructions to run documented recovery before normal operations. This requirement has explicit docs and tests.
+- Simplification-release legacy compatibility for `_tx/pending/*.json`: preflight reject with loud instructions to run documented recovery before normal operations. This requirement has explicit docs and tests.
 - Characterization tests added before deletion: mutation ordering (no success without a durable append attempt), append-failure behavior, CAS semantics unchanged, and `_tx/pending/*.json` compatibility behavior. Crash-recovery tests are deleted with the feature.
 - Docs: design doc sections 3, 5, and 8 drop `_tx/`; the FAQ crash answer and `docs/mycelium-phases.md` acceptance criterion 6 are rewritten to the new contract; README's "Crash-safe" bullet becomes: atomic content mutations, durable append-only log, no silent loss — at worst, a power loss in a microsecond window leaves the final mutation unlogged.
 
@@ -84,7 +84,7 @@ Compatibility: existing logs keep their `op:"evolve"` lines as valid, tolerated 
 - `tests/portable-events-fixture.test.ts`: the fixture stays as full-vocabulary documentation for all adapters; the test's "exactly 8 op types" assertion is retargeted to "fixture ops are within the documented vocabulary".
 - `docs/portable-activity-events.md`: vocabulary unchanged; the L3 example paragraph updated to match what pi-mycelium now emits (session boundaries, compaction, deduped context checkpoints).
 - `extensions/pi-mycelium` remains responsible for those events only after Stage 5; turn and tool events are intentionally not emitted by this adapter.
-- Release v0.3.0 after this stage (binary + extension + platform packages), per `docs/release-checklist.md`.
+- Original plan: release v0.3.0 after this stage (binary + extension + platform packages), per `docs/release-checklist.md`. Actual release prep folded Stages 6-7 into the same cut and ships the combined tree as v0.4.0.
 
 ### Stage 6 — Skill + adapter split on the slim core
 
@@ -107,7 +107,7 @@ CAS semantics and version tokens; atomic write/edit/rm/mv; the conflict envelope
 
 ## Risks
 
-- **Published extension users (pre-1.0):** v0.3.0 is breaking (evolve gone, two flags gone, glob folded). Mitigations: CHANGELOG, the transitional evolve stub, early-access framing already in README.
+- **Published extension users (pre-1.0):** v0.4.0 is breaking (evolve gone, two flags gone, glob folded). Mitigations: CHANGELOG, the transitional evolve stub, early-access framing already in README.
 - **Seeded templates in existing mounts reference evolve:** the stub's pointer message covers the transition; templates self-heal as agents edit them.
 - **T2 grading drift:** rubric edit happens in Stage 3 alongside the code so the benchmark never references a removed feature.
 
@@ -116,4 +116,4 @@ CAS semantics and version tokens; atomic write/edit/rm/mv; the conflict envelope
 - Pre-1.0 breaking changes are acceptable with CHANGELOG documentation (per README's early-access framing).
 - No external consumers of `evolve` or the journal beyond this repo's extension and docs.
 - Benchmark T1/T2 model runs have not been published, so rubric rewording has no comparability cost.
-- Phase 2 distribution work begins after Stage 5, on the simplified surface.
+- Phase 2 distribution work begins after Stage 7, on the simplified surface.

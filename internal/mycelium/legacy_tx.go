@@ -33,7 +33,7 @@ func blockLegacyPendingTransactions(errOut io.Writer, mount string) int {
 	first := relForwardSlash(mount, matches[0])
 	fmt.Fprintf(
 		errOut,
-		"mycelium: legacy _tx/pending records found; v0.3 no longer replays the transaction journal. Run the last v0.2 mycelium binary on this mount to recover pending records, then retry. First pending record: %s\n",
+		"mycelium: legacy _tx/pending records found; current versions no longer replay the transaction journal. Run the last v0.2 mycelium binary on this mount to recover pending records, then retry. First pending record: %s\n",
 		first,
 	)
 	return ExitGenericError

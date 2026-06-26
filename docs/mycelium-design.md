@@ -203,7 +203,7 @@ There is no backend interface in the v1 design. A future storage adapter would n
 
 ### Durable activity boundary
 
-The activity log is authoritative, so Mycelium cannot treat log append failure as a warning after content has changed. But a local filesystem still cannot atomically mutate an arbitrary content file and append a different JSONL file as one hardware transaction. The v0.3 contract makes that boundary explicit rather than hiding it behind a recovery journal.
+The activity log is authoritative, so Mycelium cannot treat log append failure as a warning after content has changed. But a local filesystem still cannot atomically mutate an arbitrary content file and append a different JSONL file as one hardware transaction. The current contract makes that boundary explicit rather than hiding it behind a recovery journal.
 
 Every content mutation follows this sequence:
 
@@ -223,13 +223,13 @@ Failure examples:
 
 **Log append fails after content changed.** The command exits non-zero with a message that the log entry write failed after content commit. The content mutation remains committed. No `_tx/` record is created, so there is no automatic replay path.
 
-**Legacy `_tx` records exist.** v0.3 does not replay the old transaction journal. If `_tx/pending/*.json` exists, mutating commands fail before content changes with instructions to run the last v0.2 binary on the mount to recover pending records, then retry.
+**Legacy `_tx` records exist.** Current binaries do not replay the old transaction journal. If `_tx/pending/*.json` exists, mutating commands fail before content changes with instructions to run the last v0.2 binary on the mount to recover pending records, then retry.
 
 Legacy recovery procedure:
 
 1. Run the last v0.2 `mycelium` binary with `MYCELIUM_MOUNT` pointed at the affected mount.
-2. Execute a harmless log append, for example: `mycelium log legacy_tx_recovery --payload-json '{"from":"pre-v0.3"}'`. The v0.2 binary runs pending transaction recovery before appending the log entry.
-3. If the command exits 0, verify `_tx/pending/` has no `*.json` files, then return to v0.3.
+2. Execute a harmless log append, for example: `mycelium log legacy_tx_recovery --payload-json '{"from":"legacy-tx-recovery"}'`. The v0.2 binary runs pending transaction recovery before appending the log entry.
+3. If the command exits 0, verify `_tx/pending/` has no `*.json` files, then return to the current binary.
 4. If v0.2 reports an unrecoverable pending record, inspect the named JSON file and content path manually before deleting or archiving the pending record.
 
 `mycelium log` has no content mutation: its only state change is the activity append itself. It still acquires the mount lock, checks for legacy pending records, and returns success only after the activity entry is durable.
@@ -413,7 +413,7 @@ schema.
 
 ### Export
 
-Export is `tar` or `cp -r`. No proprietary format; a directory of UTF-8 files plus JSONL logs is the export format. If a pre-v0.3 store still has `_tx/pending/*.json`, recover it with the last v0.2 binary before treating the export as clean.
+Export is `tar` or `cp -r`. No proprietary format; a directory of UTF-8 files plus JSONL logs is the export format. If a legacy store still has `_tx/pending/*.json`, recover it with the last v0.2 binary before treating the export as clean.
 
 ---
 

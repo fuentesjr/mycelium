@@ -78,7 +78,7 @@ Every content mutation follows a fail-loud durability boundary:
 3. The activity log entry is appended and fsynced.
 4. The command returns success only after the log append succeeds.
 
-If the process dies before the content commit, the target file is unchanged. If it dies after the content commit but before the activity append, the file may contain the final mutation without a matching log entry. If the append fails after content commit, the command exits non-zero and says the log write failed after content commit. That bounded gap is the documented durable-history contract. Pre-v0.3 mounts with leftover `_tx/pending/*.json` records are blocked with instructions to recover them using the last v0.2 binary before retrying. See the [design doc](mycelium-design.md) section 5 for the full storage contract.
+If the process dies before the content commit, the target file is unchanged. If it dies after the content commit but before the activity append, the file may contain the final mutation without a matching log entry. If the append fails after content commit, the command exits non-zero and says the log write failed after content commit. That bounded gap is the documented durable-history contract. Legacy mounts with leftover `_tx/pending/*.json` records are blocked with instructions to recover them using the last v0.2 binary before retrying. See the [design doc](mycelium-design.md) section 5 for the full storage contract.
 
 ### Two agents writing the same file at the same instant — what happens?
 
@@ -219,7 +219,7 @@ For self-evolution decisions — conventions adopted, regions archived — `MYCE
 
 ### Is mycelium production-ready?
 
-Not yet. Mycelium is pre-1.0, currently at v0.3.0-pre (early access). Phase 1 is feature-complete: atomic content-addressable storage (CAS), a durable append-only activity log, conventions-as-files, and the on-disk format are all implemented and have property-based and concurrent-process test coverage. What is not yet complete is the full benchmark validation against frontier models (T1 multi-session synthesis and T2 self-evolution runs are drafted but awaiting published runs). The [roadmap](mycelium-phases.md) lays out what Phases 2 and 3 add.
+Not yet. Mycelium is pre-1.0, currently at v0.4.0 (early access). Phase 1 is feature-complete: atomic content-addressable storage (CAS), a durable append-only activity log, conventions-as-files, and the on-disk format are all implemented and have property-based and concurrent-process test coverage. What is not yet complete is the full benchmark validation against frontier models (T1 multi-session synthesis and T2 self-evolution runs are drafted but awaiting published runs). The [roadmap](mycelium-phases.md) lays out what Phases 2 and 3 add.
 
 The practical risk at this stage is not data loss — the core integrity primitives are solid — but rather that the API surface, on-disk format details, or activity log schema may still shift before 1.0.
 
