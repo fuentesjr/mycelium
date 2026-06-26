@@ -45,7 +45,7 @@ Mycelium targets **Frontier-class production models** — top-of-class capabilit
 
 This is the project's first principle and the one every other principle answers to. Every tool, parameter, on-disk structure, and guarantee earns its complexity against "could this be expressed in terms of something already here?" — and is removed when the answer turns out to be yes. When in doubt, fewer.
 
-The "but not simpler" half is load-bearing. A system that fakes simplicity by hiding necessary complexity behind opaque abstractions, or that drops a guarantee the bet depends on, has failed this principle as surely as one that piles on unnecessary layers. Atomicity, conflict visibility, reserved-prefix protection, authoritative activity logging, and crash recovery cannot be removed without breaking the bet — they're as simple as the bet allows, and no simpler.
+The "but not simpler" half is load-bearing. A system that fakes simplicity by hiding necessary complexity behind opaque abstractions, or that drops a guarantee the bet depends on, has failed this principle as surely as one that piles on unnecessary layers. Atomicity, conflict visibility, reserved-prefix protection, and durable activity logging cannot be removed without breaking the bet — they're as simple as the bet allows, and no simpler.
 
 **Simplicity budget.** Any new command, flag, metadata path, persisted concept,
 or prompt requirement must either remove an equal or larger concept elsewhere or
@@ -58,7 +58,7 @@ implementation docs and diagnostics rather than the default agent/user model.
 
 A specialized memory API encodes assumptions: what gets saved, how it's indexed, what counts as "relevant," when to summarize. As models improve, those heuristics become drag — the system forces the agent into compression and ranking policies the model could now beat unaided.
 
-General tools (read, write, list, edit, grep) have no such ceiling. The agent invokes them through its existing shell — `mycelium read` sits in the same Bash tool as `git log` and `rg` — and `mycelium` is the smallest adapter that earns its keep: atomic conditional writes, an authoritative activity log, a crash-recovery journal, no policy about what to save, how to name, or what's relevant. A Frontier model uses them with judgment indistinguishable from a thoughtful engineer keeping a working notebook, and the same surface gets _more_ useful — not less — as the next generation arrives. This is the central bet, and every other decision is downstream of it.
+General tools (read, write, list, edit, grep) have no such ceiling. The agent invokes them through its existing shell — `mycelium read` sits in the same Bash tool as `git log` and `rg` — and `mycelium` is the smallest adapter that earns its keep: atomic conditional writes, an authoritative activity log, no policy about what to save, how to name, or what's relevant. A Frontier model uses them with judgment indistinguishable from a thoughtful engineer keeping a working notebook, and the same surface gets _more_ useful — not less — as the next generation arrives. This is the central bet, and every other decision is downstream of it.
 
 ### Files are the unit. Directories are the structure. The agent owns both.
 
@@ -68,13 +68,13 @@ The filesystem is the agent's workspace, not a managed resource. The system does
 
 Every byte stored is plain content the user can open, read, diff, copy, and export. No opaque embedding index, no proprietary serialization, no metadata sidecar authoritative over the visible file. If a person can't read and reason about the store, the agent will eventually mis-edit it — and the user will have no way to recover.
 
-There is one operational boundary: **raw filesystem reads are allowed; raw filesystem writes are not. All live-store mutations go through `mycelium`.** Operators can inspect with `cat`, `ls`, `rg`, editors, and tarballs. But raw writes, edits, deletes, and renames inside the mounted store are unsupported because they bypass CAS, the transaction journal, and the authoritative activity log. If a human wants to change the live store, they use the same `mycelium write` / `edit` / `rm` / `mv` surface the agent uses.
+There is one operational boundary: **raw filesystem reads are allowed; raw filesystem writes are not. All live-store mutations go through `mycelium`.** Operators can inspect with `cat`, `ls`, `rg`, editors, and tarballs. But raw writes, edits, deletes, and renames inside the mounted store are unsupported because they bypass CAS and the authoritative activity log. If a human wants to change the live store, they use the same `mycelium write` / `edit` / `rm` / `mv` surface the agent uses.
 
 ### Hints over enforcement; conventions over schemas
 
 System opinions about how the agent should organize memory live as **starter files inside the store** — not system features, not enforced layouts, not middleware that rewrites calls. Hints are removable. Schemas are sticky.
 
-One principled exception (sections 4, 5, and 8): the `_` prefix at the store root is reserved for system paths, and `mycelium` rejects agent mutations under it. The activity log and transaction journal are load-bearing for self-evolution, crash recovery, and debugging. Reserving the prefix rather than just the current paths (`_activity/`, `_tx/`) prevents future namespace collisions.
+One principled exception (sections 4, 5, and 8): the `_` prefix at the store root is reserved for system paths, and `mycelium` rejects agent mutations under it. The activity log, lock file, and any future system metadata need a collision-free namespace. Reserving the prefix rather than just the current paths prevents future namespace collisions.
 
 ### Concurrency is a property of the store
 
@@ -92,7 +92,7 @@ The system records what the agent did. It does not act on what the agent did. Th
 
 Public model first: **a folder + safe mutations + a searchable activity log**.
 Agents and operators should not need to think about CAS, `flock`, fsync, or the
-transaction journal during normal use. Those details exist to make "safe
+durability boundary during normal use. Those details exist to make "safe
 mutations" true.
 
 Internally there are two layers, with system metadata inside the store under
@@ -112,12 +112,10 @@ reserved `_` paths:
        — enforces _-prefix reservation for agent mutations
        — provides CAS and structured conflict errors
        — writes authoritative activity entries
-       — recovers pending transactions from _tx/
        ▼
   Local POSIX filesystem store
        agent-authored files and directories
        _activity/YYYY/MM/DD/{agent_id}.jsonl
-       _tx/pending/{tx_id}.json
 ```
 
 Agents and operators share one readable surface — the filesystem. The binary is a thin shim over LocalFS for mutations and system metadata; it never interprets agent-authored content.
@@ -152,7 +150,7 @@ A single binary, `mycelium`, invoked through the agent's shell. Eight visible su
 **Failure modes:**
 
 - exit 0 — success
-- exit 1 — generic error (path not found, malformed args, unrecoverable pending transaction)
+- exit 1 — generic error (path not found, malformed args, log append failure after content commit, legacy pending transaction)
 - exit 2 — usage error (bad flags, malformed args, invalid regex, invalid output format)
 - exit 64 — CAS conflict; stderr is JSON `{"error":"conflict","op":"write","path":"...","current_version":"sha256:...","expected_version":"sha256:..."}`.
 - exit 65 — protocol violation (reserved path, oversize rationale, etc.)
@@ -165,15 +163,15 @@ What's _not_ here:
 - **No `summarize`, `index`, `embed`, `tag`, `pin`, `archive`, `recall`.** If the agent wants any of those, it implements them by writing files and may record the standing convention in `MYCELIUM_MEMORY.md`.
 - **No `exists` subcommand.** `mycelium read` exits non-zero with a typed not-found message.
 
-Four contract notes:
+Five contract notes:
 
-**Raw reads are allowed; raw writes are not.** `cat`, `ls`, `rg`, editors, `tar`, and `cp -r` are fine for inspection/export. Mutations inside the live mount go through `mycelium` so CAS, `_tx/`, and `_activity/` remain authoritative.
+**Raw reads are allowed; raw writes are not.** `cat`, `ls`, `rg`, editors, `tar`, and `cp -r` are fine for inspection/export. Mutations inside the live mount go through `mycelium` so CAS and `_activity/` remain authoritative.
 
 **Conditional writes are first-class.** Every content-mutating subcommand (`write`, `edit`, `rm`, `mv`) accepts optional `--expected-version`. Version tokens are opaque strings to the caller; the LocalFS implementation uses content hashes (`sha256:...`) and the sentinel `sha256:absent` for a missing file. A single-agent store can ignore CAS and the system behaves like a regular filesystem with an audit log.
 
 **Operational rationale is optional on every mutation and signal.** `write`, `edit`, `rm`, `mv`, and `log` all accept optional `--rationale "..."`. When supplied, rationale appears as `rationale` on the activity log entry and on the conflict envelope. Maximum 64 KiB; oversize input is rejected with exit 65 before the mutation runs.
 
-**The `_` prefix is reserved at the store root.** `mycelium` rejects `write`, `edit`, `rm`, and `mv` whose target/source is under any path beginning with `_`. Currently `_activity/` and `_tx/`; future system paths inherit the same protection without code changes.
+**The `_` prefix is reserved at the store root.** `mycelium` rejects `write`, `edit`, `rm`, and `mv` whose target/source is under any path beginning with `_`. Currently `_activity/` and `_lock` are system-owned; legacy `_tx/` records are detected for compatibility. Future system paths inherit the same protection without code changes.
 
 **Identity travels via environment.** The harness sets `MYCELIUM_MOUNT` (the store directory) once. `MYCELIUM_AGENT_ID` is optional and defaults to `agent`; `MYCELIUM_SESSION_ID` is optional and auto-generated per CLI process when absent. Harnesses that can provide stable agent/session ids should still do so for clearer multi-agent timelines. Every invocation reads identity from the environment/defaults; every log entry records the agent and session. Standard Unix request identity.
 
@@ -194,7 +192,7 @@ NFS, SMB, FUSE, and non-POSIX synchronization layers are outside the v1 guarante
 Implementation shape:
 
 - Versions are content hashes. `read --format json` and conflict envelopes surface the current version.
-- Conditional mutations acquire the mount lock, check the expected version against current bytes, prepare a transaction record, perform the file operation atomically, append the activity entry durably, then remove the transaction record.
+- Conditional mutations acquire the mount lock, check the expected version against current bytes, perform the file operation atomically, then append the activity entry durably.
 - `write` uses write-to-temp, fsync, rename, and directory fsync.
 - `edit` reads, validates unique substring replacement, then uses the same atomic write path.
 - `rm` captures the prior version before deletion.
@@ -203,66 +201,38 @@ Implementation shape:
 
 There is no backend interface in the v1 design. A future storage adapter would need to re-prove every guarantee above rather than share this contract by assertion.
 
-### Transaction journal: `_tx/`
+### Durable activity boundary
 
-The activity log is authoritative, so Mycelium cannot treat log append failure as a warning after content has changed. But a local filesystem still cannot atomically mutate an arbitrary content file and append a different JSONL file as one hardware transaction. `_tx/` is the minimal bridge.
+The activity log is authoritative, so Mycelium cannot treat log append failure as a warning after content has changed. But a local filesystem still cannot atomically mutate an arbitrary content file and append a different JSONL file as one hardware transaction. The v0.3 contract makes that boundary explicit rather than hiding it behind a recovery journal.
 
-Every content mutation is a small transaction:
+Every content mutation follows this sequence:
 
 1. Acquire the mount lock.
-2. Compute the operation's precondition and postcondition (`prior_version`, `version`, paths).
-3. Write and fsync `_tx/pending/{tx_id}.json` with the intended activity entry.
-4. Apply the content mutation atomically and fsync affected files/directories.
-5. Append and fsync the activity entry.
-6. Remove the pending transaction and fsync `_tx/pending/`.
+2. Refuse to proceed if legacy `_tx/pending/*.json` records exist.
+3. Compute the operation's precondition and postcondition (`prior_version`, `version`, paths).
+4. Check `--expected-version`, when supplied.
+5. Apply the content mutation atomically and fsync affected files/directories.
+6. Append and fsync the activity entry.
 7. Return success.
 
-A normal prepared transaction for a write looks like this while the command is in flight:
+Failure examples:
 
-```json
-{
-  "tx_id": "01HXKP4Z9M8YV1W6E2RTSA9KFG",
-  "op": "write",
-  "path": "notes/foo.md",
-  "prior_version": "sha256:abc...",
-  "version": "sha256:def...",
-  "activity": {
-    "tx_id": "01HXKP4Z9M8YV1W6E2RTSA9KFG",
-    "op": "write",
-    "path": "notes/foo.md",
-    "prior_version": "sha256:abc...",
-    "version": "sha256:def..."
-  }
-}
-```
+**Failure before content changed.** The target file remains at its prior version. No activity entry is written, and the command exits non-zero.
 
-On the success path the agent never sees `_tx/`: the pending file is created, the content changes, the activity line is appended, and the pending file is removed before exit 0.
+**Power loss after content changed but before log append.** The target file may contain the final mutation without a matching `_activity/` entry. This is the bounded power-loss gap in the durable-history contract.
 
-Crash recovery examples:
+**Log append fails after content changed.** The command exits non-zero with a message that the log entry write failed after content commit. The content mutation remains committed. No `_tx/` record is created, so there is no automatic replay path.
 
-**Crash before content changed.** `_tx/pending/01H.json` exists, but `notes/foo.md` still has `prior_version`. Recovery removes the pending transaction and appends no activity entry because the mutation did not commit.
+**Legacy `_tx` records exist.** v0.3 does not replay the old transaction journal. If `_tx/pending/*.json` exists, mutating commands fail before content changes with instructions to run the last v0.2 binary on the mount to recover pending records, then retry.
 
-**Crash after content changed but before log append.** `_tx/pending/01H.json` exists, and `notes/foo.md` has `version`. Recovery appends the stored activity entry, optionally adding `"recovered": true`, fsyncs the log, removes the pending transaction, and only then allows new mutations.
+Legacy recovery procedure:
 
-```json
-{
-  "ts": "2026-04-26T18:42:11.034Z",
-  "agent_id": "researcher-7",
-  "session_id": "sess-9b2f",
-  "tx_id": "01HXKP4Z9M8YV1W6E2RTSA9KFG",
-  "op": "write",
-  "path": "notes/foo.md",
-  "prior_version": "sha256:abc...",
-  "version": "sha256:def...",
-  "recovered": true
-}
-```
+1. Run the last v0.2 `mycelium` binary with `MYCELIUM_MOUNT` pointed at the affected mount.
+2. Execute a harmless log append, for example: `mycelium log legacy_tx_recovery --payload-json '{"from":"pre-v0.3"}'`. The v0.2 binary runs pending transaction recovery before appending the log entry.
+3. If the command exits 0, verify `_tx/pending/` has no `*.json` files, then return to v0.3.
+4. If v0.2 reports an unrecoverable pending record, inspect the named JSON file and content path manually before deleting or archiving the pending record.
 
-**Log append fails after content changed.** The command exits non-zero and leaves the pending transaction in `_tx/pending/`. The next mutating command runs recovery first. It does not proceed until the missing activity entry is durable or recovery reports an unrecoverable error.
-
-**Recovery is uncertain.** If neither the precondition nor postcondition matches — normally possible only after unsupported raw writes or filesystem corruption — Mycelium refuses further mutations and reports the pending transaction path. The operator can inspect the plain JSON and content files directly.
-
-`mycelium log` does not need a content transaction: its only state change is the activity append itself. It still acquires the mount lock and returns success only after the activity entry is durable.
+`mycelium log` has no content mutation: its only state change is the activity append itself. It still acquires the mount lock, checks for legacy pending records, and returns success only after the activity entry is durable.
 
 ---
 
@@ -273,10 +243,10 @@ Multiple agents may mount the same local store simultaneously. Guarantees:
 1. **No silent loss.** Concurrent writes to the same path don't silently overwrite each other when conditional writes are used. Unconditional writes are documented as last-writer-wins.
 2. **Visible conflicts.** A failed conditional write returns a typed error with the current version; the agent re-reads, merges, retries.
 3. **Atomic single-file ops.** `write`, `edit`, `rm`, `mv` either fully apply or fail. No half-written files, no partial renames.
-4. **Authoritative mutation log.** Every committed mutation has a durable activity entry. If a crash interrupts the content/log boundary, `_tx/` makes the missing entry recoverable before further mutations.
+4. **Authoritative mutation log.** Every successful mutation has a durable activity entry. If content commits but logging fails, the command exits non-zero and reports that the post-commit append failed.
 5. **Per-agent log files.** Each agent writes its daily activity stream at `_activity/YYYY/MM/DD/{agent_id}.jsonl`. Cross-agent order can be reconstructed by sorting on `ts` or `tx_id`.
 
-No user-facing multi-file transactions. If the agent wants atomicity across several agent-authored files, it composes it from single-file operations — typically a composite file or an agent-chosen journaling pattern. Mycelium's `_tx/` exists only to preserve the system invariant between content mutations and the activity log; it is not a general transaction API.
+No user-facing multi-file transactions. If the agent wants atomicity across several agent-authored files, it composes it from single-file operations — typically a composite file or an agent-chosen journaling pattern.
 
 Locks are not exposed as the primary coordination mechanism. They introduce timeouts, deadlocks, and lifecycle questions at the agent layer. CAS via versioned writes degrades cleanly: a conflict is just an error to read, reason about, and handle.
 
@@ -338,7 +308,7 @@ Observability is plain JSONL files at a reserved path. No sidecar service, no au
 
 Two paths produce entries in `_activity/YYYY/MM/DD/{agent_id}.jsonl`: every content-mutating subcommand (`write`, `edit`, `rm`, `mv`) appends automatically on commit, and `mycelium log` appends explicit signal entries. Reads (`read`, `ls`, `grep`) aren't logged; the log records what changed and what was observed, not what was looked at.
 
-The activity log is authoritative for state-changing Mycelium operations: no mutating command returns success unless its activity entry is durable. If content changes but logging cannot complete, the command fails and leaves a pending `_tx/` record that recovery must resolve before future mutations.
+The activity log is authoritative for state-changing Mycelium operations: no mutating command returns success unless its activity entry is durable. If content changes but logging cannot complete, the command fails loudly after the content commit. A power loss in that same narrow window can leave the final content mutation unlogged; that bounded gap is part of the durable-history contract.
 
 A mutation entry (`write`):
 
@@ -347,7 +317,7 @@ A mutation entry (`write`):
   "ts": "2026-04-26T18:42:11.034Z",
   "agent_id": "researcher-7",
   "session_id": "sess-9b2f",
-  "tx_id": "01HXKP4Z9M8YV1W6E2RTSA9KFG",
+  "tx_id": "tx-1782468000000000000-4f8d2c1a9b0e7d33",
   "op": "write",
   "path": "learnings/glp1-pipeline.md",
   "prior_version": "sha256:abc...",
@@ -380,7 +350,7 @@ A move entry:
   "ts": "2026-04-26T18:45:00.000Z",
   "agent_id": "researcher-7",
   "session_id": "sess-9b2f",
-  "tx_id": "01HXKP7C6HVM6W4S5NJ3BB0Z0Y",
+  "tx_id": "tx-1782468300000000000-b03a8e4574c9f211",
   "op": "mv",
   "from": "notes/old.md",
   "path": "archive/old.md",
@@ -414,11 +384,11 @@ schema.
 
 - **The agent** reads the log with `mycelium ls --recursive` / `mycelium grep --format=json` / `mycelium read` — or raw `ls` / `rg --json` / `cat`. This is the substrate self-evolution runs on.
 - **Operators** tail the same files with standard tools — `tail -f`, log shippers, text editors, shell scripts. Plain JSONL; standard tools work without Mycelium-specific config.
-- **Mutations** go through `mycelium`. The binary writes `_activity/` and `_tx/`; callers do not write those paths directly.
+- **Mutations** go through `mycelium`. The binary writes `_activity/`; callers do not write reserved `_` paths directly.
 
 ### Export
 
-Export is `tar` or `cp -r`. No proprietary format; a directory of UTF-8 files plus JSONL logs is the export format. The log and transaction metadata come along automatically. A cleanly recovered store should normally have no pending `_tx/` entries.
+Export is `tar` or `cp -r`. No proprietary format; a directory of UTF-8 files plus JSONL logs is the export format. If a pre-v0.3 store still has `_tx/pending/*.json`, recover it with the last v0.2 binary before treating the export as clean.
 
 ---
 

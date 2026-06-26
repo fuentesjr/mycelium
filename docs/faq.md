@@ -71,14 +71,14 @@ These approaches are complementary, not mutually exclusive. A team could pair my
 
 ### What happens to a write if mycelium gets killed or the machine crashes?
 
-Every content mutation is a small transaction:
+Every content mutation follows a fail-loud durability boundary:
 
-1. Before changing a file, mycelium writes an internal pending record under the reserved `_` namespace.
-2. The content change and activity log append are performed.
-3. The pending record is removed — marking the transaction complete.
-4. On restart after a crash, any remaining pending records are replayed or cleaned up before later mutations proceed.
+1. Mycelium takes the mount lock and checks the requested CAS precondition.
+2. The content change is committed atomically and fsynced.
+3. The activity log entry is appended and fsynced.
+4. The command returns success only after the log append succeeds.
 
-The activity log is authoritative: a command returns success only after both the file and the log entry are durable on disk. See the [design doc](mycelium-design.md) section 5 for the full transaction protocol.
+If the process dies before the content commit, the target file is unchanged. If it dies after the content commit but before the activity append, the file may contain the final mutation without a matching log entry. If the append fails after content commit, the command exits non-zero and says the log write failed after content commit. That bounded gap is the documented durable-history contract. Pre-v0.3 mounts with leftover `_tx/pending/*.json` records are blocked with instructions to recover them using the last v0.2 binary before retrying. See the [design doc](mycelium-design.md) section 5 for the full storage contract.
 
 ### Two agents writing the same file at the same instant — what happens?
 
@@ -213,7 +213,7 @@ For self-evolution decisions — conventions adopted, regions archived — `MYCE
 
 ### Is mycelium production-ready?
 
-Not yet. Mycelium is pre-1.0, currently at v0.3.0-pre (early access). Phase 1 is feature-complete: atomic content-addressable storage (CAS), transaction-journal crash recovery, the activity log, conventions-as-files, and the on-disk format are all implemented and have property-based and concurrent-process test coverage. What is not yet complete is the full benchmark validation against frontier models (T1 multi-session synthesis and T2 self-evolution runs are drafted but awaiting published runs). The [roadmap](mycelium-phases.md) lays out what Phases 2 and 3 add.
+Not yet. Mycelium is pre-1.0, currently at v0.3.0-pre (early access). Phase 1 is feature-complete: atomic content-addressable storage (CAS), a durable append-only activity log, conventions-as-files, and the on-disk format are all implemented and have property-based and concurrent-process test coverage. What is not yet complete is the full benchmark validation against frontier models (T1 multi-session synthesis and T2 self-evolution runs are drafted but awaiting published runs). The [roadmap](mycelium-phases.md) lays out what Phases 2 and 3 add.
 
 The practical risk at this stage is not data loss — the core integrity primitives are solid — but rather that the API surface, on-disk format details, or activity log schema may still shift before 1.0.
 
@@ -223,7 +223,7 @@ A rubric is fully defined in [benchmarks/phase-1.md](benchmarks/phase-1.md): thr
 
 ### What's on the roadmap?
 
-Three phases. Phase 1 (current, feature-complete): the core CLI, CAS, activity log, conventions-as-files, crash recovery, and the pi.dev extension. Phase 2 (distribution and operational polish): a versioned activity log schema, recovery diagnostics, Claude Code skill distribution, a second harness integration (Hermes plugin or equivalent), optional read-byte caps if benchmarks call for them, and install/troubleshooting docs. Phase 3 (workflow integration): opt-in git/jj integration with per-operation commits, historical reads via `mycelium read --version=...`, configurable activity log retention, a curated templates repository, and a `mycelium init` CLI for template-based mount setup. See [the roadmap](mycelium-phases.md) for acceptance criteria per phase.
+Three phases. Phase 1 (current, feature-complete): the core CLI, CAS, activity log, conventions-as-files, durable mutation behavior, and the pi.dev extension. Phase 2 (distribution and operational polish): a versioned activity log schema, legacy recovery diagnostics, Claude Code skill distribution, a second harness integration (Hermes plugin or equivalent), optional read-byte caps if benchmarks call for them, and install/troubleshooting docs. Phase 3 (workflow integration): opt-in git/jj integration with per-operation commits, historical reads via `mycelium read --version=...`, configurable activity log retention, a curated templates repository, and a `mycelium init` CLI for template-based mount setup. See [the roadmap](mycelium-phases.md) for acceptance criteria per phase.
 
 ---
 

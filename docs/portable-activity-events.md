@@ -54,7 +54,7 @@ Example entry with rationale:
   "ts": "2026-05-12T14:22:00.000Z",
   "agent_id": "pi-agent",
   "session_id": "sess-1",
-  "tx_id": "01HWKP4Z9M8YV1W6E2RTSA9KFG",
+  "tx_id": "tx-1782468120000000000-4f8d2c1a9b0e7d33",
   "op": "write",
   "path": "notes/incidents/2026-05-12-api-503.md",
   "prior_version": "sha256:absent",

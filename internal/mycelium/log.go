@@ -67,8 +67,7 @@ func appendActivity(errOut io.Writer, id Identity, entry LogEntry, now time.Time
 }
 
 // appendActivityEntryDurable appends an already-complete LogEntry exactly as
-// supplied. Unlike appendActivity, it does not rewrite ts/agent/session fields;
-// recovery uses this to replay a prepared activity entry from _tx/.
+// supplied. Unlike appendActivity, it does not rewrite ts/agent/session fields.
 func appendActivityEntryDurable(mount string, entry LogEntry) error {
 	when, err := time.Parse(time.RFC3339Nano, entry.TS)
 	if err != nil {
@@ -163,7 +162,7 @@ func appendLog(
 	}
 	defer release()
 
-	if rc := recoverPendingTransactions(errOut, id); rc != ExitOK {
+	if rc := blockLegacyPendingTransactions(errOut, id.Mount); rc != ExitOK {
 		return rc
 	}
 

@@ -411,59 +411,21 @@ func TestLogRationaleOversizeRejected(t *testing.T) {
 	}
 }
 
-// --- Recovery with rationale in pending tx ---
-
-func TestRecoveryPreservesRationaleInActivityEntry(t *testing.T) {
+// Legacy _tx recovery was removed in v0.3. Rationale-bearing mutations still
+// block before content changes when a pre-v0.3 mount has pending records.
+func TestRationaleWriteBlockedByLegacyPendingTx(t *testing.T) {
 	mount := t.TempDir()
 	t.Setenv("MYCELIUM_MOUNT", mount)
-	t.Setenv("MYCELIUM_AGENT_ID", "agent")
-	t.Setenv("MYCELIUM_SESSION_ID", "sess")
-	id := Identity{AgentID: "agent", SessionID: "sess", Mount: mount}
+	writeLegacyPendingTx(t, mount, "legacy-rationale")
 
-	// Write a file whose committed version matches what we'll put in the pending tx.
-	prior := versionPrefix + "absent"
-	content := []byte("committed\n")
-	post := hashVersion(content)
-	writeTestFile(t, mount, "notes.md", string(content))
-
-	// Build the pending tx manually with a rationale on the activity entry.
-	txID := newULID()
-	activity := LogEntry{
-		Op:           "write",
-		Path:         "notes.md",
-		PriorVersion: prior,
-		Version:      post,
-		Rationale:    "recovery rationale",
+	_, errOut, rc := runDispatchWithStdin(t, "new\n", "write", "other.md", "--rationale", "keep this reason")
+	if rc != ExitGenericError {
+		t.Fatalf("rc=%d, want %d (stderr=%q)", rc, ExitGenericError, errOut)
 	}
-	tx := newContentTransaction(id, txID, fixedNow, activity, prior, post)
-	writePendingTx(t, mount, tx)
-
-	// Trigger recovery by issuing any mutation.
-	_, errOut, rc := runDispatchWithStdin(t, "new\n", "write", "other.md")
-	if rc != ExitOK {
-		t.Fatalf("write after recovery rc=%d stderr=%q", rc, errOut)
+	if !strings.Contains(errOut, "legacy _tx/pending records found") {
+		t.Fatalf("stderr should mention legacy pending records, got %q", errOut)
 	}
-
-	// readLogLines reads all activity files across all dates.
-	entries := readLogLines(t, mount)
-	if len(entries) != 2 {
-		t.Fatalf("log entries: got %d, want 2 (recovered + new write)", len(entries))
-	}
-	// The recovered entry is the one with the matching txID.
-	var recovered *LogEntry
-	for i := range entries {
-		if entries[i].TxID == txID {
-			recovered = &entries[i]
-			break
-		}
-	}
-	if recovered == nil {
-		t.Fatalf("no recovered log entry found with tx_id %q", txID)
-	}
-	if recovered.Rationale != "recovery rationale" {
-		t.Errorf("recovered entry rationale: got %q, want %q", recovered.Rationale, "recovery rationale")
-	}
-	if !recovered.Recovered {
-		t.Error("recovered entry should have recovered=true")
+	if _, err := os.Stat(filepath.Join(mount, "other.md")); !os.IsNotExist(err) {
+		t.Fatalf("write should not proceed while legacy pending tx exists, stat err=%v", err)
 	}
 }

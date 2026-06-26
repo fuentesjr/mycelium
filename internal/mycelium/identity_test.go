@@ -34,6 +34,7 @@ func TestReadIdentityDefaultsOptionalFieldsWhenUnset(t *testing.T) {
 	if !strings.HasPrefix(id.SessionID, "auto-") {
 		t.Errorf("SessionID default should be auto-generated, got %q", id.SessionID)
 	}
+	assertGeneratedID(t, id.SessionID, "auto")
 	if id.Mount != "" {
 		t.Errorf("Mount: got %q, want empty", id.Mount)
 	}

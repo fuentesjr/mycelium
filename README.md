@@ -41,9 +41,9 @@ For agents and operators, Mycelium is deliberately small:
 
 The everyday loop is: list or grep paths, read the relevant files, write or
 edit a note, and inspect `_activity/` when you need the history. CAS tokens,
-locks, fsync, and the crash-recovery journal are implementation details of the
-"safe mutations" part; they are documented in the design doc for implementers
-and recovery debugging, not required for normal use.
+locks, fsync, and durable append boundaries are implementation details of the
+"safe mutations" part; they are documented in the design doc for implementers,
+not required for normal use.
 
 ## Features
 
@@ -51,8 +51,9 @@ and recovery debugging, not required for normal use.
   SHA-256 version token. Pass it back as `--expected-version` for
   compare-and-swap; on conflict, Mycelium returns the current version
   so the caller can re-read, merge, and retry.
-- **Crash-safe.** Content mutations and activity-log entries recover
-  together; interrupted operations are repaired before later mutations proceed.
+- **Crash-safe.** Content mutations are atomic and activity-log appends are
+  durable before success. A power loss in the narrow post-commit/pre-log window
+  can leave the final mutation unlogged, but never silently reports success.
 - **Multi-agent safe.** Mount-level `flock` plus CAS lets sibling
   processes share a mount without corruption.
 - **Append-only activity log per agent.** Plain JSONL at
@@ -130,7 +131,7 @@ coder         mycelium         reviewer
 ## Status
 
 Early access (pre-1.0). Phase 1 is feature-complete and tested: atomic
-CAS, transaction-journal recovery, property-checked activity log, and
+CAS, a durable append-only activity log, property-checked mutation behavior, and
 the on-disk format contract. Benchmark validation against frontier
 models runs against the released artifact rather than gating release;
 see [`docs/benchmarks/phase-1.md`](docs/benchmarks/phase-1.md).
@@ -221,7 +222,7 @@ A log entry — the keys are self-describing; the annotations explain the
 value formats:
 
 ```
-{"ts":"2026-05-09T15:32:00Z","agent_id":"agent","session_id":"auto-01HXKQ8T9V3R5W4Y2N7Z1B6P0M","op":"write","path":"notes/inc.md","version":"sha256:abc...","rationale":"Capturing initial symptoms before mitigation closes the window."}
+{"ts":"2026-05-09T15:32:00Z","agent_id":"agent","session_id":"auto-1782468720000000000-7f3b8c0d9a1e2f44","tx_id":"tx-1782468720123456789-4f8d2c1a9b0e7d33","op":"write","path":"notes/inc.md","version":"sha256:abc...","rationale":"Capturing initial symptoms before mitigation closes the window."}
        │                         │                   │                   │            │                        │
        └─ ISO timestamp          └─ agent id         └─ session group    └─ event op  └─ mount-relative        └─ optional; omitted when not supplied
 ```

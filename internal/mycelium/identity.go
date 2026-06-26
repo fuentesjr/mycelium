@@ -3,6 +3,7 @@ package mycelium
 import (
 	"os"
 	"sync"
+	"time"
 )
 
 const defaultAgentID = "agent"
@@ -38,7 +39,7 @@ func ReadIdentity() Identity {
 
 func generatedDefaultSessionID() string {
 	defaultSessionOnce.Do(func() {
-		defaultSessionID = "auto-" + newULID()
+		defaultSessionID = newDefaultSessionID(time.Now())
 	})
 	return defaultSessionID
 }

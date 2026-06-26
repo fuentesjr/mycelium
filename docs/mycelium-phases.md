@@ -25,11 +25,11 @@ Mycelium is LocalFS/POSIX-native. The roadmap below keeps that guarantee set ins
 - One storage contract: **LocalFS on a local POSIX filesystem**, with conditional writes implemented via `flock`-guarded version checks and content-hash version tokens.
 - Atomic single-file ops via write-to-temp-then-rename, atomic rename for `mv`, and destination-collision protection.
 - Authoritative activity log at `_activity/YYYY/MM/DD/{agent_id}.jsonl`. Every successful state-changing operation (`write`, `edit`, `rm`, `mv`, `log`) produces a durable JSONL entry. Reads are not logged.
-- Transaction journal at `_tx/pending/{tx_id}.json` so content mutations and activity entries recover together across crashes. A command returns success only after the content change, activity entry, and pending transaction cleanup are durable.
+- Durable mutation boundary: a command returns success only after the content change and activity entry are durable. A post-commit log append failure exits non-zero; a power loss in that narrow window may leave the final mutation unlogged.
 - Mount and identity via environment variables: `MYCELIUM_MOUNT` is required; `MYCELIUM_AGENT_ID` defaults to `agent`; `MYCELIUM_SESSION_ID` is auto-generated per CLI process when absent. Harnesses can set stable agent/session ids for clearer timelines.
 - Typed conflict errors. When `--expected-version` doesn't match, `mycelium` exits 64 and prints structured JSON to stderr containing the current version token. Recovery is re-read, merge, retry.
 - Raw-read/raw-write boundary: raw filesystem reads are allowed; raw filesystem writes are unsupported. All live-store mutations go through `mycelium`.
-- Reserved `_` prefix. `mycelium` rejects agent mutations under any `_`-prefixed root path; currently `_activity/` and `_tx/`.
+- Reserved `_` prefix. `mycelium` rejects agent mutations under any `_`-prefixed root path; currently `_activity/` and `_lock` are system-owned, with legacy `_tx/` detected for compatibility.
 - Reference agent harness: pi.dev extension. It registers no tools — the agent invokes `mycelium` via pi's built-in `bash` tool — and contributes only env-var setup, a small system-prompt block, starter convention seeding, and portable activity logging (`context_checkpoint`, turn/tool boundaries, compaction).
 - Documentation for starter conventions, self-evolution recipes, and conflict-resolution conventions.
 
@@ -51,10 +51,10 @@ Mycelium is LocalFS/POSIX-native. The roadmap below keeps that guarantee set ins
 3. **Conflict recovery on real models.** When a conditional write fails, the model receives the typed conflict error and produces sensible recovery behavior (re-read, merge, retry) given only the error and no special prompting.
 4. **Self-evolution through conventions-file edits and activity-log evidence.** T2 task passes. Self-evolution is the floor behavior the supported tier is defined by; failure here is a Phase 1 blocker.
 5. **Failure-mode observability.** T3 detectors distinguish dysfunctional traces from healthy use by reading the activity log alone.
-6. **Activity log integrity.** Every successful state-changing operation has a durable activity entry; crash tests show `_tx/` recovers missing log entries or safely aborts uncommitted operations before allowing further mutations.
+6. **Activity log integrity.** Every successful state-changing operation has a durable activity entry; tests cover post-commit append failure, CAS behavior, and legacy `_tx/pending/*.json` blocking before further mutations.
 7. **Reserved-path protection.** Property-based tests cover every mutating subcommand against `_`-prefixed paths.
 8. **LocalFS correctness.** Property-based and sibling-process tests cover atomicity, destination collisions, and CAS semantics under concurrent writes.
-9. **Human-readability.** A second engineer can take a tarball of the store and inspect content files, `_activity/`, and `_tx/` with standard tools and a text editor.
+9. **Human-readability.** A second engineer can take a tarball of the store and inspect content files and `_activity/` with standard tools and a text editor.
 
 **What Phase 1 explicitly does not prove.** It does not prove every future ergonomic feature stays out of the way of Frontier models. That remains a decision gate after each later phase.
 
@@ -67,7 +67,7 @@ Mycelium is LocalFS/POSIX-native. The roadmap below keeps that guarantee set ins
 **In scope.**
 
 - Documented activity log schema. A versioned `_activity/SCHEMA.md` declares the entry shape and compatibility expectations.
-- Recovery tooling and diagnostics. Startup/mutation recovery is automatic; a read-only diagnostic command or documented procedure explains pending `_tx/` records when recovery is uncertain.
+- Legacy recovery diagnostics. A documented procedure explains how to handle pre-v0.3 `_tx/pending/*.json` records before using the current binary.
 - Optional read-byte caps with explicit override, if benchmarks show large reads causing practical failures.
 - Claude Code skill distribution bundling platform-specific binaries and the starter `MYCELIUM_MEMORY.md` template.
 - Hermes memory plugin or equivalent harness integration that shells out to the binary and avoids auto-acting memory hooks.
@@ -127,8 +127,8 @@ All anti-goals from `mycelium-design.md` section 9 hold across every phase. Phas
 
 | Phase | Theme                                             | Validates                                                               | Ships                                                        |
 | ----- | ------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------ |
-| 1     | MVP: multi-agent + multi-session + self-evolution | The core bet pays off under realistic LocalFS conditions                | LocalFS CLI + CAS + `_activity/` + `_tx/` + pi.dev extension |
-| 2     | Distribution + operational polish                 | The LocalFS-native system is installable, observable, and recoverable   | Schema docs + diagnostics + harness bundles                  |
+| 1     | MVP: multi-agent + multi-session + self-evolution | The core bet pays off under realistic LocalFS conditions                | LocalFS CLI + CAS + `_activity/` + pi.dev extension           |
+| 2     | Distribution + operational polish                 | The LocalFS-native system is installable, observable, and diagnosable   | Schema docs + diagnostics + harness bundles                  |
 | 3     | Workflow integration                              | The system fits normal engineering workflows without weakening the core | git/jj, historical reads, retention, templates               |
 
 The decision gate after each phase is the most important rule in the roadmap. If a Frontier model is bottlenecked by anything Mycelium added, that thing comes out or gets redesigned before any new feature goes in.

@@ -98,20 +98,20 @@ func runWrite(in io.Reader, out, errOut io.Writer, args []string) int {
 		return ExitReservedPrefix
 	}
 	id := ReadIdentity()
-	// Check _-prefix reservation before reading stdin and entering transactional write.
+	// Check _-prefix reservation before reading stdin and entering the locked mutation.
 	if _, resErr := resolveAgentWritable(id.Mount, positional[0]); resErr != nil {
 		if errors.Is(resErr, ErrReservedPath) {
 			fmt.Fprintf(errOut, "mycelium write: %s: writes to '_'-prefixed paths are reserved\n", positional[0])
 			return ExitReservedPrefix
 		}
-		// Other path errors are handled inside transactionalWrite; fall through.
+		// Other path errors are handled inside mutatingWrite; fall through.
 	}
 	content, err := io.ReadAll(in)
 	if err != nil {
 		fmt.Fprintf(errOut, "mycelium write: read stdin: %v\n", err)
 		return ExitGenericError
 	}
-	version, rc := transactionalWrite(errOut, id, positional[0], content, *expectedVersion, *rationaleFlag)
+	version, rc := mutatingWrite(errOut, id, positional[0], content, *expectedVersion, *rationaleFlag)
 	if rc != ExitOK {
 		return rc
 	}
@@ -142,14 +142,14 @@ func runEdit(_ io.Reader, out, errOut io.Writer, args []string) int {
 		return ExitReservedPrefix
 	}
 	id := ReadIdentity()
-	// Check _-prefix reservation before entering transactional edit.
+	// Check _-prefix reservation before entering the locked mutation.
 	if _, resErr := resolveAgentWritable(id.Mount, positional[0]); resErr != nil {
 		if errors.Is(resErr, ErrReservedPath) {
 			fmt.Fprintf(errOut, "mycelium edit: %s: writes to '_'-prefixed paths are reserved\n", positional[0])
 			return ExitReservedPrefix
 		}
 	}
-	version, rc := transactionalEdit(errOut, id, positional[0], *oldStr, *newStr, *expectedVersion, *rationaleFlag)
+	version, rc := mutatingEdit(errOut, id, positional[0], *oldStr, *newStr, *expectedVersion, *rationaleFlag)
 	if rc != ExitOK {
 		return rc
 	}
@@ -232,14 +232,14 @@ func runRm(_ io.Reader, out, errOut io.Writer, args []string) int {
 		return ExitReservedPrefix
 	}
 	id := ReadIdentity()
-	// Check _-prefix reservation before entering transactional remove.
+	// Check _-prefix reservation before entering the locked mutation.
 	if _, resErr := resolveAgentWritable(id.Mount, positional[0]); resErr != nil {
 		if errors.Is(resErr, ErrReservedPath) {
 			fmt.Fprintf(errOut, "mycelium rm: %s: writes to '_'-prefixed paths are reserved\n", positional[0])
 			return ExitReservedPrefix
 		}
 	}
-	_, rc := transactionalRemove(errOut, id, positional[0], *expectedVersion, *rationaleFlag)
+	_, rc := mutatingRemove(errOut, id, positional[0], *expectedVersion, *rationaleFlag)
 	if rc != ExitOK {
 		return rc
 	}
@@ -277,7 +277,7 @@ func runMv(_ io.Reader, out, errOut io.Writer, args []string) int {
 			return ExitReservedPrefix
 		}
 	}
-	_, rc := transactionalMove(errOut, id, src, dst, *expectedVersion, *rationaleFlag)
+	_, rc := mutatingMove(errOut, id, src, dst, *expectedVersion, *rationaleFlag)
 	if rc != ExitOK {
 		return rc
 	}

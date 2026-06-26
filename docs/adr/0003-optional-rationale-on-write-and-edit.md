@@ -21,7 +21,7 @@ For per-note content and other mutations, no such mechanism exists. The
 README's "What agents record" section frames rationale capture as a
 discipline that applies to both surfaces — file contents _and_ `evolve`
 events — but at the time of this ADR, `internal/mycelium/write.go`,
-`mutate_tx.go`, `mv.go`, and `log.go` contained no references to rationale.
+The mutation and log paths contained no references to rationale.
 A note may be written, an edit applied, a file removed, or a path renamed
 with no reasoning at all, and the binary will accept it.
 

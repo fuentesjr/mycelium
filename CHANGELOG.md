@@ -6,6 +6,8 @@
 - Removed `mycelium grep --file-type`; use `--path` to scope searches.
 - Removed `--include-current-content` from `write`, `edit`, `rm`, and `mv`. Conflict envelopes still include `current_version`; recover by re-reading with `mycelium read <path> --format json`, merging, and retrying with the fresh version token.
 - Removed functional `mycelium evolve`; conventions, lessons, index locations, archive policy, and open questions now live in `MYCELIUM_MEMORY.md`. A hidden transitional `evolve` stub exits with guidance for old prompts and templates.
+- Removed the `_tx/` transaction journal. Mutating commands now lock, check CAS, commit content, append the durable activity entry, and return success only after the append succeeds. If legacy `_tx/pending/*.json` records are present, v0.3 blocks mutations with instructions to recover the mount using the last v0.2 binary.
+- Mutation `tx_id` values now use stdlib time/randomness (`tx-<unix-nano>-<rand>`), and generated default session IDs use the matching `auto-<unix-nano>-<rand>` shape.
 
 ## [0.2.1] - 2026-05-29
 

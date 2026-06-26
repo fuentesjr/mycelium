@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-func transactionalWrite(errOut io.Writer, id Identity, requested string, content []byte, expectedVersion string, rationale string) (version string, rc int) {
+func mutatingWrite(errOut io.Writer, id Identity, requested string, content []byte, expectedVersion string, rationale string) (version string, rc int) {
 	abs, err := resolveUnderMount(id.Mount, requested)
 	if err != nil {
 		fmt.Fprintf(errOut, "mycelium write: %v\n", err)
@@ -28,7 +28,7 @@ func transactionalWrite(errOut io.Writer, id Identity, requested string, content
 	}
 	defer release()
 
-	if rc := recoverPendingTransactions(errOut, id); rc != ExitOK {
+	if rc := blockLegacyPendingTransactions(errOut, id.Mount); rc != ExitOK {
 		return "", rc
 	}
 
@@ -45,16 +45,18 @@ func transactionalWrite(errOut io.Writer, id Identity, requested string, content
 	}
 
 	version = hashVersion(content)
-	txID := newULID()
-	tx := newContentTransaction(id, txID, time.Now(), LogEntry{
+	entry, rc := newMutationLogEntry(errOut, id, "write", LogEntry{
 		Op:           "write",
 		Path:         requested,
 		PriorVersion: prior,
 		Version:      version,
 		Rationale:    rationale,
-	}, prior, version)
+	})
+	if rc != ExitOK {
+		return "", rc
+	}
 
-	rc = commitContentTransaction(errOut, id, tx, func() error {
+	rc = commitMutation(errOut, id, "write", entry, func() error {
 		return atomicWrite(abs, content, id.Mount)
 	})
 	if rc != ExitOK {
@@ -63,7 +65,7 @@ func transactionalWrite(errOut io.Writer, id Identity, requested string, content
 	return version, ExitOK
 }
 
-func transactionalEdit(errOut io.Writer, id Identity, requested, oldStr, newStr, expectedVersion string, rationale string) (version string, rc int) {
+func mutatingEdit(errOut io.Writer, id Identity, requested, oldStr, newStr, expectedVersion string, rationale string) (version string, rc int) {
 	abs, err := resolveUnderMount(id.Mount, requested)
 	if err != nil {
 		fmt.Fprintf(errOut, "mycelium edit: %v\n", err)
@@ -80,7 +82,7 @@ func transactionalEdit(errOut io.Writer, id Identity, requested, oldStr, newStr,
 	}
 	defer release()
 
-	if rc := recoverPendingTransactions(errOut, id); rc != ExitOK {
+	if rc := blockLegacyPendingTransactions(errOut, id.Mount); rc != ExitOK {
 		return "", rc
 	}
 
@@ -116,16 +118,18 @@ func transactionalEdit(errOut io.Writer, id Identity, requested, oldStr, newStr,
 	newContent := strings.Replace(content, oldStr, newStr, 1)
 	newBytes := []byte(newContent)
 	version = hashVersion(newBytes)
-	txID := newULID()
-	tx := newContentTransaction(id, txID, time.Now(), LogEntry{
+	entry, rc := newMutationLogEntry(errOut, id, "edit", LogEntry{
 		Op:           "edit",
 		Path:         requested,
 		PriorVersion: prior,
 		Version:      version,
 		Rationale:    rationale,
-	}, prior, version)
+	})
+	if rc != ExitOK {
+		return "", rc
+	}
 
-	rc = commitContentTransaction(errOut, id, tx, func() error {
+	rc = commitMutation(errOut, id, "edit", entry, func() error {
 		return atomicWrite(abs, newBytes, id.Mount)
 	})
 	if rc != ExitOK {
@@ -134,7 +138,7 @@ func transactionalEdit(errOut io.Writer, id Identity, requested, oldStr, newStr,
 	return version, ExitOK
 }
 
-func transactionalRemove(errOut io.Writer, id Identity, requested, expectedVersion string, rationale string) (priorVersion string, rc int) {
+func mutatingRemove(errOut io.Writer, id Identity, requested, expectedVersion string, rationale string) (priorVersion string, rc int) {
 	abs, err := resolveUnderMount(id.Mount, requested)
 	if err != nil {
 		fmt.Fprintf(errOut, "mycelium rm: %v\n", err)
@@ -151,7 +155,7 @@ func transactionalRemove(errOut io.Writer, id Identity, requested, expectedVersi
 	}
 	defer release()
 
-	if rc := recoverPendingTransactions(errOut, id); rc != ExitOK {
+	if rc := blockLegacyPendingTransactions(errOut, id.Mount); rc != ExitOK {
 		return "", rc
 	}
 
@@ -172,15 +176,17 @@ func transactionalRemove(errOut io.Writer, id Identity, requested, expectedVersi
 		}
 	}
 
-	txID := newULID()
-	tx := newContentTransaction(id, txID, time.Now(), LogEntry{
+	entry, rc := newMutationLogEntry(errOut, id, "rm", LogEntry{
 		Op:           "rm",
 		Path:         requested,
 		PriorVersion: priorVersion,
 		Rationale:    rationale,
-	}, priorVersion, versionPrefix+"absent")
+	})
+	if rc != ExitOK {
+		return "", rc
+	}
 
-	rc = commitContentTransaction(errOut, id, tx, func() error {
+	rc = commitMutation(errOut, id, "rm", entry, func() error {
 		if err := os.Remove(abs); err != nil {
 			if errors.Is(err, fs.ErrNotExist) {
 				return fmt.Errorf("%s: not found", requested)
@@ -195,7 +201,7 @@ func transactionalRemove(errOut io.Writer, id Identity, requested, expectedVersi
 	return priorVersion, ExitOK
 }
 
-func transactionalMove(errOut io.Writer, id Identity, src, dst, expectedVersion string, rationale string) (version string, rc int) {
+func mutatingMove(errOut io.Writer, id Identity, src, dst, expectedVersion string, rationale string) (version string, rc int) {
 	srcAbs, err := resolveUnderMount(id.Mount, src)
 	if err != nil {
 		fmt.Fprintf(errOut, "mycelium mv: %v\n", err)
@@ -224,7 +230,7 @@ func transactionalMove(errOut io.Writer, id Identity, src, dst, expectedVersion 
 	}
 	defer release()
 
-	if rc := recoverPendingTransactions(errOut, id); rc != ExitOK {
+	if rc := blockLegacyPendingTransactions(errOut, id.Mount); rc != ExitOK {
 		return "", rc
 	}
 
@@ -254,16 +260,18 @@ func transactionalMove(errOut io.Writer, id Identity, src, dst, expectedVersion 
 		}
 	}
 
-	txID := newULID()
-	tx := newContentTransaction(id, txID, time.Now(), LogEntry{
+	entry, rc := newMutationLogEntry(errOut, id, "mv", LogEntry{
 		Op:        "mv",
 		From:      src,
 		Path:      dst,
 		Version:   version,
 		Rationale: rationale,
-	}, version, version)
+	})
+	if rc != ExitOK {
+		return "", rc
+	}
 
-	rc = commitContentTransaction(errOut, id, tx, func() error {
+	rc = commitMutation(errOut, id, "mv", entry, func() error {
 		dstDir := filepath.Dir(dstAbs)
 		if err := os.MkdirAll(dstDir, 0o755); err != nil {
 			return fmt.Errorf("mkdir: %w", err)
@@ -285,4 +293,27 @@ func transactionalMove(errOut io.Writer, id Identity, src, dst, expectedVersion 
 		return "", rc
 	}
 	return version, ExitOK
+}
+
+func newMutationLogEntry(errOut io.Writer, id Identity, op string, entry LogEntry) (LogEntry, int) {
+	now := time.Now()
+	txID, err := newTxID(now)
+	if err != nil {
+		fmt.Fprintf(errOut, "mycelium %s: generate tx id: %v\n", op, err)
+		return LogEntry{}, ExitGenericError
+	}
+	entry.TxID = txID
+	return completeLogEntry(id, entry, now), ExitOK
+}
+
+func commitMutation(errOut io.Writer, id Identity, op string, entry LogEntry, apply func() error) int {
+	if err := apply(); err != nil {
+		fmt.Fprintf(errOut, "mycelium %s: %v\n", op, err)
+		return ExitGenericError
+	}
+	if err := appendActivityEntryDurable(id.Mount, entry); err != nil {
+		fmt.Fprintf(errOut, "mycelium %s: log entry write failed after content commit: %v\n", op, err)
+		return ExitGenericError
+	}
+	return ExitOK
 }
