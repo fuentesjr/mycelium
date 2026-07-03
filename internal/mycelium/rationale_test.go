@@ -81,8 +81,8 @@ func TestWriteRationaleOversizeRejected(t *testing.T) {
 	oversized := strings.Repeat("x", 64*1024+1)
 
 	_, errOut, rc := runDispatchWithStdin(t, "content", "write", "notes.md", "--rationale", oversized)
-	if rc != ExitReservedPrefix {
-		t.Errorf("rc: got %d, want ExitReservedPrefix (%d) (stderr=%q)", rc, ExitReservedPrefix, errOut)
+	if rc != ExitProtocolViolation {
+		t.Errorf("rc: got %d, want ExitProtocolViolation (%d) (stderr=%q)", rc, ExitProtocolViolation, errOut)
 	}
 	if _, err := os.Stat(filepath.Join(mount, "notes.md")); !os.IsNotExist(err) {
 		t.Error("file should not have been created on oversized rationale")
@@ -156,8 +156,8 @@ func TestEditRationaleOversizeRejected(t *testing.T) {
 	oversized := strings.Repeat("x", 64*1024+1)
 
 	_, errOut, rc := runDispatchWithStdin(t, "", "edit", "f.md", "--old", "world", "--new", "there", "--rationale", oversized)
-	if rc != ExitReservedPrefix {
-		t.Errorf("rc: got %d, want ExitReservedPrefix (%d) (stderr=%q)", rc, ExitReservedPrefix, errOut)
+	if rc != ExitProtocolViolation {
+		t.Errorf("rc: got %d, want ExitProtocolViolation (%d) (stderr=%q)", rc, ExitProtocolViolation, errOut)
 	}
 	// File must be unchanged.
 	disk, _ := os.ReadFile(filepath.Join(mount, "f.md"))
@@ -234,8 +234,8 @@ func TestRmRationaleOversizeRejected(t *testing.T) {
 	oversized := strings.Repeat("x", 64*1024+1)
 
 	_, errOut, rc := runDispatchWithStdin(t, "", "rm", "target.md", "--rationale", oversized)
-	if rc != ExitReservedPrefix {
-		t.Errorf("rc: got %d, want ExitReservedPrefix (%d) (stderr=%q)", rc, ExitReservedPrefix, errOut)
+	if rc != ExitProtocolViolation {
+		t.Errorf("rc: got %d, want ExitProtocolViolation (%d) (stderr=%q)", rc, ExitProtocolViolation, errOut)
 	}
 	// File must still exist.
 	if _, err := os.Stat(filepath.Join(mount, "target.md")); err != nil {
@@ -310,8 +310,8 @@ func TestMvRationaleOversizeRejected(t *testing.T) {
 	oversized := strings.Repeat("x", 64*1024+1)
 
 	_, errOut, rc := runDispatchWithStdin(t, "", "mv", "src.md", "dst.md", "--rationale", oversized)
-	if rc != ExitReservedPrefix {
-		t.Errorf("rc: got %d, want ExitReservedPrefix (%d) (stderr=%q)", rc, ExitReservedPrefix, errOut)
+	if rc != ExitProtocolViolation {
+		t.Errorf("rc: got %d, want ExitProtocolViolation (%d) (stderr=%q)", rc, ExitProtocolViolation, errOut)
 	}
 	// src must be untouched.
 	if _, err := os.Stat(filepath.Join(mount, "src.md")); err != nil {
@@ -403,8 +403,8 @@ func TestLogRationaleOversizeRejected(t *testing.T) {
 	oversized := strings.Repeat("x", 64*1024+1)
 
 	_, errOut, rc := runDispatch(t, "log", "decision", "--rationale", oversized)
-	if rc != ExitReservedPrefix {
-		t.Errorf("rc: got %d, want ExitReservedPrefix (%d) (stderr=%q)", rc, ExitReservedPrefix, errOut)
+	if rc != ExitProtocolViolation {
+		t.Errorf("rc: got %d, want ExitProtocolViolation (%d) (stderr=%q)", rc, ExitProtocolViolation, errOut)
 	}
 	if logExists(mount) {
 		t.Error("no activity entry should be written on oversized rationale")

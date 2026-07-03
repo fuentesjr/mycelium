@@ -95,14 +95,14 @@ func runWrite(in io.Reader, out, errOut io.Writer, args []string) int {
 	}
 	if len(*rationaleFlag) > maxRationaleSize {
 		fmt.Fprintf(errOut, "mycelium write: --rationale exceeds %d bytes\n", maxRationaleSize)
-		return ExitReservedPrefix
+		return ExitProtocolViolation
 	}
 	id := ReadIdentity()
 	// Check _-prefix reservation before reading stdin and entering the locked mutation.
 	if _, resErr := resolveAgentWritable(id.Mount, positional[0]); resErr != nil {
 		if errors.Is(resErr, ErrReservedPath) {
 			fmt.Fprintf(errOut, "mycelium write: %s: writes to '_'-prefixed paths are reserved\n", positional[0])
-			return ExitReservedPrefix
+			return ExitProtocolViolation
 		}
 		// Other path errors are handled inside mutatingWrite; fall through.
 	}
@@ -139,14 +139,14 @@ func runEdit(_ io.Reader, out, errOut io.Writer, args []string) int {
 	}
 	if len(*rationaleFlag) > maxRationaleSize {
 		fmt.Fprintf(errOut, "mycelium edit: --rationale exceeds %d bytes\n", maxRationaleSize)
-		return ExitReservedPrefix
+		return ExitProtocolViolation
 	}
 	id := ReadIdentity()
 	// Check _-prefix reservation before entering the locked mutation.
 	if _, resErr := resolveAgentWritable(id.Mount, positional[0]); resErr != nil {
 		if errors.Is(resErr, ErrReservedPath) {
 			fmt.Fprintf(errOut, "mycelium edit: %s: writes to '_'-prefixed paths are reserved\n", positional[0])
-			return ExitReservedPrefix
+			return ExitProtocolViolation
 		}
 	}
 	version, rc := mutatingEdit(errOut, id, positional[0], *oldStr, *newStr, *expectedVersion, *rationaleFlag)
@@ -229,14 +229,14 @@ func runRm(_ io.Reader, out, errOut io.Writer, args []string) int {
 	}
 	if len(*rationaleFlag) > maxRationaleSize {
 		fmt.Fprintf(errOut, "mycelium rm: --rationale exceeds %d bytes\n", maxRationaleSize)
-		return ExitReservedPrefix
+		return ExitProtocolViolation
 	}
 	id := ReadIdentity()
 	// Check _-prefix reservation before entering the locked mutation.
 	if _, resErr := resolveAgentWritable(id.Mount, positional[0]); resErr != nil {
 		if errors.Is(resErr, ErrReservedPath) {
 			fmt.Fprintf(errOut, "mycelium rm: %s: writes to '_'-prefixed paths are reserved\n", positional[0])
-			return ExitReservedPrefix
+			return ExitProtocolViolation
 		}
 	}
 	_, rc := mutatingRemove(errOut, id, positional[0], *expectedVersion, *rationaleFlag)
@@ -260,7 +260,7 @@ func runMv(_ io.Reader, out, errOut io.Writer, args []string) int {
 	}
 	if len(*rationaleFlag) > maxRationaleSize {
 		fmt.Fprintf(errOut, "mycelium mv: --rationale exceeds %d bytes\n", maxRationaleSize)
-		return ExitReservedPrefix
+		return ExitProtocolViolation
 	}
 	id := ReadIdentity()
 	src, dst := positional[0], positional[1]
@@ -268,13 +268,13 @@ func runMv(_ io.Reader, out, errOut io.Writer, args []string) int {
 	if _, resErr := resolveAgentWritable(id.Mount, src); resErr != nil {
 		if errors.Is(resErr, ErrReservedPath) {
 			fmt.Fprintf(errOut, "mycelium mv: %s: writes to '_'-prefixed paths are reserved\n", src)
-			return ExitReservedPrefix
+			return ExitProtocolViolation
 		}
 	}
 	if _, resErr := resolveAgentWritable(id.Mount, dst); resErr != nil {
 		if errors.Is(resErr, ErrReservedPath) {
 			fmt.Fprintf(errOut, "mycelium mv: %s: writes to '_'-prefixed paths are reserved\n", dst)
-			return ExitReservedPrefix
+			return ExitProtocolViolation
 		}
 	}
 	_, rc := mutatingMove(errOut, id, src, dst, *expectedVersion, *rationaleFlag)
@@ -304,7 +304,7 @@ func runLog(in io.Reader, _ io.Writer, errOut io.Writer, args []string) int {
 	}
 	if len(*rationaleFlag) > maxRationaleSize {
 		fmt.Fprintf(errOut, "mycelium log: --rationale exceeds %d bytes\n", maxRationaleSize)
-		return ExitReservedPrefix
+		return ExitProtocolViolation
 	}
 	op := positional[0]
 	return appendLog(in, errOut, ReadIdentity(), op, *pathFlag, *payloadJSON, *fromStdin, *rationaleFlag, time.Now())

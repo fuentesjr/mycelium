@@ -13,7 +13,7 @@ import (
 // ---- custom types with quick.Generator implementations ----
 
 // reservedPath is a relative path whose first segment starts with '_'.
-// Guaranteed to pass the shape rules but trigger ExitReservedPrefix.
+// Guaranteed to pass the shape rules but trigger ExitProtocolViolation.
 type reservedPath string
 
 func (reservedPath) Generate(r *rand.Rand, _ int) reflect.Value {
@@ -21,7 +21,7 @@ func (reservedPath) Generate(r *rand.Rand, _ int) reflect.Value {
 }
 
 // validPath is a relative path whose first segment does NOT start with '_'.
-// Guaranteed to pass shape rules and not trigger ExitReservedPrefix.
+// Guaranteed to pass shape rules and not trigger ExitProtocolViolation.
 type validPath string
 
 func (validPath) Generate(r *rand.Rand, _ int) reflect.Value {
@@ -114,8 +114,8 @@ func TestProperty_ReservedPrefixAlwaysRejected(t *testing.T) {
 		t.Run(fmt.Sprintf("reserved/%q", path), func(t *testing.T) {
 			// write
 			_, stderr, rc := runDispatchWithStdin(t, "content", "write", path)
-			if rc != ExitReservedPrefix {
-				t.Errorf("write %q: rc=%d want %d", path, rc, ExitReservedPrefix)
+			if rc != ExitProtocolViolation {
+				t.Errorf("write %q: rc=%d want %d", path, rc, ExitProtocolViolation)
 				passed = false
 			}
 			if !strings.Contains(stderr, "reserved") {
@@ -125,8 +125,8 @@ func TestProperty_ReservedPrefixAlwaysRejected(t *testing.T) {
 
 			// edit
 			_, stderr, rc = runDispatchWithStdin(t, "", "edit", path, "--old", "x", "--new", "y")
-			if rc != ExitReservedPrefix {
-				t.Errorf("edit %q: rc=%d want %d", path, rc, ExitReservedPrefix)
+			if rc != ExitProtocolViolation {
+				t.Errorf("edit %q: rc=%d want %d", path, rc, ExitProtocolViolation)
 				passed = false
 			}
 			if !strings.Contains(stderr, "reserved") {
@@ -136,8 +136,8 @@ func TestProperty_ReservedPrefixAlwaysRejected(t *testing.T) {
 
 			// rm
 			_, stderr, rc = runDispatchWithStdin(t, "", "rm", path)
-			if rc != ExitReservedPrefix {
-				t.Errorf("rm %q: rc=%d want %d", path, rc, ExitReservedPrefix)
+			if rc != ExitProtocolViolation {
+				t.Errorf("rm %q: rc=%d want %d", path, rc, ExitProtocolViolation)
 				passed = false
 			}
 			if !strings.Contains(stderr, "reserved") {
@@ -147,8 +147,8 @@ func TestProperty_ReservedPrefixAlwaysRejected(t *testing.T) {
 
 			// mv with reserved src
 			_, stderr, rc = runDispatchWithStdin(t, "", "mv", path, "dst.md")
-			if rc != ExitReservedPrefix {
-				t.Errorf("mv-src %q: rc=%d want %d", path, rc, ExitReservedPrefix)
+			if rc != ExitProtocolViolation {
+				t.Errorf("mv-src %q: rc=%d want %d", path, rc, ExitProtocolViolation)
 				passed = false
 			}
 			if !strings.Contains(stderr, "reserved") {
@@ -159,8 +159,8 @@ func TestProperty_ReservedPrefixAlwaysRejected(t *testing.T) {
 			// mv with reserved dst — seed a valid src first
 			writeTestFile(t, mount, "mv_prop_src.md", "seed")
 			_, stderr, rc = runDispatchWithStdin(t, "", "mv", "mv_prop_src.md", path)
-			if rc != ExitReservedPrefix {
-				t.Errorf("mv-dst %q: rc=%d want %d", path, rc, ExitReservedPrefix)
+			if rc != ExitProtocolViolation {
+				t.Errorf("mv-dst %q: rc=%d want %d", path, rc, ExitProtocolViolation)
 				passed = false
 			}
 			if !strings.Contains(stderr, "reserved") {
@@ -179,7 +179,7 @@ func TestProperty_ReservedPrefixAlwaysRejected(t *testing.T) {
 
 // TestProperty_ValidPathNeverReturns65 checks that for any path whose first
 // segment does NOT start with '_', every agent-facing mutating op never exits
-// ExitReservedPrefix=65.
+// ExitProtocolViolation=65.
 func TestProperty_ValidPathNeverReturns65(t *testing.T) {
 	cfg := &quick.Config{
 		MaxCount: 50,
@@ -196,22 +196,22 @@ func TestProperty_ValidPathNeverReturns65(t *testing.T) {
 		t.Run(fmt.Sprintf("valid/%q", path), func(t *testing.T) {
 			// write — seed the file so subsequent ops have something to work with
 			_, _, rc := runDispatchWithStdin(t, "seed content", "write", path)
-			if rc == ExitReservedPrefix {
-				t.Errorf("write %q: unexpected ExitReservedPrefix", path)
+			if rc == ExitProtocolViolation {
+				t.Errorf("write %q: unexpected ExitProtocolViolation", path)
 				passed = false
 			}
 
 			// edit on the pre-seeded file
 			_, _, rc = runDispatchWithStdin(t, "", "edit", path, "--old", "seed", "--new", "replaced")
-			if rc == ExitReservedPrefix {
-				t.Errorf("edit %q: unexpected ExitReservedPrefix", path)
+			if rc == ExitProtocolViolation {
+				t.Errorf("edit %q: unexpected ExitProtocolViolation", path)
 				passed = false
 			}
 
 			// rm
 			_, _, rc = runDispatchWithStdin(t, "", "rm", path)
-			if rc == ExitReservedPrefix {
-				t.Errorf("rm %q: unexpected ExitReservedPrefix", path)
+			if rc == ExitProtocolViolation {
+				t.Errorf("rm %q: unexpected ExitProtocolViolation", path)
 				passed = false
 			}
 
@@ -219,16 +219,16 @@ func TestProperty_ValidPathNeverReturns65(t *testing.T) {
 			srcPath := "mv_valid_src.md"
 			writeTestFile(t, mount, srcPath, "mv seed")
 			_, _, rc = runDispatchWithStdin(t, "", "mv", srcPath, path)
-			if rc == ExitReservedPrefix {
-				t.Errorf("mv-src into %q: unexpected ExitReservedPrefix", path)
+			if rc == ExitProtocolViolation {
+				t.Errorf("mv-src into %q: unexpected ExitProtocolViolation", path)
 				passed = false
 			}
 
 			// mv-dst: seed path (may have been removed above) and move to a fixed dst
 			writeTestFile(t, mount, path, "mv dst seed")
 			_, _, rc = runDispatchWithStdin(t, "", "mv", path, "mv_valid_dst.md")
-			if rc == ExitReservedPrefix {
-				t.Errorf("mv-dst from %q: unexpected ExitReservedPrefix", path)
+			if rc == ExitProtocolViolation {
+				t.Errorf("mv-dst from %q: unexpected ExitProtocolViolation", path)
 				passed = false
 			}
 		})

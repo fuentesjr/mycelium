@@ -153,7 +153,7 @@ A single binary, `mycelium`, invoked through the agent's shell. Eight visible su
 - exit 1 — generic error (path not found, malformed args, log append failure after content commit, legacy pending transaction)
 - exit 2 — usage error (bad flags, malformed args, invalid regex, invalid output format)
 - exit 64 — CAS conflict; stderr is JSON `{"error":"conflict","op":"write","path":"...","current_version":"sha256:...","expected_version":"sha256:..."}`.
-- exit 65 — protocol violation (reserved path, oversize rationale, etc.)
+- exit 65 — protocol violation such as a reserved `_` path or oversize rationale.
 
 A successful `write` or `edit` prints `{"version":"sha256:..."}` on stdout. `read --format json` prints a read envelope. `rm`, `mv`, and `log` are silent on success.
 

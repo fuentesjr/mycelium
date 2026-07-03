@@ -11,8 +11,8 @@ func TestReservedPrefixWriteRejected(t *testing.T) {
 	t.Setenv("MYCELIUM_MOUNT", mount)
 
 	_, errOut, rc := runDispatchWithStdin(t, "x", "write", "_activity/foo.md")
-	if rc != ExitReservedPrefix {
-		t.Errorf("rc: got %d, want %d (stderr=%q)", rc, ExitReservedPrefix, errOut)
+	if rc != ExitProtocolViolation {
+		t.Errorf("rc: got %d, want %d (stderr=%q)", rc, ExitProtocolViolation, errOut)
 	}
 	if !strings.Contains(errOut, "reserved") {
 		t.Errorf("stderr should mention reserved, got %q", errOut)
@@ -25,8 +25,8 @@ func TestReservedPrefixWriteAnyPrefix(t *testing.T) {
 	t.Setenv("MYCELIUM_MOUNT", mount)
 
 	_, errOut, rc := runDispatchWithStdin(t, "x", "write", "_custom/foo.md")
-	if rc != ExitReservedPrefix {
-		t.Errorf("rc: got %d, want %d (stderr=%q)", rc, ExitReservedPrefix, errOut)
+	if rc != ExitProtocolViolation {
+		t.Errorf("rc: got %d, want %d (stderr=%q)", rc, ExitProtocolViolation, errOut)
 	}
 	if !strings.Contains(errOut, "reserved") {
 		t.Errorf("stderr should mention reserved, got %q", errOut)
@@ -39,8 +39,8 @@ func TestReservedPrefixUnderscoreOnly(t *testing.T) {
 	t.Setenv("MYCELIUM_MOUNT", mount)
 
 	_, errOut, rc := runDispatchWithStdin(t, "x", "write", "_/foo.md")
-	if rc != ExitReservedPrefix {
-		t.Errorf("rc: got %d, want %d (stderr=%q)", rc, ExitReservedPrefix, errOut)
+	if rc != ExitProtocolViolation {
+		t.Errorf("rc: got %d, want %d (stderr=%q)", rc, ExitProtocolViolation, errOut)
 	}
 	if !strings.Contains(errOut, "reserved") {
 		t.Errorf("stderr should mention reserved, got %q", errOut)
@@ -53,8 +53,8 @@ func TestReservedPrefixBareUnderscore(t *testing.T) {
 	t.Setenv("MYCELIUM_MOUNT", mount)
 
 	_, errOut, rc := runDispatchWithStdin(t, "x", "write", "_")
-	if rc != ExitReservedPrefix {
-		t.Errorf("rc: got %d, want %d (stderr=%q)", rc, ExitReservedPrefix, errOut)
+	if rc != ExitProtocolViolation {
+		t.Errorf("rc: got %d, want %d (stderr=%q)", rc, ExitProtocolViolation, errOut)
 	}
 	if !strings.Contains(errOut, "reserved") {
 		t.Errorf("stderr should mention reserved, got %q", errOut)
@@ -67,8 +67,8 @@ func TestReservedPrefixEditRejected(t *testing.T) {
 	t.Setenv("MYCELIUM_MOUNT", mount)
 
 	_, errOut, rc := runDispatchWithStdin(t, "", "edit", "_activity/foo.md", "--old", "x", "--new", "y")
-	if rc != ExitReservedPrefix {
-		t.Errorf("rc: got %d, want %d (stderr=%q)", rc, ExitReservedPrefix, errOut)
+	if rc != ExitProtocolViolation {
+		t.Errorf("rc: got %d, want %d (stderr=%q)", rc, ExitProtocolViolation, errOut)
 	}
 	if !strings.Contains(errOut, "reserved") {
 		t.Errorf("stderr should mention reserved, got %q", errOut)
@@ -81,8 +81,8 @@ func TestReservedPrefixRmRejected(t *testing.T) {
 	t.Setenv("MYCELIUM_MOUNT", mount)
 
 	_, errOut, rc := runDispatchWithStdin(t, "", "rm", "_activity/foo.md")
-	if rc != ExitReservedPrefix {
-		t.Errorf("rc: got %d, want %d (stderr=%q)", rc, ExitReservedPrefix, errOut)
+	if rc != ExitProtocolViolation {
+		t.Errorf("rc: got %d, want %d (stderr=%q)", rc, ExitProtocolViolation, errOut)
 	}
 	if !strings.Contains(errOut, "reserved") {
 		t.Errorf("stderr should mention reserved, got %q", errOut)
@@ -95,8 +95,8 @@ func TestReservedPrefixMvSrcRejected(t *testing.T) {
 	t.Setenv("MYCELIUM_MOUNT", mount)
 
 	_, errOut, rc := runDispatchWithStdin(t, "", "mv", "_activity/foo.md", "dst.md")
-	if rc != ExitReservedPrefix {
-		t.Errorf("rc: got %d, want %d (stderr=%q)", rc, ExitReservedPrefix, errOut)
+	if rc != ExitProtocolViolation {
+		t.Errorf("rc: got %d, want %d (stderr=%q)", rc, ExitProtocolViolation, errOut)
 	}
 	if !strings.Contains(errOut, "reserved") {
 		t.Errorf("stderr should mention reserved, got %q", errOut)
@@ -110,8 +110,8 @@ func TestReservedPrefixMvDstRejected(t *testing.T) {
 	writeTestFile(t, mount, "src.md", "data\n")
 
 	_, errOut, rc := runDispatchWithStdin(t, "", "mv", "src.md", "_activity/dst.md")
-	if rc != ExitReservedPrefix {
-		t.Errorf("rc: got %d, want %d (stderr=%q)", rc, ExitReservedPrefix, errOut)
+	if rc != ExitProtocolViolation {
+		t.Errorf("rc: got %d, want %d (stderr=%q)", rc, ExitProtocolViolation, errOut)
 	}
 	if !strings.Contains(errOut, "reserved") {
 		t.Errorf("stderr should mention reserved, got %q", errOut)
@@ -169,7 +169,7 @@ func TestReservedPrefixTestReservedPath(t *testing.T) {
 	t.Setenv("MYCELIUM_MOUNT", mount)
 
 	_, errOut, rc := runDispatchWithStdin(t, "x", "write", "_test_reserved/data.md")
-	if rc != ExitReservedPrefix {
-		t.Errorf("rc: got %d, want %d (stderr=%q)", rc, ExitReservedPrefix, errOut)
+	if rc != ExitProtocolViolation {
+		t.Errorf("rc: got %d, want %d (stderr=%q)", rc, ExitProtocolViolation, errOut)
 	}
 }

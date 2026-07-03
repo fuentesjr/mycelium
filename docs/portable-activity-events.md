@@ -190,5 +190,7 @@ exit "$code"
 `pi-mycelium` emits session boundary events, `compaction`, and deduped
 `context_checkpoint` entries using the vocabulary above. It intentionally does
 not emit turn/tool telemetry; richer adapters may still use those documented
-op names when they are memory-relevant. It still registers no tools: the agent
+op names when they are memory-relevant. See
+[ADR-0006](adr/0006-reference-adapter-memory-relevant-events.md) for why the
+reference adapter emits this subset. It still registers no tools: the agent
 invokes the portable `mycelium` CLI through pi's built-in shell tool.

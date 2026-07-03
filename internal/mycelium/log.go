@@ -20,7 +20,6 @@ type LogEntry struct {
 	Version      string          `json:"version,omitempty"`
 	PriorVersion string          `json:"prior_version,omitempty"`
 	From         string          `json:"from,omitempty"`
-	Recovered    bool            `json:"recovered,omitempty"`
 	Payload      json.RawMessage `json:"payload,omitempty"`
 	Rationale    string          `json:"rationale,omitempty"`
 }

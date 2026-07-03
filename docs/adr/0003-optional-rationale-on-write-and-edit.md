@@ -91,7 +91,7 @@ Rationale string `json:"rationale,omitempty"`
 ```
 
 - Maximum size: 64 KiB. Oversize input is rejected before the mutation runs
-  with exit code `ExitReservedPrefix` (65).
+  with exit code `ExitProtocolViolation` (65).
 - `omitempty` ensures both fields are absent from log entries and
   envelopes when no rationale is supplied — existing log readers and
   JSONL fixtures remain valid without migration.
