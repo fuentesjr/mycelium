@@ -53,6 +53,7 @@ The tarball should include both seed and post-run state — diff against `seed/`
 The grader is a Frontier model from the *opposite* provider — GPT-5.5 grades Opus runs, Opus 4.7 grades GPT runs.
 
 Per instance, the grader receives:
+
 - The unpacked post-run store directory.
 - The `seed/` tree for diff context.
 - Both session transcripts.
@@ -65,7 +66,7 @@ The grader returns a single verdict per instance: **pass** / **fail** with a one
 5 instances per model. Per `docs/benchmarks/phase-1.md`:
 
 - **Acceptance #4 passes for a model** if a *majority* (≥3/5) of instances are graded pass.
-- **Model-agnostic claim** requires both Claude Opus 4.7 and GPT-5.5 to pass.
+- **Cross-model criterion** requires both Claude Opus 4.7 and GPT-5.5 to pass through pi.
 
 ## Recording results
 

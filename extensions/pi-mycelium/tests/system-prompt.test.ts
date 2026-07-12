@@ -29,7 +29,16 @@ describe("systemPromptAvailable", () => {
 		expect(block).toContain("Everyday commands");
 		expect(block).toContain("Occasional commands");
 		expect(block).toContain("Metadata commands");
-		for (const sub of ["read", "write", "edit", "ls", "grep", "rm", "mv", "log"]) {
+		for (const sub of [
+			"read",
+			"write",
+			"edit",
+			"ls",
+			"grep",
+			"rm",
+			"mv",
+			"log",
+		]) {
 			expect(block).toContain(`mycelium ${sub}`);
 		}
 		expect(block).not.toContain("mycelium evolve");
@@ -37,7 +46,9 @@ describe("systemPromptAvailable", () => {
 
 	it("points agents at the conventions file instead of broad rediscovery", () => {
 		expect(block).toContain("### Conventions file");
-		expect(block).toContain("Read `/test/store/MYCELIUM_MEMORY.md` once at session start");
+		expect(block).toContain(
+			"Read `/test/store/MYCELIUM_MEMORY.md` once at session start",
+		);
 		expect(block).toContain("Do not broad-search for a substitute");
 		expect(block).toContain("edit that file in the same session");
 		expect(block).toContain("mycelium log decision|agent_note");
@@ -48,11 +59,13 @@ describe("systemPromptAvailable", () => {
 		expect(block).toContain("exits 64");
 		expect(block).toContain('"error":"conflict"');
 		expect(block).toContain('"error":"destination_exists"');
-		expect(block).toContain("re-read with `mycelium read <path> --format json`");
+		expect(block).toContain(
+			"re-read with `mycelium read <path> --format json`",
+		);
 		expect(block).not.toContain("--include-current-content");
 	});
 
-	it("describes reserved paths and adapter activity events", () => {
+	it("describes reserved paths and pi lifecycle events", () => {
 		expect(block).toContain("Reserved paths");
 		expect(block).toContain("_activity/YYYY/MM/DD/test-agent.jsonl");
 		expect(block).not.toContain("_tx/pending");

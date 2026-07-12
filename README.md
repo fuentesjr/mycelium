@@ -1,350 +1,138 @@
 # Mycelium
 
-**Persistent memory for AI coding agents.** A CLI and on-disk format
-that lets agents keep notes across sessions, processes, and concurrent
-runs — using plain files plus a JSONL activity log. No daemon, no
-network, no database.
+**Persistent memory for pi coding agents:** a journal folder, safe mutations, and a searchable activity log. The `pi-mycelium` extension installs the runtime guidance, journal template, lifecycle logging, and bundled Go CLI engine used from pi's shell.
 
 ```
-   ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
-   │ Claude Code  │  │      π       │  │   scripts    │
-   └──────┬───────┘  └──────┬───────┘  └──────┬───────┘
-          │                 │                 │
-          └─────────────────┼─────────────────┘
-                            │  mycelium <subcommand>
-                    ┌───────▼───────┐
-                    │ mycelium CLI  │
-                    └───────┬───────┘
-                            │  safe mutations + activity log
-                    ┌───────▼───────┐
-                    │    mount/     │  ◀── git, grep, tar, cat
-                    │  plain files  │      read this directly
-                    └───────────────┘
+pi coding agent
+    │ system prompt + lifecycle events + env
+    ▼
+pi-mycelium extension
+    │ invokes bundled `mycelium` binary
+    ▼
+local journal directory
+    ├── agent-owned notes
+    └── _activity/YYYY/MM/DD/<agent>.jsonl
 ```
+
+Mycelium is pre-1.0 and supports pi as its sole coding-agent harness. Other programs may be able to invoke the binary, but non-pi harness integrations are not documented, tested, or supported.
 
 ## Why
 
-AI coding agents lose context the moment a session ends. The usual
-workarounds — system-prompt stuffing, vector stores, ad-hoc scratch
-files — either don't survive across processes or hide context behind
-opaque retrieval.
-
-Mycelium gives agents a durable, inspectable filesystem they own:
-`cat` reads it, `grep` searches it, `git` versions it, and multiple
-agents can write to it concurrently without stepping on each other.
+AI coding agents lose context when a session ends. Mycelium gives pi agents a durable, inspectable filesystem they own: `cat` reads it, `grep` searches it, `git` can version it, and multiple pi agents can write to it concurrently without corrupting the journal.
 
 ## Public model
 
-For agents and operators, Mycelium is deliberately small:
-
 > **A folder + safe mutations + a searchable activity log.**
 
-The everyday loop is: list or grep paths, read the relevant files, write or
-edit a note, and inspect `_activity/` when you need the history. CAS tokens,
-locks, fsync, and durable append boundaries are implementation details of the
-"safe mutations" part; they are documented in the design doc for implementers,
-not required for normal use.
+The everyday loop is: list or grep paths, read relevant files, write or edit a note, and inspect `_activity/` when you need history. CAS tokens, locks, fsync, and durable append boundaries are implementation details of the safe-mutation layer.
 
 ## Features
 
-- **Atomic writes with optimistic concurrency.** Every write returns a
-  SHA-256 version token. Pass it back as `--expected-version` for
-  compare-and-swap; on conflict, Mycelium returns the current version
-  so the caller can re-read, merge, and retry.
-- **Crash-safe.** Content mutations are atomic and activity-log appends are
-  durable before success. A power loss in the narrow post-commit/pre-log window
-  can leave the final mutation unlogged, but never silently reports success.
-- **Multi-agent safe.** Mount-level `flock` plus CAS lets sibling
-  processes share a mount without corruption.
-- **Append-only activity log per agent.** Plain JSONL at
-  `<mount>/_activity/YYYY/MM/DD/<agent>.jsonl` — `tail -f` works.
-- **Self-evolution.** Agents revise `MYCELIUM_MEMORY.md` as conventions,
-  lessons, index locations, archive policy, and open questions emerge. The
-  activity log records every edit and its rationale.
-- **Boring on disk.** Plain files in a directory you own. Inspect with
-  `cat`, search with `grep`, version with `git`, back up with `tar`.
-
-## How it fits together
-
-A _mount_ is a directory that holds an agent's notes plus the read-only
-`_activity/` log. Agents — running in pi.dev, Claude Code, a script,
-whatever — invoke `mycelium <subcommand>` to read and write inside the
-mount. The reserved `_` path prefix keeps agent writes from clobbering system
-metadata; only `_activity/` is part of the daily mental model.
-
-```
-.mycelium-store/
-├── notes/                                        ← agent-owned content
-│   ├── incidents/
-│   │   ├── 2026-04-30-query-latency-spike.md     ← convention in MYCELIUM_MEMORY.md: <date>-<slug>.md
-│   │   └── 2026-05-02-checkout-503s.md
-│   ├── services/
-│   │   ├── _index.md                             ← index location noted in MYCELIUM_MEMORY.md
-│   │   ├── checkout-api.md
-│   │   └── payments-worker.md
-│   ├── reviews/
-│   │   └── 2026-05-08-pr-1247.md
-│   └── spikes/
-│       └── 2026-Q1/                              ← archive policy noted in MYCELIUM_MEMORY.md
-│           └── caching-prototype.md
-└── _activity/                                    ← append-only JSONL log per agent
-    └── 2026/05/09/
-        ├── coder.jsonl                           ← writes + log events
-        └── reviewer.jsonl
-```
-
-## Subcommands
-
-| Tier       | Command  | Purpose                                                                                                |
-| ---------- | -------- | ------------------------------------------------------------------------------------------------------ |
-| Everyday   | `read`   | Read a note (optionally with version metadata)                                                         |
-| Everyday   | `write`  | Safe write; returns version, supports CAS via `--expected-version` and optional `--rationale`          |
-| Everyday   | `edit`   | Safe find/replace of a unique substring; accepts `--rationale`                                         |
-| Everyday   | `ls`     | List entries in the mount, optionally filtered by pattern                                               |
-| Everyday   | `grep`   | Search content across the mount                                                                        |
-| Occasional | `rm`     | Remove a note; accepts `--rationale`                                                                   |
-| Occasional | `mv`     | Move/rename a note; accepts `--rationale`                                                              |
-| Metadata   | `log`    | Append a signal entry to the activity log; mostly adapter-facing                                       |
-
-## Concurrent writes
-
-Two agents racing on the same file resolve via compare-and-swap. Each
-write returns a SHA-256 version; pass it back as `--expected-version`
-on the next write. On conflict, mycelium emits a JSON envelope with
-`current_version`; the caller re-reads the file, merges, and retries:
-
-```
-coder         mycelium         reviewer
-  │              │                │
-  │──write v1───▶│                │
-  │◀───ok, v2────│                │
-  │              │◀───write v1────│
-  │              │─CONFLICT(64)──▶│
-  │              │   current=v2   │   ← conflict envelope
-  │              │                │
-  │              │                │     re-read, merge, retry
-  │              │                │
-  │              │◀───write v2────│
-  │              │──ok, v3───────▶│
-```
-
-## Status
-
-Early access (pre-1.0). Phase 1 is feature-complete and tested: atomic
-CAS, a durable append-only activity log, property-checked mutation behavior, and
-the on-disk format contract. Benchmark validation against frontier
-models runs against the released artifact rather than gating release;
-see [`docs/benchmarks/phase-1.md`](docs/benchmarks/phase-1.md).
+- **Pi extension install.** `pi install npm:pi-mycelium` sets the journal mount, identity, prompt guidance, starter `MYCELIUM_MEMORY.md`, and lifecycle activity entries.
+- **Bundled Go CLI engine.** The extension invokes `mycelium` through pi's `bash` tool. The CLI remains a separate, testable engine for filesystem safety and diagnostics.
+- **Atomic writes with optimistic concurrency.** Mutations can use `--expected-version`; conflicts return structured JSON and exit 64.
+- **Crash-aware durable history.** Mutations commit atomically and append a durable JSONL activity entry before reporting success.
+- **Multi-agent safe.** Mount-level locking plus CAS lets sibling pi agents share a local POSIX journal.
+- **Plain files.** Notes and logs are ordinary files you can inspect, diff, copy, and back up.
+- **Self-evolution.** Agents revise `MYCELIUM_MEMORY.md` as durable conventions, lessons, index locations, archive policy, and open questions emerge.
 
 ## Install
 
-### Binary (from source)
-
-Requires Go 1.26+.
-
-```
-git clone https://github.com/fuentesjr/mycelium.git
-cd mycelium
-make build
-sudo install cmd/mycelium/mycelium /usr/local/bin/
-mycelium    # prints subcommand list
-```
-
-Or via `go install`:
-
-```
-go install ./cmd/mycelium
-```
-
-### Agent skill
-
-The portable skill lives at [`skills/mycelium/`](skills/mycelium/). Copy that
-directory into a Codex- or Claude-style skill directory when you want shell
-agents to receive Mycelium-specific operating guidance without the pi.dev
-adapter.
-
-```
-cp -R skills/mycelium ~/.codex/skills/mycelium
-# or: cp -R skills/mycelium ~/.claude/skills/mycelium
-```
-
-The skill expects a `mycelium` binary on `PATH` and `MYCELIUM_MOUNT` set. Run
-`skills/mycelium/scripts/doctor` to check a local setup.
-
-### Pi extension
-
-The extension ships on npm and bundles the platform-matching
-`mycelium` binary as an optional dependency — no separate binary
-install or PATH setup needed.
-
-```
-# Global — available in every pi session, mounts at ~/.pi/agent/extensions/pi-mycelium/journal/
+```bash
+# Global — available in every pi session, journal at ~/.pi/agent/extensions/pi-mycelium/journal/
 pi install npm:pi-mycelium
 
-# Or project-local — mounts at <cwd>/.pi/pi-mycelium/journal/
+# Project-local — journal at <cwd>/.pi/pi-mycelium/journal/
 pi install npm:pi-mycelium -l
 ```
 
-Verify with `pi list`. Updates: `pi update npm:pi-mycelium`.
+Verify with `pi list`. Update with `pi update npm:pi-mycelium`.
 
-The bundled binary takes precedence; if the optional dependency was
-skipped (unsupported platform, `--omit=optional`), the extension falls
-back to `which mycelium` on PATH and contributes an `UNAVAILABLE`
-system-prompt notice if neither is found. See
-[`extensions/pi-mycelium/README.md`](extensions/pi-mycelium/README.md)
-for the full install / scope-detection / identity story.
+The npm package depends on platform-specific `@fuentesjr/mycelium-cli-*` optional packages and selects the one matching your OS/architecture. No separate binary or PATH setup is needed for supported pi installs.
+
+## Direct CLI use
+
+The `mycelium` binary remains documented for development, diagnostics, advanced operation, and for pi agents' normal shell-invoked memory operations. A source build is not a supported generic harness integration path.
+
+Requires Go 1.26+:
+
+```bash
+git clone https://github.com/fuentesjr/mycelium.git
+cd mycelium
+make build
+./cmd/mycelium/mycelium --help
+```
+
+For diagnostics outside pi, set `MYCELIUM_MOUNT` to a journal directory and optionally set `MYCELIUM_AGENT_ID` / `MYCELIUM_SESSION_ID`. Existing journals remain compatible.
+
+## Subcommands
+
+| Tier | Command | Purpose |
+| --- | --- | --- |
+| Everyday | `read` | Read a note, optionally as JSON with version metadata |
+| Everyday | `write` | Safe write with optional CAS and rationale |
+| Everyday | `edit` | Safe unique-substring replacement |
+| Everyday | `ls` | List journal entries, optionally by pattern |
+| Everyday | `grep` | Search content and activity logs |
+| Occasional | `rm` | Remove a note |
+| Occasional | `mv` | Move/rename a note |
+| Metadata | `log` | Append an agent-authored signal such as `decision` or `agent_note` |
 
 ## Quick example
 
-```
-export MYCELIUM_MOUNT=$(pwd)/.mycelium-store
-# Optional: export MYCELIUM_AGENT_ID=coder        # defaults to "agent"; use letters/digits/._-
-# Optional: export MYCELIUM_SESSION_ID=session-1  # otherwise auto-generated per CLI process
+```bash
+export MYCELIUM_MOUNT=$(pwd)/.pi/pi-mycelium/journal
+export MYCELIUM_AGENT_ID=pi-agent
 
-# Write a note (atomic, returns version)
-echo "incident: query latency spike correlates with deploys at 14:30" \
-  | mycelium write notes/incident-2026-04-30.md
-# {"version":"sha256:..."}
+printf 'incident: query latency spike at 14:30\n' \
+  | mycelium write notes/incident-2026-07-12.md \
+      --rationale "Capture symptoms before mitigation closes the window."
 
-# Read it back
-mycelium read notes/incident-2026-04-30.md
-
-# Read content plus version for a future CAS update
-mycelium read notes/incident-2026-04-30.md --format json
-# {"path":"notes/incident-2026-04-30.md","version":"sha256:...","content":"..."}
-
-# Search
+mycelium read notes/incident-2026-07-12.md --format json
 mycelium grep --pattern latency --format json
-
-# Record a durable convention by editing the conventions file
-mycelium edit MYCELIUM_MEMORY.md \
-  --old "## Conventions" \
-  --new "## Conventions
-
-- 2026-04-30: Use <date>-<slug>.md filenames under notes/incidents/ so incidents sort chronologically without a separate index." \
-  --rationale "Adopting incident filenames after index.md drifted from reality within a week."
-
-# Concurrent-safe update via CAS — pass the prior version, retry on conflict (exit 64).
-# On conflict, re-read with --format json, merge, and retry with the fresh version.
-echo "updated content" | mycelium write notes/incident-2026-04-30.md \
-  --expected-version sha256:abc123...
-
-# Inspect activity log directly — plain JSONL, no tooling required
-cat $MYCELIUM_MOUNT/_activity/*/*/*/*.jsonl
+mycelium log decision --rationale "Treat cache eviction as leading hypothesis." \
+  --payload-json '{"path":"notes/incident-2026-07-12.md"}'
+mycelium grep --path _activity --pattern '"op":"write"' --format json
 ```
 
-A log entry — the keys are self-describing; the annotations explain the
-value formats:
+## Activity log
 
-```
-{"ts":"2026-05-09T15:32:00Z","agent_id":"agent","session_id":"auto-1782468720000000000-7f3b8c0d9a1e2f44","tx_id":"tx-1782468720123456789-4f8d2c1a9b0e7d33","op":"write","path":"notes/inc.md","version":"sha256:abc...","rationale":"Capturing initial symptoms before mitigation closes the window."}
-       │                         │                   │                   │            │                        │
-       └─ ISO timestamp          └─ agent id         └─ session group    └─ event op  └─ mount-relative        └─ optional; omitted when not supplied
-```
+Activity is plain JSONL at `<journal>/_activity/YYYY/MM/DD/<agent_id>.jsonl`. The pi extension records session boundaries, `session_shutdown`, and `compaction`. The CLI records successful `write`, `edit`, `rm`, `mv`, and explicit `log` entries. Historical journals may contain older event names; readers should tolerate unknown operations. See [`docs/pi-activity-events.md`](docs/pi-activity-events.md).
 
 ## What agents record
 
-A note's _what_ is the cheap part — the file content, the diff. The
-_why_ is what survives across sessions and travels between agents.
-Mycelium has three recording surfaces, and the discipline for all of
-them is: **capture the rationale at the moment of decision, and name
-what was rejected, not just what was chosen.**
-
-**File contents** carry the per-note reasoning. Incident notes name
-the trigger. Investigation notes name the hypothesis being tested.
-Plan files name the alternatives considered and rejected. The same
-craft as a good commit message, applied to every note. This is a
-convention; the binary does not enforce it.
-
-**Operational rationale** can now be captured on the activity log line
-itself, at the moment of the mutation or signal, via `--rationale`:
-
-```bash
-mycelium write notes/incident-2026-05-12.md \
-  --rationale "API began returning 503 at 14:22; recording symptoms before mitigation closes the window."
-
-mycelium rm notes/spikes/2026-Q1/deprecated.md \
-  --rationale "Spike concluded; superseded by notes/decisions/2026-04-cache-layer.md."
-
-mycelium log decision \
-  --rationale "Choosing Redis over Memcached for the cache layer; cluster mode and persistence outweigh the marginal latency cost." \
-  --payload-json '{"chosen":"redis","rejected":["memcached","dragonfly"]}'
-```
-
-When supplied, `rationale` appears as a top-level field on the
-activity log entry (`omitempty` — absent when not supplied). On a CAS
-conflict, it also appears in the conflict envelope on stderr so the
-retrying agent sees both sides' intent. Maximum 64 KiB. The note-body
-discipline and operational `--rationale` are complementary: note bodies
-hold _why-this-thing_, the flag holds _why-this-operation_.
-
-**The conventions file** carries durable structural decisions —
-conventions adopted, indices built, archive policy, lessons, and open
-questions. Revise `MYCELIUM_MEMORY.md` proactively when a repeated
-pattern, mistake, durable user preference, naming rule, or useful
-index emerges:
-
-```bash
-mycelium edit MYCELIUM_MEMORY.md \
-  --old "## Conventions" \
-  --new "## Conventions
-
-- 2026-05-12: `notes/services/_index.md` maps services by team owner. Regenerate it after substantial service-note changes." \
-  --rationale "Lookups were dominated by 'whose service is this?', so the index earned its maintenance cost."
-```
-
-A future agent asking "why are incidents named this way?" gets the
-current rule by reading `MYCELIUM_MEMORY.md`, and the activity log
-preserves the full history of how that rule changed and why.
-
-See [`skills/mycelium/references/memory-guidance.md`](skills/mycelium/references/memory-guidance.md)
-for file-based memory recipes and
-[`docs/portable-activity-events.md`](docs/portable-activity-events.md) for
-adapter event conventions.
+- File contents carry per-note reasoning.
+- `--rationale` captures why a specific operation happened and appears on the activity log line.
+- `MYCELIUM_MEMORY.md` carries current durable conventions and lessons; `_activity/` preserves how those rules changed over time.
 
 ## Documentation
 
-**Start here:**
-
-- [`docs/faq.md`](docs/faq.md) — common questions about adopting, integrating, and operating mycelium.
-- [`docs/mycelium-design.md`](docs/mycelium-design.md) — design rationale, architecture, principles.
-- [`skills/mycelium/`](skills/mycelium/) — portable agent-facing skill and operational references.
-
-**Reference:**
-
-- [`docs/mycelium-phases.md`](docs/mycelium-phases.md) — phasing roadmap; what's in scope when, and why.
-- [`docs/portable-activity-events.md`](docs/portable-activity-events.md) — adapter event vocabulary and payload conventions.
-- [`docs/benchmarks/phase-1.md`](docs/benchmarks/phase-1.md) — validation rubric, target models, scoring.
+- [`docs/faq.md`](docs/faq.md) — adoption and operation questions.
+- [`extensions/pi-mycelium/README.md`](extensions/pi-mycelium/README.md) — pi extension details.
+- [`docs/pi-activity-events.md`](docs/pi-activity-events.md) — current pi activity contract and compatibility notes.
+- [`docs/mycelium-design.md`](docs/mycelium-design.md) — design rationale and storage contract.
+- [`docs/mycelium-phases.md`](docs/mycelium-phases.md) — pi-focused roadmap.
+- [`docs/benchmarks/phase-1.md`](docs/benchmarks/phase-1.md) — model benchmark rubric run through pi.
 - [`docs/adr/`](docs/adr/) — architecture decision records.
 - [`CHANGELOG.md`](CHANGELOG.md) — release notes.
-- [`docs/release-checklist.md`](docs/release-checklist.md) — step-by-step guide for cutting a release.
+- [`docs/release-checklist.md`](docs/release-checklist.md) — release checklist.
 
 ## Repository layout
 
-- **`cmd/mycelium/`** — the Go binary. Eight visible subcommands: content
-  (`read`, `write`, `edit`, `rm`, `mv`), discovery (`ls`, `grep`),
-  and meta (`log`). A hidden transitional `evolve` stub points old
-  callers at `MYCELIUM_MEMORY.md`.
-- **`extensions/pi-mycelium/`** — pi.dev extension. Wires Mycelium
-  into pi sessions: env vars, a system-prompt block, and portable
-  activity events. Registers no tools; agents invoke `mycelium`
-  through pi's built-in `bash`.
-- **`docs/`** — design, phasing, self-evolution, benchmarks, ADRs.
-- **`skills/mycelium/`** — portable agent-facing skill with command,
-  conflict, activity-log, and memory-guidance references.
+- `cmd/mycelium/` — Go CLI engine for safe mutations, search, and activity appends.
+- `extensions/pi-mycelium/` — supported pi extension, prompt, tests, and journal template.
+- `docs/` — design, roadmap, benchmarks, ADRs, release notes.
 
 ## Development
 
-```
-make test     # run the Go test suite
-make build    # build the host-platform binary
-make dist     # cross-compile release tarballs for darwin+linux x amd64+arm64
-make clean    # remove build artifacts
+```bash
+make test
+make build
+make dist
+make clean
 ```
 
-The repository uses [Jujutsu](https://docs.jj-vcs.dev/) (`jj`)
-co-located with git. Either toolchain works against the same history.
-See `AGENTS.md` for repository conventions.
+The repository uses [Jujutsu](https://docs.jj-vcs.dev/) (`jj`) co-located with git. Either toolchain works against the same history. See `AGENTS.md` for repository conventions.
 
 ## License
 

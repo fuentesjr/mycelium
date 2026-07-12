@@ -4,7 +4,7 @@
   "pi": {
     "extensions": ["./index.ts"]
   },
-  "description": "Pi.dev extension for Mycelium agent memory",
+  "description": "Persistent memory for pi coding agents",
   "type": "module",
   "main": "index.ts",
   "files": [

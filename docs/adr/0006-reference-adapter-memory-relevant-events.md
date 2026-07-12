@@ -1,8 +1,10 @@
 # ADR 0006: Reference adapter emits only memory-relevant events
 
-- **Status:** Accepted
+- **Status:** Superseded by ADR-0007
 - **Date:** 2026-06-11
 - **Deciders:** Sal Fuentes Jr.
+
+> Supersession note: ADR-0007 keeps the pi extension lifecycle subset but removes this ADR's cross-adapter framing. The active pi contract is documented in `docs/pi-activity-events.md`.
 
 ## Context
 

@@ -24,11 +24,12 @@ signals that should remain history but not become standing guidance, use
 function renderActivityEventsSection(): string {
 	return `### Activity events
 
-The pi-mycelium adapter automatically records portable activity events under
+The pi-mycelium extension automatically records pi lifecycle events under
 \`_activity/\`: session boundaries and \`compaction\`. Older logs may contain
 turn/tool events, \`context_checkpoint\`, or legacy \`context_signal\` entries.
 
-Payloads are metadata-only by default. Read them with normal file/search tools,
+Payloads are metadata-only by default; put larger details in normal files and
+reference them with \`--path\`. Read events with normal file/search tools,
 for example \`mycelium grep --path _activity --pattern session_ --format json\`.`;
 }
 

@@ -30,16 +30,17 @@ find better shapes:
   the project, or recurring patterns
 - `shared/` — collaborative notes
 - `learnings/` — durable lessons you want to keep across sessions
-- `INDEX.md` — a hand-maintained map you build as patterns emerge
+- `INDEX.md` — a hand-maintained map you build as patterns emerge; record its refresh rule here once it earns maintenance
 
 You will likely invent your own directories ad-hoc — that's expected. When
-a new shape stabilizes, update this file.
+a new shape stabilizes, update this file. Prefer descriptive names over opaque timestamps. Archive stale regions with `mycelium mv` plus `--rationale`; if the move creates a durable policy, record the policy here.
 
 ## Reading your own activity
 
 The activity log at `_activity/YYYY/MM/DD/{agent_id}.jsonl` is plain JSONL.
-Standard tools work; `mycelium grep` and patterned `mycelium ls --recursive`
-work on the same files. Other root paths beginning with `_` are internal; read
+Successful `write`, `edit`, `rm`, `mv`, and `log` operations append entries;
+reads are not logged. Standard tools work; `mycelium grep` and patterned
+`mycelium ls --recursive` work on the same files. Other root paths beginning with `_` are internal; read
 `_activity/` for history and leave the rest alone.
 
 ```sh
@@ -57,8 +58,10 @@ mycelium grep --path _activity --pattern session_ --format=json
 ```
 
 Grepping your own log between sessions is how you notice duplicated writes,
-abandoned notes, or stale conventions. The system makes this possible; you
-do the reflection.
+abandoned notes, stale conventions, and prior paths. Treat `_activity/` as
+history; this file is the current rules source. When an open question resolves,
+edit it into a current lesson or remove it so history and active guidance do
+not conflict.
 
 ## Edit me
 

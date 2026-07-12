@@ -1,9 +1,9 @@
-# Mycelium: A Model-Agnostic Agent Memory System
+# Mycelium: Pi Agent Memory System
 
 **Status:** Design draft
 **Project:** Mycelium
 
-A persistent memory substrate for autonomous agents, on the bet that **a real filesystem driven by general file tools outperforms specialized memory infrastructure as models improve** — and that this should be cashed in without a dependency on any single model provider.
+A persistent memory substrate for pi coding agents, on the bet that **a real filesystem driven by general file tools outperforms specialized memory infrastructure as models improve**. Mycelium is model-flexible inside pi, but pi is the sole supported coding-agent harness.
 
 ---
 
@@ -15,7 +15,7 @@ A persistent memory substrate for autonomous agents, on the bet that **a real fi
 - Let the agent own the schema. The agent decides what to save, how to name it, and how to organize it.
 - Keep memory human-interpretable end to end — exportable as a directory, diffable as text, shareable as a tarball.
 - Support multiple agents concurrently using the same local POSIX store with predictable conflict semantics.
-- Run on any agent harness with a shell tool — the agent invokes a `mycelium` binary alongside its other shell calls.
+- Support pi coding agents through the `pi-mycelium` extension, which invokes the bundled `mycelium` binary through pi's shell tool.
 - Stay filesystem-native: LocalFS, `flock`, atomic rename, `O_APPEND`, and `fsync` are the guarantee set.
 - Stay useful on Frontier models without compensating logic that becomes a ceiling on the next generation.
 - Equip the agent to **observe and revise its own memory practices over time** — using the same general file tools and a conventions file.
@@ -33,7 +33,7 @@ A persistent memory substrate for autonomous agents, on the bet that **a real fi
 
 ### Target model tier
 
-Mycelium targets **Frontier-class production models** — top-of-class capability defined by the behaviors the rest of this design assumes: self-organizing a filesystem store from empty, reflecting on its own activity log, revising its own conventions without operator scaffolding (Claude Opus 4.7, GPT-5.5, and equivalent successors). Models below Frontier are out of scope; baking in compensating logic for tiers below the floor would mask, with infrastructure heuristics, exactly the self-evolution behavior this design exists to capture.
+Mycelium targets **Frontier-class production models running in pi** — top-of-class capability defined by the behaviors the rest of this design assumes: self-organizing a filesystem store from empty, reflecting on its own activity log, revising its own conventions without operator scaffolding (Claude Opus 4.7, GPT-5.5, and equivalent successors). Models below Frontier are out of scope; baking in compensating logic for tiers below the floor would mask, with infrastructure heuristics, exactly the self-evolution behavior this design exists to capture.
 
 ---
 
@@ -58,7 +58,7 @@ implementation docs and diagnostics rather than the default agent/user model.
 
 A specialized memory API encodes assumptions: what gets saved, how it's indexed, what counts as "relevant," when to summarize. As models improve, those heuristics become drag — the system forces the agent into compression and ranking policies the model could now beat unaided.
 
-General tools (read, write, list, edit, grep) have no such ceiling. The agent invokes them through its existing shell — `mycelium read` sits in the same Bash tool as `git log` and `rg` — and `mycelium` is the smallest adapter that earns its keep: atomic conditional writes, an authoritative activity log, no policy about what to save, how to name, or what's relevant. A Frontier model uses them with judgment indistinguishable from a thoughtful engineer keeping a working notebook, and the same surface gets _more_ useful — not less — as the next generation arrives. This is the central bet, and every other decision is downstream of it.
+General tools (read, write, list, edit, grep) have no such ceiling. The pi agent invokes them through pi's shell — `mycelium read` sits in the same Bash tool as `git log` and `rg` — and the `mycelium` CLI is the smallest engine that earns its keep: atomic conditional writes, an authoritative activity log, no policy about what to save, how to name, or what's relevant. A Frontier model uses them with judgment indistinguishable from a thoughtful engineer keeping a working notebook, and the same surface gets _more_ useful — not less — as the next generation arrives. This is the central bet, and every other decision is downstream of it.
 
 ### Files are the unit. Directories are the structure. The agent owns both
 
@@ -99,10 +99,10 @@ Internally there are two layers, with system metadata inside the store under
 reserved `_` paths:
 
 ```
-  Frontier-class agent
+  Frontier-class pi agent
        │
-       │  invokes `mycelium <sub>` via its existing shell tool
-       │  env: MYCELIUM_MOUNT required; MYCELIUM_AGENT_ID / MYCELIUM_SESSION_ID optional
+       │  pi-mycelium injects prompt guidance, env, and lifecycle logging
+       │  agent invokes `mycelium <sub>` via pi's shell tool
        │
        │  raw reads are okay: cat, ls, rg, editor, tar
        │  raw writes are unsupported: all mutations go through mycelium
@@ -173,7 +173,7 @@ Five contract notes:
 
 **The `_` prefix is reserved at the store root.** `mycelium` rejects `write`, `edit`, `rm`, and `mv` whose target/source is under any path beginning with `_`. Currently `_activity/` and `_lock` are system-owned; legacy `_tx/` records are detected for compatibility. Future system paths inherit the same protection without code changes.
 
-**Identity travels via environment.** The harness sets `MYCELIUM_MOUNT` (the store directory) once. `MYCELIUM_AGENT_ID` is optional and defaults to `agent`; `MYCELIUM_SESSION_ID` is optional and auto-generated per CLI process when absent. Harnesses that can provide stable agent/session ids should still do so for clearer multi-agent timelines. Every invocation reads identity from the environment/defaults; every log entry records the agent and session. Standard Unix request identity.
+**Identity travels via environment.** The harness sets `MYCELIUM_MOUNT` (the store directory) once. `MYCELIUM_AGENT_ID` is optional and defaults to `agent`; `MYCELIUM_SESSION_ID` is optional and auto-generated per CLI process when absent. The pi extension provides stable agent/session ids for clearer multi-agent timelines. Every invocation reads identity from the environment/defaults; every log entry records the agent and session. Standard Unix request identity.
 
 ---
 
@@ -199,7 +199,7 @@ Implementation shape:
 - `mv` refuses destination collisions and uses atomic rename.
 - `grep` is implemented in Go, using the same scanner and regex engine on every machine.
 
-There is no backend interface in the v1 design. A future storage adapter would need to re-prove every guarantee above rather than share this contract by assertion.
+There is no backend interface in the v1 design. Any future storage change would need to re-prove every guarantee above rather than share this contract by assertion.
 
 ### Durable activity boundary
 
@@ -272,8 +272,7 @@ Operation-specific guidance:
 
 Stop instead of looping when repeated conflicts show another active writer, the
 current content contradicts the intended change, or a destination collision has
-valuable content. Agent-facing quick guidance lives in
-`skills/mycelium/references/conflicts.md`.
+valuable content. Agent-facing quick guidance lives in the `pi-mycelium` system prompt and starter `MYCELIUM_MEMORY.md` template.
 
 **Identity** is set once by the harness via the env vars in section 4 and recorded on every log entry. By default it isn't used for access control — every mounted agent has equal permissions and the same view of the log.
 
@@ -281,7 +280,7 @@ valuable content. Agent-facing quick guidance lives in
 
 ## 7. Self-Evolution
 
-A Frontier agent doesn't just use general file tools well — it _reflects on its own use of them and revises its approach_. Given an empty store, it self-organizes: extracts durable lessons, archives stale notes, names things consistently, deletes on purpose. Over sessions it edits its own convention files, builds indexes when patterns emerge, consolidates when the activity log shows duplication. This is the central observable behavior the supported tier is defined by — and the property the system has to avoid breaking.
+A Frontier agent doesn't just use general file tools well — it _reflects on its own use of them and revises its approach_. Given an empty pi journal, it self-organizes: extracts durable lessons, archives stale notes, names things consistently, deletes on purpose. Over sessions it edits its own convention files, builds indexes when patterns emerge, consolidates when the activity log shows duplication. This is the central observable behavior the supported tier is defined by — and the property the system has to avoid breaking.
 
 The system _enables_ this with primitives the agent already has, and is careful not to _do_ it on the agent's behalf:
 
@@ -291,7 +290,7 @@ The system _enables_ this with primitives the agent already has, and is careful 
 
 **Starter conventions are files inside the store, not code paths.** A new mount can optionally be initialized with `MYCELIUM_MEMORY.md` at the root proposing a default layout (`agents/{agent_id}/`, `memories/`, `shared/`, `learnings/`, `INDEX.md`). The template tells the agent it owns the file and should revise it proactively as better conventions emerge.
 
-**No automatic injection of retrieved memory content into agent context.** A harness may surface minimal mount metadata and the exact conventions-file path at session start. It should not prefetch, rank, summarize, or inject arbitrary memory content.
+**No automatic injection of retrieved memory content into agent context.** The pi extension surfaces minimal mount metadata and the exact conventions-file path at session start. It should not prefetch, rank, summarize, or inject arbitrary memory content.
 
 **No automatic intervention.** The system never summarizes, dedupes, organizes, prunes, or rewrites the agent's files. If the activity log shows behavior the operator dislikes, the lever is the prompt or the model — not a system feature.
 
@@ -305,7 +304,7 @@ Three primitives, all from section 4:
 2. **State awareness and modification via standard file tools.** Self-evolution adds no content mutation verbs; it gives the agent reasons to use existing ones differently.
 3. **Conventions as files.** Current rules live in editable text (`MYCELIUM_MEMORY.md`, `INDEX.md`, an agent-written `ARCHIVE_POLICY.md`). Changing the file is the supersession mechanism. The activity log records each edit and its rationale.
 
-Patterns that emerge — convention bootstrap, convention revision, self-built indexes, archiving and pruning — are documented for agents in `skills/mycelium/references/memory-guidance.md`.
+Patterns that emerge — convention bootstrap, convention revision, self-built indexes, archiving and pruning — are documented for agents in the pi-owned starter `MYCELIUM_MEMORY.md` template.
 
 What the system does _not_ do: run a reflection step between turns; analyze patterns or detect drift for the agent; maintain or update convention files on the agent's behalf; enforce that conventions are read before acting. Doing any of these would re-introduce the capability coupling this principle exists to reject. The system makes self-evolution _possible_; the agent _does_ it.
 
@@ -390,17 +389,15 @@ A `mycelium log` entry with an inline payload:
   "ts": "2026-04-26T18:43:02.117Z",
   "agent_id": "researcher-7",
   "session_id": "sess-9b2f",
-  "op": "context_checkpoint",
+  "op": "decision",
   "payload": {
-    "message_count": 42,
-    "last_role": "assistant"
+    "chosen": "redis",
+    "rejected": ["memcached"]
   }
 }
 ```
 
-Adapter-owned event names and generic payload fields are conventions, documented
-in [portable activity events](portable-activity-events.md), not binary-enforced
-schema.
+Pi lifecycle events and compatibility expectations are documented in [pi activity events](pi-activity-events.md). The binary does not enforce a closed set of `log` operation names.
 
 **Path layout: `_activity/YYYY/MM/DD/{agent_id}.jsonl`.** Each agent writes its own daily file; `agent_id` must be filename-safe ASCII using letters, digits, `.`, `_`, or `-`. Cross-agent order is reconstructed by sorting on `ts` or `tx_id`. Time-windowed queries use path patterns with `mycelium ls --recursive`: `_activity/2026/04/*/*.jsonl` (this month, all agents); `_activity/2026/04/26/*.jsonl` (today, all agents); `_activity/2026/04/26/glp1-research.jsonl` (today, one agent). Payloads from `mycelium log` are inlined on the entry; larger signals belong in a regular file referenced via `--path`.
 
@@ -420,4 +417,4 @@ Export is `tar` or `cp -r`. No proprietary format; a directory of UTF-8 files pl
 
 Frameworks in this space commonly ship features Mycelium deliberately omits: automatic memory extraction at session end (mem0), vector retrieval as the primary access path to memory, hierarchical tiered memory maintained by the framework (MemGPT/Letta), automatic summarization (`ConversationSummaryMemory` and friends), temporal knowledge graphs with auto-extraction (Zep, Graphiti), embedding-based deduplication of "similar" memories, system-driven reflection between turns, and specialized query DSLs over agent-authored content. Each encodes a salience, structure, or compression policy that ages out as models improve — wrong for some, unnecessary for others, never adjustable in the moment. The principle is the same in every case: the agent owns those decisions; the system gives it the primitives (read/write/edit, grep, an activity log it can re-read) and stays out of the loop.
 
-Two clarifications worth naming. Vector retrieval against an _external_ knowledge base is a tool the agent might choose to invoke; we reject it only as the primary access path to the agent's _own_ memory. Specialized agent protocols (custom REST, MCP servers, framework-specific plugin contracts) are rejected as the _primary_ surface — `mycelium read foo.md` and `cat foo.md` should produce the same bytes against the same files; an "agent surface" distinct from the "operator surface" reintroduces exactly the human-uninterpretable opacity Section 2's "human-interpretable wins" rules out. A future harness without shell access can still wrap the binary in a thin protocol adapter, but the binary and LocalFS store are the contract.
+Two clarifications worth naming. Vector retrieval against an _external_ knowledge base is a tool the agent might choose to invoke; we reject it only as the primary access path to the agent's _own_ memory. Specialized agent protocols (custom REST, MCP servers, framework-specific plugin contracts) are rejected as the _primary_ surface — `mycelium read foo.md` and `cat foo.md` should produce the same bytes against the same files; an "agent surface" distinct from the "operator surface" reintroduces exactly the human-uninterpretable opacity Section 2's "human-interpretable wins" rules out. The binary and LocalFS store remain the implementation contract for the supported pi extension and for diagnostics.

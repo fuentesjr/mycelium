@@ -1,246 +1,88 @@
 # Mycelium FAQ
 
-> Quick answers for people considering, integrating, or operating mycelium. If you're an AI agent reading mycelium's docs, use the portable skill in [`../skills/mycelium/`](../skills/mycelium/).
+Quick answers for people adopting or operating Mycelium with pi coding agents.
 
-## Table of contents
+## What is Mycelium?
 
-- [What it is and isn't](#what-it-is-and-isnt)
-  - [What is mycelium and what problem does it solve?](#what-is-mycelium-and-what-problem-does-it-solve)
-  - [Who is this for?](#who-is-this-for)
-  - [How does this differ from a vector store, RAG service, or memory MCP server?](#how-does-this-differ-from-a-vector-store-rag-service-or-memory-mcp-server)
-  - [Does it lock me into a particular model or harness?](#does-it-lock-me-into-a-particular-model-or-harness)
-- [Trust, safety, and the threat model](#trust-safety-and-the-threat-model)
-  - [Can a misbehaving agent escape the mount or trash my filesystem?](#can-a-misbehaving-agent-escape-the-mount-or-trash-my-filesystem)
-  - [What happens to a write if mycelium gets killed or the machine crashes?](#what-happens-to-a-write-if-mycelium-gets-killed-or-the-machine-crashes)
-  - [Two agents writing the same file at the same instant — what happens?](#two-agents-writing-the-same-file-at-the-same-instant--what-happens)
-  - [Will it work on iCloud / Dropbox / NFS / Windows?](#will-it-work-on-icloud--dropbox--nfs--windows)
-- [Install and integration](#install-and-integration)
-  - [How do I install it?](#how-do-i-install-it)
-  - [Does it need a daemon, database, or network access?](#does-it-need-a-daemon-database-or-network-access)
-  - [What does an agent harness have to configure?](#what-does-an-agent-harness-have-to-configure)
-  - [Can I use it without pi.dev, or with a custom harness?](#can-i-use-it-without-pidev-or-with-a-custom-harness)
-  - [Does it conflict with Claude Code, Cursor, or Codex built-in memory?](#does-it-conflict-with-claude-code-cursor-or-codex-built-in-memory)
-- [Auditing and operations](#auditing-and-operations)
-  - [How do I see what an agent has been doing in a mount?](#how-do-i-see-what-an-agent-has-been-doing-in-a-mount)
-  - [What does mycelium record so a future reviewer can understand why a change happened?](#what-does-mycelium-record-so-a-future-reviewer-can-understand-why-a-change-happened)
-  - [Should I commit a mount to git?](#should-i-commit-a-mount-to-git)
-  - [How do I move a mount between machines?](#how-do-i-move-a-mount-between-machines)
-  - [How big does the activity log get, and how do I prune it?](#how-big-does-the-activity-log-get-and-how-do-i-prune-it)
-  - [How do I delete or roll back something an agent wrote?](#how-do-i-delete-or-roll-back-something-an-agent-wrote)
-- [Status and maturity](#status-and-maturity)
-  - [Is mycelium production-ready?](#is-mycelium-production-ready)
-  - [Are benchmarks available yet?](#are-benchmarks-available-yet)
-  - [What's on the roadmap?](#whats-on-the-roadmap)
-- [Why these design choices](#why-these-design-choices)
-  - [Why a directory of files instead of a database?](#why-a-directory-of-files-instead-of-a-database)
-  - [Why JSONL for the activity log?](#why-jsonl-for-the-activity-log)
+Mycelium is persistent memory for pi coding agents: a local journal folder, safe CLI mutations, and a searchable JSONL activity log. The `pi-mycelium` extension installs the prompt guidance, starter journal template, lifecycle logging, and bundled Go CLI engine.
 
----
+## Who is it for?
 
-## What it is and isn't
+Teams using pi agents for coding, research, or operations work where context must survive across sessions and concurrent agents. It is a good fit when you want agent memory in human-readable files that can be audited with normal tools.
 
-### What is mycelium and what problem does it solve?
+## Does it lock me into a model or harness?
 
-AI coding agents lose all context when a session ends. The common workarounds — stuffing everything into the system prompt, ad-hoc scratch files, vector stores — either don't survive across processes or hide context behind opaque retrieval that no human can inspect.
+Mycelium does not lock you into a model: benchmark coverage can include multiple frontier models running inside pi. It does intentionally support only the pi coding-agent harness. The binary may be useful from a shell for diagnostics or development, but non-pi harness integrations are unsupported.
 
-Mycelium is a CLI and on-disk format that gives agents a durable, inspectable store they own across sessions, processes, and concurrent runs. A mount is a plain directory plus a searchable `_activity/` log. The daily model is small: list or grep paths, read relevant files, safely write or edit notes, and inspect the log when you need history. The same files are readable with `cat`, searchable with `grep`, versionable with `git`, and shareable as a tarball — no special tooling required.
+## How is it different from a vector store or MCP memory server?
 
-### Who is this for?
+Mycelium is file-based, not retrieval-service-based. The agent navigates with `ls`, `grep`, and `read`; every byte is visible to humans; and no daemon, network service, embeddings index, or database is required.
 
-Teams running Frontier-class AI agents (Claude Opus, GPT-5.5, and their successors) on coding, research, or operations work where memory across sessions matters. It's a good fit if you want the agent's reasoning to persist in human-readable form and you want to audit what the agent actually did. It's probably not the right fit if you need embedding-based retrieval as the primary access path or if your agent runs on a harness with no shell tool.
+## How do I install it?
 
-### How does this differ from a vector store, RAG service, or memory MCP server?
-
-The core differences are access model and observability. Mycelium is file-based, not embedding-based: the agent navigates with `ls` and `grep` and reads files directly — no opaque retrieval step, no relevance scoring, no index to maintain. Every byte is plain text you can read line by line; a vector store's internal state is not.
-
-Because it's a directory, standard tools work on it without any mycelium-specific tooling: `tail -f` for the activity log, `rg` for search, `git diff` for changes. And it needs no daemon or network — just a local POSIX filesystem.
-
-These approaches are complementary, not mutually exclusive. A team could pair mycelium with a vector store: mycelium holds the agent's working notes and decision history; the vector store handles retrieval over a larger external corpus.
-
-### Does it lock me into a particular model or harness?
-
-**No — mycelium is harness-neutral and does not lock you into a model or harness.** Any agent that can run shell commands and read files can use it. The `pi-mycelium` npm extension is one harness integration for pi.dev, but the core binary works from any shell. Configure `MYCELIUM_MOUNT` once; `MYCELIUM_AGENT_ID` defaults to `agent`, and `MYCELIUM_SESSION_ID` is generated per CLI process when absent. After that, every invocation is a plain CLI call. Portable activity events are documented conventions for observability signals, not schema enforced by the binary. See [portable activity events](portable-activity-events.md) and [ADR 0002](adr/0002-portable-activity-events-as-adapter-conventions.md).
-
----
-
-## Trust, safety, and the threat model
-
-### Can a misbehaving agent escape the mount or trash my filesystem?
-
-**Mycelium does not sandbox the agent.** If an agent has shell access, it can touch files anywhere on the filesystem that its OS user permits — mycelium's `_` prefix reservation only prevents the agent from using `mycelium write` on reserved system paths inside the mount. The harness controls what commands the agent can run; mycelium's contract is integrity within the mount (atomic writes, conflict detection, durable log), not isolation from the broader system. Treat mount-level protection accordingly: scope the agent's shell permissions at the harness level, not at mycelium's level.
-
-### What happens to a write if mycelium gets killed or the machine crashes?
-
-Every content mutation follows a fail-loud durability boundary:
-
-1. Mycelium takes the mount lock and checks the requested CAS precondition.
-2. The content change is committed atomically and fsynced.
-3. The activity log entry is appended and fsynced.
-4. The command returns success only after the log append succeeds.
-
-If the process dies before the content commit, the target file is unchanged. If it dies after the content commit but before the activity append, the file may contain the final mutation without a matching log entry. If the append fails after content commit, the command exits non-zero and says the log write failed after content commit. That bounded gap is the documented durable-history contract. Legacy mounts with leftover `_tx/pending/*.json` records are blocked with instructions to recover them using the last v0.2 binary before retrying. See the [design doc](mycelium-design.md) section 5 for the full storage contract.
-
-### Two agents writing the same file at the same instant — what happens?
-
-One wins; the other gets a structured conflict rather than silent data loss. The winning write returns a new SHA-256 version token. The losing write — if it used `--expected-version` — exits with code 64 and a JSON envelope containing the winner's version token. The losing agent re-reads, merges in memory, and retries with the fresh version. The design doc's concurrency section and [`skills/mycelium/references/conflicts.md`](../skills/mycelium/references/conflicts.md) document the re-read/merge/retry pattern.
-
-### Will it work on iCloud / Dropbox / NFS / Windows?
-
-The honest answer is: probably not reliably, and the recommendation is not to try. Mycelium depends on `flock`, atomic rename within a directory, `O_APPEND`, and `fsync` — the POSIX local filesystem guarantee set. These are tested on macOS and Linux on local disks. iCloud, Dropbox, and OneDrive can mangle file locks and replicate `_*` directories unexpectedly. NFS has well-known flock semantics issues. Windows is untested. Keep the mount on a local POSIX disk.
-
----
-
-## Install and integration
-
-### How do I install it?
-
-Two paths. Build from source (requires Go 1.26+):
-
-```sh
-git clone https://github.com/fuentesjr/mycelium.git
-cd mycelium
-make build
-sudo install cmd/mycelium/mycelium /usr/local/bin/
+```bash
+pi install npm:pi-mycelium        # global journal
+pi install npm:pi-mycelium -l     # project-local journal
 ```
 
-Or via `go install ./cmd/mycelium`.
+The npm package resolves the platform-matching bundled CLI package. Source builds are for development, diagnostics, and advanced operation, not a supported alternate harness path.
 
-For Codex- or Claude-style skill directories, copy `skills/mycelium/` into the
-harness's skill path and make sure `mycelium` is on `PATH` with
-`MYCELIUM_MOUNT` set. The skill's `scripts/doctor` helper checks that setup.
+## What does the pi extension configure?
 
-For pi.dev, the `pi-mycelium` npm extension bundles the platform-matching binary and handles PATH setup automatically:
+On session start it resolves the bundled binary, sets `MYCELIUM_MOUNT`, `MYCELIUM_AGENT_ID`, and `MYCELIUM_SESSION_ID`, bootstraps `MYCELIUM_MEMORY.md` if needed, and appends a session-boundary activity entry. Before the agent starts it injects concise operating guidance.
 
-```sh
-pi install npm:pi-mycelium        # global
-pi install npm:pi-mycelium -l     # project-local
-```
+## Can I use it outside pi?
 
-Full install instructions are in the [README](../README.md).
+Direct CLI invocations are useful for inspecting a journal, debugging packaging, or developing the engine. Set `MYCELIUM_MOUNT` and run `mycelium <subcommand>`. That does not make Claude Code, Codex, Hermes, custom scripts, or third-party adapters supported Mycelium integrations.
 
-### Does it need a daemon, database, or network access?
+## Does it need a daemon, database, or network access?
 
-**No — mycelium is a single stateless binary with no daemon, database, or network access.** Every invocation opens the mount directory, does its work, and exits. The entire system state is in a directory on your local disk.
+No. Each CLI invocation opens the local POSIX journal, performs one operation, writes any activity entry, and exits.
 
-### What does an agent harness have to configure?
+## Can a misbehaving agent escape the mount?
 
-One environment variable is required before the agent runs:
+Mycelium is not a sandbox. It protects the integrity of mutations made through `mycelium` inside the journal, including reserved `_` paths, CAS, and durable logging. pi and the operating system control broader shell permissions.
 
-- `MYCELIUM_MOUNT` — absolute path to the mount directory (created if absent on first write).
+## What happens if the process crashes during a write?
 
-Two identity variables are optional:
+Content mutations are atomic and fsynced before the activity entry is appended and fsynced. If the process dies before content commit, the file is unchanged. If power is lost after content commit but before log append, the content may exist without the matching log line; if the append fails in-process after commit, the command exits non-zero.
 
-- `MYCELIUM_AGENT_ID` — stable identifier for the agent; defaults to `agent`.
-- `MYCELIUM_SESSION_ID` — session grouping id; auto-generated per CLI process when absent.
+## What happens when two agents write the same file?
 
-That's it. Higher-fidelity observability (session boundaries, turn/tool events) is optional and documented in [portable activity events](portable-activity-events.md).
+Conditional writes with `--expected-version` prevent silent loss. One writer succeeds and returns a new version; the stale writer exits 64 with a JSON conflict envelope. Recovery is re-read with `mycelium read <path> --format json`, merge, and retry with the fresh version.
 
-### Can I use it without pi.dev, or with a custom harness?
+## What filesystems are supported?
 
-Yes. `pi-mycelium` is a convenience wrapper, not a requirement. Any agent harness that can run shell commands works at L0 (the baseline shell-command integration level): set `MYCELIUM_MOUNT` and let the agent invoke `mycelium` subcommands through its existing shell tool. Set `MYCELIUM_AGENT_ID` and `MYCELIUM_SESSION_ID` only when you need stable multi-agent or cross-process session grouping. A minimal L1 shell wrapper that emits `session_startup` and `session_shutdown` log entries is shown in [portable activity events](portable-activity-events.md).
+Use a local POSIX filesystem on macOS or Linux. Mycelium relies on `flock`, atomic rename, `O_APPEND`, and `fsync`. iCloud, Dropbox, OneDrive, NFS, SMB, FUSE, and Windows are outside the current guarantee set.
 
-### Does it conflict with Claude Code, Cursor, or Codex built-in memory?
+## How do I audit activity?
 
-No. They're orthogonal. Claude Code's `CLAUDE.md`, Cursor's rules, and Codex's session context are session-scoped prompt injections managed by those harnesses. Mycelium is a durable on-disk store the agent reads and writes. They coexist: the harness-level memory shapes how the agent behaves; mycelium preserves what the agent has written across sessions.
+Read `_activity/YYYY/MM/DD/<agent_id>.jsonl` with `cat`, `tail -f`, `grep`, or `mycelium grep`. The pi extension records session boundaries, `session_shutdown`, and `compaction`; the CLI records `write`, `edit`, `rm`, `mv`, and explicit `log` entries.
 
-> **See also:** [README](../README.md) for full install details · [`skills/mycelium/`](../skills/mycelium/) for agent-facing operating guidance · [portable activity events spec](portable-activity-events.md) for advanced observability configuration.
+## What should agents record for future reviewers?
 
----
+Use three layers: note content for per-note reasoning, `--rationale` for why a specific mutation or signal happened, and `MYCELIUM_MEMORY.md` for durable conventions and lessons. Use `mycelium log decision` or `mycelium log agent_note` for point-in-time signals that should remain grepable history.
 
-## Auditing and operations
+## Should I commit a journal to git or jj?
 
-### How do I see what an agent has been doing in a mount?
+You can. A journal is plain files plus JSONL logs. The tradeoff is log growth and noisy diffs. For now, commits are manual; future workflow integration is planned separately.
 
-The activity log is plain JSONL at `<mount>/_activity/YYYY/MM/DD/<agent_id>.jsonl`. Every write, edit, delete, move, and explicit `log` event lands there automatically. Read it with standard tools:
+## How do I move a journal between machines?
 
-```sh
-# All activity today, all agents
-cat $MYCELIUM_MOUNT/_activity/2026/05/10/*.jsonl
+Archive or copy the directory, then point pi or `MYCELIUM_MOUNT` at the copied journal. There is no database migration.
 
-# Tail a live session
-tail -f $MYCELIUM_MOUNT/_activity/2026/05/10/coder.jsonl
+## How big does the activity log get?
 
-# Find write events
-mycelium grep --pattern '"op":"write"' --path _activity --format json
-```
+It grows with successful mutations and explicit signals. There is no built-in retention policy yet. Manual archival of older `_activity/YYYY/` subtrees is possible when you no longer need those logs online.
 
-For structured decisions — conventions the agent adopted, lessons distilled, regions archived — read `MYCELIUM_MEMORY.md` to see what rules are currently in effect, then inspect `_activity/` to see how the file changed over time.
+## Is Mycelium production-ready?
 
-### What does mycelium record so a future reviewer can understand why a change happened?
+It is early-access pre-1.0. The core storage and mutation behavior has tests, and the supported integration is pi-only. API details and activity wording may still change before 1.0, while journal compatibility remains a transition constraint.
 
-The diff is the cheap part — any version control system can tell you _what_ changed. The thing a future reviewer (or another agent) usually can't reconstruct is the _why_. Mycelium records that across two surfaces, both governed by the same discipline: capture the rationale at the moment of decision, and name what was rejected — not just what was chosen.
+## Are benchmarks available?
 
-| Layer              | What it captures                                  | Where it lives                         |
-| ------------------ | ------------------------------------------------- | -------------------------------------- |
-| File content       | Per-note reasoning — trigger, hypothesis, outcome | The note file itself                   |
-| `--rationale` flag | Why this specific operation was performed         | Activity log entry (`rationale` field) |
-| Conventions file   | Structural patterns/conventions currently in use  | `MYCELIUM_MEMORY.md`                   |
-| Activity log       | Who did what and when (chain of custody)          | `_activity/YYYY/MM/DD/<agent>.jsonl`   |
+The Phase 1 benchmark rubric is in [`benchmarks/phase-1.md`](benchmarks/phase-1.md). It evaluates model behavior through pi; model diversity is benchmark coverage, not harness portability.
 
-**File contents carry the per-note reasoning.** When the agent writes an incident note, an investigation log, or a plan file, the _why_ lives in the note itself — the trigger, the hypothesis being tested, the alternatives considered and rejected. Same craft as a good commit message, applied to every note. A diff shows what changed; the note explains why. This is a convention; the binary does not enforce it.
+## What's on the roadmap?
 
-**Operational rationale is now first-class on every rationale-bearing op.** `write`, `edit`, `rm`, `mv`, and `log` all accept an optional `--rationale "..."` flag. When supplied, rationale appears as a top-level field on the corresponding activity log entry (`omitempty` — absent when not supplied, so existing log readers are unaffected). On a CAS or destination-exists conflict, the losing caller's rationale also appears in the conflict envelope emitted to stderr, so the retrying agent can merge intent rather than just bytes. Maximum 64 KiB per rationale; oversize input is rejected with exit 65 before the mutation runs.
-
-The note-body discipline and `--rationale` are complementary: note bodies hold _why-this-thing_ (per-note reasoning embedded in content), `--rationale` holds _why-this-operation_ (the reason for the mutation or signal, captured on the activity log line). Both can coexist on the same write.
-
-**`MYCELIUM_MEMORY.md` carries the structural decisions** — the patterns and rules the agent adopts for itself. When the agent picks a filename convention, builds an index, or archives a region, it edits that file with `--rationale`. The file shows the current rules; the activity log shows when and why they changed.
-
-**The activity log is the chain of custody.** Every mutation lands in `<mount>/_activity/YYYY/MM/DD/<agent>.jsonl` with `agent_id`, `session_id`, timestamp, op kind, path, version hash, and (when supplied) `rationale`. With session-boundary entries (`session_startup`/`session_shutdown`, and optionally `turn_start`/`turn_end` from richer harnesses), you can group a burst of writes as one turn of one session rather than as scattered events, then cross-reference note content and convention-file edits to recover the reasoning.
-
-The split is deliberate: notes carry _why-this-thing_, the `--rationale` flag carries _why-this-operation_, `MYCELIUM_MEMORY.md` carries _what pattern is active now_, and the activity log carries _who_ and _when_. A reviewer typically reads the notes for per-decision rationale, checks the activity log for operational context attached to individual mutations, reads `MYCELIUM_MEMORY.md` for the workspace's current rules, and consults the activity log to reconstruct timelines or find which session a given change belonged to.
-
-### Should I commit a mount to git?
-
-It's a legitimate option, not a requirement. A mount is a directory of plain text files and JSONL logs, so `git add` and `git commit` work naturally. The benefit is versioned history and the ability to share state between machines or teammates using normal git workflows. The tradeoff is that the `_activity/` log grows with every agent run and will produce large diffs. Phase 3 of the roadmap includes opt-in git/jj integration with proper commit authoring per agent operation; for now, manual commits work, but treat the activity log as append-only operational data rather than source code.
-
-### How do I move a mount between machines?
-
-`tar` it:
-
-```sh
-tar czf mount-backup.tar.gz .mycelium-store/
-```
-
-Copy the tarball to the other machine and extract it. Set `MYCELIUM_MOUNT` to the new path before running the agent. There is no registration, no daemon to inform, and no database to migrate.
-
-### How big does the activity log get, and how do I prune it?
-
-The log partitions by `_activity/YYYY/MM/DD/<agent_id>.jsonl`. In practice, growth depends on how many mutations the agent makes per day. There is no built-in retention policy in the current release — that is Phase 3 scope. Manual pruning works cleanly: archive or delete older date directories (e.g., anything under `_activity/2025/`) with normal filesystem tools. The agent and the binary only read from paths they discover at runtime, so removing old date trees does not break anything for ongoing work.
-
-### How do I delete or roll back something an agent wrote?
-
-There is no native undo command. To revert a file to a prior state, you need its prior content — either from your own memory of what it contained, from the git history if the mount is versioned, or by reading a saved copy. The activity log records every mutation with before/after version hashes, so you can see what changed and when; it does not store full snapshots of prior content.
-
-For self-evolution decisions — conventions adopted, regions archived — `MYCELIUM_MEMORY.md` shows what's currently in effect, and `_activity/` shows the timeline of edits. To retire a specific convention, edit the file with a rationale explaining what replaced it.
-
----
-
-## Status and maturity
-
-### Is mycelium production-ready?
-
-Not yet. Mycelium is pre-1.0, currently at v0.4.0 (early access). Phase 1 is feature-complete: atomic content-addressable storage (CAS), a durable append-only activity log, conventions-as-files, and the on-disk format are all implemented and have property-based and concurrent-process test coverage. What is not yet complete is the full benchmark validation against frontier models (T1 multi-session synthesis and T2 self-evolution runs are drafted but awaiting published runs). The [roadmap](mycelium-phases.md) lays out what Phases 2 and 3 add.
-
-The practical risk at this stage is not data loss — the core integrity primitives are solid — but rather that the API surface, on-disk format details, or activity log schema may still shift before 1.0.
-
-### Are benchmarks available yet?
-
-A rubric is fully defined in [benchmarks/phase-1.md](benchmarks/phase-1.md): three tasks (T1 multi-session research synthesis, T2 seeded self-evolution, T3 failure-mode detectors), target models (Claude Opus 4.7 and GPT-5.5), and pass/fail criteria. T3's failure-mode detectors are implemented and exercised by `go test ./docs/benchmarks/tasks/T3-failure-detectors/tool`. T1 and T2 task definitions and grading rubrics are drafted and ready to run. Published model runs against Opus 4.7 and GPT-5.5 are pending — results will land in `docs/benchmarks/` as they complete.
-
-### What's on the roadmap?
-
-Three phases. Phase 1 (current, feature-complete): the core CLI, CAS, activity log, conventions-as-files, durable mutation behavior, and the pi.dev extension. Phase 2 (distribution and operational polish): a versioned activity log schema, legacy recovery diagnostics, Claude Code skill distribution, a second harness integration (Hermes plugin or equivalent), optional read-byte caps if benchmarks call for them, and install/troubleshooting docs. Phase 3 (workflow integration): opt-in git/jj integration with per-operation commits, historical reads via `mycelium read --version=...`, configurable activity log retention, a curated templates repository, and a `mycelium init` CLI for template-based mount setup. See [the roadmap](mycelium-phases.md) for acceptance criteria per phase.
-
----
-
-## Why these design choices
-
-### Why a directory of files instead of a database?
-
-The core bet is that general file tools scale with model intelligence, while specialized memory infrastructure caps it. A database or embedding index encodes assumptions about what gets saved, how it's indexed, and what counts as relevant. As models improve, those assumptions become drag. A filesystem has no such ceiling: `read`, `write`, `ls`, `grep` are the same interface regardless of model generation, and a Frontier model uses them with the same judgment a thoughtful engineer brings to a working notebook.
-
-There are also practical benefits. Filesystems are durable, concurrent-safe with standard primitives (`flock`, atomic rename), inspectable with every text tool, and trivially exportable as a tarball. The agent owns the schema — directory structure, filenames, organization — and can revise it without a migration. See [ADR 0004](adr/0004-conventions-as-files.md) and the [design doc](mycelium-design.md) section 2 for the full argument.
-
-### Why JSONL for the activity log?
-
-JSONL is append-only and line-oriented, which means it tolerates partial writes gracefully: a corrupt or incomplete last line does not poison the rest of the file. It is readable with `cat`, streamable with `tail -f`, parseable by every language without a special library, and searchable with `grep` or `rg --json`. Log shippers, text editors, and shell scripts all work against it without mycelium-specific tooling. The alternative — a structured database or binary format — would require a dedicated reader for every consumer and make the store opaque to the same standard tools that make the content files useful.
+See [`mycelium-phases.md`](mycelium-phases.md). The roadmap now focuses on pi installation quality, pi session continuity, LocalFS correctness, diagnostics, and later workflow integrations such as git/jj.

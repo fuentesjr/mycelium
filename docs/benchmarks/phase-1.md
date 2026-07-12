@@ -20,7 +20,7 @@ Phase 1 targets one Anthropic model and one OpenAI model:
 - **Anthropic:** Claude Opus 4.7
 - **OpenAI:** GPT-5.5
 
-Both must pass the model-dependent criteria (#1 and #4) for the "model-agnostic" claim to hold. Single-provider passes don't count.
+Both must pass the model-dependent criteria (#1 and #4) to show the pi product works across model families. Single-provider passes do not count. Model diversity is benchmark coverage, not harness portability.
 
 Google Frontier and open-weights are out of scope for Phase 1; revisit in a later phase if the MVP holds up.
 
@@ -75,7 +75,7 @@ Why seeded: self-evolution requires something to evolve in response to. A clean 
 1. **Near-duplicate path count.** Levenshtein-1 path collisions per session across `op=write` entries. Threshold: ≥3 in a single session = unhealthy.
 2. **Thrashing.** Activity-log entries per session. Threshold: ≥50 in a single session = unhealthy. (The "too few entries" tail is deferred — hard to disambiguate from a quick-lookup session in practice.)
 
-The writes-without-reads detector was dropped: its denominator, `op=read_signal`, is not emitted by Mycelium and is absent from the portable activity vocabulary, so it only classified synthetic fixtures.
+The writes-without-reads detector was dropped: reads are not emitted by Mycelium, so the denominator only classified synthetic fixtures.
 
 **Validation.** Hand-craft 3 trajectories — 1 healthy, 2 unhealthy (one per remaining detector). The detectors must classify all 3 correctly. The 30-trajectory human-judgment validation is deferred to Phase 2 once we have real run data to calibrate against.
 
@@ -89,15 +89,15 @@ A _run_ executes T1–T3 against one model. Per-task scoring is binary (pass/fai
 
 - **Acceptance #1** passes for a model if T1 passes.
 - **Acceptance #4** passes for a model if T2 passes.
-- **Acceptance #5** passes when T3's detectors classify the 4 hand-crafted trajectories correctly. Model-independent.
+- **Acceptance #5** passes when T3's detectors classify the 3 hand-crafted trajectories correctly. Model-independent.
 
-The **model-agnostic claim passes** when both Claude Opus 4.7 and GPT-5.5 clear #1 and #4. Acceptance #3 (conflict recovery) is verified by the binary's property tests.
+The **multi-model pi benchmark passes** when both Claude Opus 4.7 and GPT-5.5 clear #1 and #4. Acceptance #3 (conflict recovery) is verified by the binary's property tests.
 
 ---
 
 ## Out of scope
 
-Performance, long-running stores, cost ceilings, and non-pi.dev harnesses (Hermes, Claude Code) are all Phase 2+.
+Performance, long-running stores, cost ceilings, and deeper pi workflow quality are later work. Non-pi harnesses are unsupported, not future benchmark targets.
 
 ---
 

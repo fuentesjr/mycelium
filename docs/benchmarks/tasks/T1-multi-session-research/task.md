@@ -2,7 +2,7 @@
 
 **Acceptance criterion:** #1 (single-agent multi-session).
 
-This task runs across three sessions, fresh process each, same mounted store. The prompts below are given verbatim as the user message for each session — no additional system prompt or framing beyond what the harness sets up (mount, identity env vars, the standard system-prompt block from the pi.dev extension).
+This task runs across three sessions, fresh process each, same mounted store. The prompts below are given verbatim as the user message for each session — no additional system prompt or framing beyond what the harness sets up (mount, identity env vars, the standard system-prompt block from the pi extension).
 
 The topic is intentionally narrow and stable: connection-pooler selection for PostgreSQL. Stable enough that training-data drift between Opus 4.7 and GPT-5.5 doesn't dominate the result; narrow enough that one focused engineer could finish the writeup in a few hours.
 

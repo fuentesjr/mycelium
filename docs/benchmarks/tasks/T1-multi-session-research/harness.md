@@ -55,10 +55,12 @@ Capture the transcript only. There is no store to tar.
 The grader is a Frontier model from the *opposite* provider — GPT-5.5 grades Opus runs, Opus 4.7 grades GPT runs. This minimizes single-vendor bias.
 
 Per Mycelium run, the grader receives:
+
 - The unpacked store directory.
 - The grading instructions in `held-out.md`.
 
 Per comparison run, the grader receives:
+
 - The single concatenated transcript.
 - The grading instructions in `held-out.md` (with the "Mycelium pass" criterion replaced by the comparison criterion below).
 
@@ -75,7 +77,7 @@ For each instance, the grader reads both the Mycelium run's store-derived answer
 5 instances per model. Per `docs/benchmarks/phase-1.md`:
 
 - **Acceptance #1 passes for a model** if ≥3/5 instances clear the Mycelium-run pass criterion AND the grader judges the Mycelium run more grounded than the comparison run in ≥3/5 instances.
-- **Model-agnostic claim** requires both Claude Opus 4.7 and GPT-5.5 to pass.
+- **Cross-model criterion** requires both Claude Opus 4.7 and GPT-5.5 to pass through pi.
 
 ## Recording results
 

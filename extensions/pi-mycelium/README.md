@@ -1,115 +1,68 @@
-# Mycelium Pi.dev Extension
+# Mycelium Pi Extension
 
-A pi.dev extension that wires [Mycelium](https://github.com/fuentesjr/mycelium)
-agent memory into pi sessions. The mycelium binary is bundled per platform —
-no manual install or PATH setup required.
+A pi extension that wires [Mycelium](https://github.com/fuentesjr/mycelium) persistent memory into pi coding-agent sessions. The platform-matching Go CLI engine is bundled through npm optional dependencies; supported users do not need a separate binary install.
 
 ## Install
 
-Global install (mount at `~/.pi/agent/extensions/pi-mycelium/journal/`, available in every project):
-
 ```bash
-pi install npm:pi-mycelium
+pi install npm:pi-mycelium        # global journal
+pi install npm:pi-mycelium -l     # project-local journal
 ```
 
-Project-local install (mount at `<repo>/.pi/pi-mycelium/journal/`):
-
-```bash
-pi install npm:pi-mycelium -l
-```
-
-That's it. Run `pi` from any project and the agent gets persistent memory.
-First invocation creates the mount directory automatically.
-
-Verify with `pi list`. The platform-matching binary
-(`@fuentesjr/mycelium-cli-<os>-<arch>`) is pulled in as an npm
-optionalDependency on install — only the one that matches your platform
-gets resolved.
+Global journals live at `~/.pi/agent/extensions/pi-mycelium/journal/`. Project-local journals live at `<repo>/.pi/pi-mycelium/journal/`. Verify with `pi list` and update with `pi update npm:pi-mycelium`.
 
 ## What it does
 
-- **`session_start`** — resolves the bundled `mycelium` binary, sets
-  `MYCELIUM_AGENT_ID` (default `pi-agent`), `MYCELIUM_SESSION_ID` (from
-  `ctx.sessionManager.getLeafId()`), and `MYCELIUM_MOUNT` for the agent's
-  bash invocations. Records a session-boundary entry in the activity log.
-- **`session_shutdown`** — records a portable `session_shutdown` entry before
-  the extension runtime is torn down.
-- **`before_agent_start`** — appends a system-prompt block with the small public
-  model — a folder, safe mutations, and a searchable activity log — then tiers
-  the `mycelium` subcommands into everyday, occasional, and metadata commands.
-  It also includes the conventions-file path, identity, conflict recovery, and
-  a rationale nudge for operations whose reasoning is worth preserving. Chains
-  off `event.systemPrompt` so other
-  extensions' contributions are preserved.
-- **memory-relevant activity events** — records session boundaries and
-  `compaction` using the portable vocabulary in
-  [`docs/portable-activity-events.md`](https://github.com/fuentesjr/mycelium/blob/main/docs/portable-activity-events.md),
-  without modifying the agent's message stream.
+- **`session_start`** resolves the bundled `mycelium` binary, prepends it to PATH, sets `MYCELIUM_MOUNT`, `MYCELIUM_AGENT_ID`, and `MYCELIUM_SESSION_ID`, bootstraps `MYCELIUM_MEMORY.md` when absent, and records a session-boundary activity entry.
+- **`before_agent_start`** contributes concise system-prompt guidance: the journal path, command tiers, conventions-file rule, conflict recovery, reserved `_` paths, rationale guidance, and activity-log notes.
+- **`session_shutdown`** records a shutdown entry before teardown.
+- **`compaction`** records pi compaction metadata when pi reports it.
 
-The bundled binary writes durable history under `_activity/`. Other `_` paths
-are internal implementation details; agents should not edit them directly.
+The extension registers no custom tools. Pi agents invoke `mycelium <subcommand>` through pi's built-in `bash` tool, the same way they run `git` or `rg`.
+
+## Activity contract
+
+The active pi contract is session boundaries, `session_shutdown`, `compaction`, core CLI mutation entries, and agent-authored `decision` / `agent_note` signals. Historical journals may contain older event names; readers should tolerate unknown operations. See [`docs/pi-activity-events.md`](https://github.com/fuentesjr/mycelium/blob/main/docs/pi-activity-events.md).
 
 ## What it does not do
 
-- Registers no tools. The agent invokes `mycelium <sub>` through pi's
-  built-in `bash` tool, the same way it runs `git`, `rg`, or any other shell
-  command. This is intentional — see
-  [`docs/mycelium-design.md`](https://github.com/fuentesjr/mycelium/blob/main/docs/mycelium-design.md)
-  section 1 in the main repo.
-- Does not prefetch, summarize, or auto-inject memory hints. Self-evolution
-  is an agent behavior, not a system feature (see design section 7).
+- Does not support non-pi coding-agent harnesses. Direct CLI use is for pi shell operation, development, diagnostics, and advanced inspection.
+- Does not prefetch, summarize, rank, or auto-inject memory contents. The agent reads and updates the journal deliberately.
+- Does not sandbox the agent's shell. Mycelium protects journal mutations made through the CLI; pi and the OS control broader permissions.
 
 ## Mount location
 
-Auto-detected from where the extension is installed:
+| Install scope | Extension path | Mount path |
+| --- | --- | --- |
+| Global | `~/.pi/agent/extensions/` | `~/.pi/agent/extensions/pi-mycelium/journal/` |
+| Project | `<repo>/.pi/extensions/` | `<repo>/.pi/pi-mycelium/journal/` |
 
-| Install scope | Extension path            | Mount path                                    |
-| ------------- | ------------------------- | --------------------------------------------- |
-| Global        | `~/.pi/agent/extensions/` | `~/.pi/agent/extensions/pi-mycelium/journal/` |
-| Project       | `<repo>/.pi/extensions/`  | `<repo>/.pi/pi-mycelium/journal/`             |
-
-Detection compares `import.meta.url` against `~/.pi/agent/extensions/`.
-A locally-checked-out copy loaded via `pi -e ./path.ts` is treated as project.
+Detection compares `import.meta.url` against `~/.pi/agent/extensions/`. A locally checked-out copy loaded with `pi -e ./path.ts` is treated as project-local.
 
 ## Identity
 
-`MYCELIUM_AGENT_ID` defaults to `pi-agent`. Agent IDs are filename-safe ASCII
-values using letters, digits, `.`, `_`, or `-`. Set it explicitly when running
-multiple concurrent agents against the same store:
+`MYCELIUM_AGENT_ID` defaults to `pi-agent`. Agent IDs are filename-safe ASCII using letters, digits, `.`, `_`, or `-`. Set it explicitly when running multiple concurrent agents against the same journal:
 
 ```bash
 MYCELIUM_AGENT_ID=researcher pi
 ```
 
-`MYCELIUM_SESSION_ID` is taken from `ctx.sessionManager.getLeafId()` when pi
-provides one — forks mint new ids automatically. If pi does not provide one,
-the extension generates a `pi-auto-*` id; the core CLI also has an `auto-*`
-per-process fallback for non-pi shell use.
+`MYCELIUM_SESSION_ID` uses `ctx.sessionManager.getLeafId()` when pi provides one. If not, the extension generates a `pi-auto-*` id; the CLI still has an `auto-*` fallback for diagnostics.
 
-## Binary resolution
+## Binary resolution and diagnostics
 
-The extension prefers the bundled binary from the matching
-`@fuentesjr/mycelium-cli-<platform>` optional dependency. If that's not
-present (unsupported platform, or `--omit=optional` install), it falls
-back to `which mycelium` on PATH. If neither is found, the system-prompt
-block becomes a `UNAVAILABLE` notice — sessions continue normally without
-memory.
+The extension prefers the bundled `@fuentesjr/mycelium-cli-<platform>` package. If optional dependencies were skipped or the platform is unsupported, it falls back to `which mycelium` on PATH. If neither exists, the injected prompt reports Mycelium as unavailable and the pi session continues without persistent memory.
+
+For troubleshooting: exit 64 is a CAS/destination conflict with a JSON envelope; exit 65 is a protocol violation such as reserved `_` path mutation or oversize rationale.
 
 ## Development
-
-Local checkout for hacking on the extension:
 
 ```bash
 git clone https://github.com/fuentesjr/mycelium
 cd mycelium/extensions/pi-mycelium
 npm install
+npm test
 pi -e ./index.ts
 ```
 
-A stub binary at `stub/mycelium` returns canned successful JSON for every
-subcommand, useful for end-to-end testing without rebuilding the Go binary:
-
-```bash
-chmod +x stub/mycelium
-ln -s "$(pwd)/stub/mycelium" ~/.local/bin/mycelium
-```
+A stub binary at `stub/mycelium` returns canned successful JSON for extension tests and local smoke checks.

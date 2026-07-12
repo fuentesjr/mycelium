@@ -216,9 +216,7 @@ resolved during acceptance:
   An adapter that wants structured rationale-adjacent metadata can
   still use `--payload-json`; the top-level flag avoids forcing every
   consumer through nested JSON.
-- **Harness adapter coordination:** _Yes_, encourage. `pi-mycelium`
-  v0.2.0 adds a one-line recommendation to its injected system-prompt
-  block urging agents to supply `--rationale` on rationale-bearing
-  operations. Future adapters are encouraged to follow suit. This is
-  documented in `docs/portable-activity-events.md`; it is not enforced
-  by the core binary.
+- **Pi extension coordination:** _Yes_. `pi-mycelium` v0.2.0 adds a
+  one-line recommendation to its injected system-prompt block urging agents
+  to supply `--rationale` on rationale-bearing operations. This remains prompt
+  guidance rather than a rule enforced by the core binary.

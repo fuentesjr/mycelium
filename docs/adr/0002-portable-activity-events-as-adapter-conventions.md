@@ -1,8 +1,10 @@
 # ADR 0002: Portable activity events as adapter conventions
 
-- **Status:** Accepted; reference adapter behavior revised by ADR-0006
+- **Status:** Superseded by ADR-0007; reference adapter behavior was previously revised by ADR-0006
 - **Date:** 2026-05-07
 - **Deciders:** Sal Fuentes Jr.
+
+> Supersession note: ADR-0007 narrows Mycelium to pi-only support and removes the portable adapter/event vocabulary from the active product contract. This ADR remains as historical context.
 
 ## Context
 
@@ -86,8 +88,9 @@ removes the context hook and checkpoint dedupe/fingerprint machinery, and
 removes the legacy helper export. The portable vocabulary above remains
 unchanged.
 
-The adapter vocabulary and examples are documented in
-[`docs/portable-activity-events.md`](../portable-activity-events.md).
+ADR-0007 later removed the portable vocabulary document from the active
+product surface. The current pi contract is documented in
+[`docs/pi-activity-events.md`](../pi-activity-events.md).
 
 ## Consequences
 
@@ -107,9 +110,9 @@ The adapter vocabulary and examples are documented in
 ### Negative
 
 - **No binary-level conformance guarantee.** A poorly-written adapter can emit
-  malformed or noisy payloads. Documentation plus the non-enforcing fixture at
-  `docs/fixtures/portable-activity-events.jsonl`, not core validation, are the
-  enforcement mechanism.
+  malformed or noisy payloads. At acceptance, documentation plus a
+  non-enforcing JSONL fixture—not core validation—were the enforcement
+  mechanism.
 - **Vocabulary drift is possible.** Different adapters may invent harness-local
   event names. The shared vocabulary is a convention they are encouraged to use,
   not a reserved namespace enforced by the binary.

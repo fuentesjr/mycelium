@@ -1,3 +1,19 @@
+# Changelog
+
+## [Unreleased]
+
+### Changed
+
+- Narrowed the supported coding-agent harness to pi via the `pi-mycelium` extension. Direct CLI use remains available for pi shell operation, development, diagnostics, and advanced inspection; non-pi harness integrations are unsupported.
+- Added ADR-0007 and marked ADR-0002 / ADR-0006 superseded by the pi-only support decision.
+- Replaced the portable activity-event specification with concise pi activity-event documentation while preserving journal compatibility and tolerance for historical/unknown log operations.
+- Kept platform CLI npm packages and binary archives as the way `pi-mycelium` ships and diagnoses its Go CLI engine.
+
+### Removed
+
+- Removed the portable Agent Skill under `skills/mycelium/`; v0.4.0 was the last release that included it.
+- Removed the portable activity-event fixture and extension test that treated cross-harness event vocabulary as an active compatibility target.
+
 ## [0.4.0] - 2026-06-26
 
 This release intentionally combines the core simplification work and the portable skill split into one pre-1.0 cut. No `v0.3.0` tag was published.

@@ -12,7 +12,7 @@ Two detectors operating on activity-log content alone must distinguish a healthy
 | `near_duplicate_paths` | ≥3 Levenshtein-1 path collisions among `op=write` entries in a single session |
 | `thrashing`            | ≥50 activity-log entries in a single session                                  |
 
-The earlier `writes_without_reads` detector was removed because its denominator, `op=read_signal`, is not emitted by Mycelium and is not in the portable activity vocabulary.
+The earlier `writes_without_reads` detector was removed because its denominator, `op=read_signal`, is not emitted by Mycelium and is not in the pi activity contract.
 
 Implementation under `docs/benchmarks/tasks/T3-failure-detectors/tool/`. Fixtures under `docs/benchmarks/tasks/T3-failure-detectors/tool/testdata/trajectories/`:
 
