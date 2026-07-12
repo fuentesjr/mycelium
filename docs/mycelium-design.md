@@ -60,7 +60,7 @@ A specialized memory API encodes assumptions: what gets saved, how it's indexed,
 
 General tools (read, write, list, edit, grep) have no such ceiling. The agent invokes them through its existing shell — `mycelium read` sits in the same Bash tool as `git log` and `rg` — and `mycelium` is the smallest adapter that earns its keep: atomic conditional writes, an authoritative activity log, no policy about what to save, how to name, or what's relevant. A Frontier model uses them with judgment indistinguishable from a thoughtful engineer keeping a working notebook, and the same surface gets _more_ useful — not less — as the next generation arrives. This is the central bet, and every other decision is downstream of it.
 
-### Files are the unit. Directories are the structure. The agent owns both.
+### Files are the unit. Directories are the structure. The agent owns both
 
 The filesystem is the agent's workspace, not a managed resource. The system does not move files behind the agent's back, deduplicate them, prune them, or rewrite them. If the agent creates `notes/2026-04-26/scratch.md`, that file stays exactly where the agent put it until the agent changes it through `mycelium`.
 
@@ -393,8 +393,7 @@ A `mycelium log` entry with an inline payload:
   "op": "context_checkpoint",
   "payload": {
     "message_count": 42,
-    "last_role": "assistant",
-    "fingerprint": "sha256:..."
+    "last_role": "assistant"
   }
 }
 ```
@@ -403,7 +402,7 @@ Adapter-owned event names and generic payload fields are conventions, documented
 in [portable activity events](portable-activity-events.md), not binary-enforced
 schema.
 
-**Path layout: `_activity/YYYY/MM/DD/{agent_id}.jsonl`.** Each agent writes its own daily file; cross-agent order is reconstructed by sorting on `ts` or `tx_id`. Time-windowed queries use path patterns with `mycelium ls --recursive`: `_activity/2026/04/*/*.jsonl` (this month, all agents); `_activity/2026/04/26/*.jsonl` (today, all agents); `_activity/2026/04/26/glp1-research.jsonl` (today, one agent). Payloads from `mycelium log` are inlined on the entry; larger signals belong in a regular file referenced via `--path`.
+**Path layout: `_activity/YYYY/MM/DD/{agent_id}.jsonl`.** Each agent writes its own daily file; `agent_id` must be filename-safe ASCII using letters, digits, `.`, `_`, or `-`. Cross-agent order is reconstructed by sorting on `ts` or `tx_id`. Time-windowed queries use path patterns with `mycelium ls --recursive`: `_activity/2026/04/*/*.jsonl` (this month, all agents); `_activity/2026/04/26/*.jsonl` (today, all agents); `_activity/2026/04/26/glp1-research.jsonl` (today, one agent). Payloads from `mycelium log` are inlined on the entry; larger signals belong in a regular file referenced via `--path`.
 
 **Same files, two readers, one mutation path:**
 

@@ -25,6 +25,27 @@ func TestRmHappyPath(t *testing.T) {
 	}
 }
 
+func TestRmRejectsSymlinkParentEscapingMount(t *testing.T) {
+	mount := t.TempDir()
+	outside := t.TempDir()
+	mkfile(t, outside, "file.md", "outside")
+	if err := os.Symlink(outside, filepath.Join(mount, "linkdir")); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("MYCELIUM_MOUNT", mount)
+
+	_, errOut, rc := runDispatchWithStdin(t, "", "rm", "linkdir/file.md")
+	if rc == ExitOK {
+		t.Fatal("rm through symlink parent succeeded")
+	}
+	if !strings.Contains(errOut, "symlink") {
+		t.Fatalf("stderr should mention symlink, got %q", errOut)
+	}
+	if _, err := os.Stat(filepath.Join(outside, "file.md")); err != nil {
+		t.Fatalf("outside file should remain: %v", err)
+	}
+}
+
 func TestRmFileMissingIsError(t *testing.T) {
 	mount := t.TempDir()
 	t.Setenv("MYCELIUM_MOUNT", mount)

@@ -3,6 +3,7 @@ package mycelium
 import (
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 )
@@ -12,6 +13,7 @@ var (
 	ErrPathEmpty       = errors.New("path is empty")
 	ErrPathAbsolute    = errors.New("path must be relative to mount")
 	ErrPathEscapesRoot = errors.New("path escapes mount root")
+	ErrPathSymlink     = errors.New("path contains symlink")
 	ErrReservedPath    = errors.New("path uses reserved '_' prefix")
 )
 
@@ -51,6 +53,40 @@ func relForwardSlash(mount, abs string) string {
 // resolveAgentWritable resolves requested under mount and rejects any path
 // whose first segment starts with '_'. Used by all agent-facing write paths.
 // Internal binary writes (auto-log, mycelium log routing) use resolveUnderMount.
+func rejectSymlinkComponents(mount, abs string) error {
+	cleanedMount := filepath.Clean(mount)
+	cleanedAbs := filepath.Clean(abs)
+	rel, err := filepath.Rel(cleanedMount, cleanedAbs)
+	if err != nil {
+		return fmt.Errorf("resolve path: %w", err)
+	}
+	if rel == "." {
+		return nil
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return ErrPathEscapesRoot
+	}
+
+	current := cleanedMount
+	for _, part := range strings.Split(rel, string(filepath.Separator)) {
+		if part == "" || part == "." {
+			continue
+		}
+		current = filepath.Join(current, part)
+		info, err := os.Lstat(current)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				return nil
+			}
+			return err
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return ErrPathSymlink
+		}
+	}
+	return nil
+}
+
 func resolveAgentWritable(mount, requested string) (string, error) {
 	abs, err := resolveUnderMount(mount, requested)
 	if err != nil {

@@ -68,6 +68,45 @@ func TestReadFileJSONFormat(t *testing.T) {
 	}
 }
 
+func TestReadRejectsSymlinkLeafEscapingMount(t *testing.T) {
+	mount := t.TempDir()
+	outside := t.TempDir()
+	mkfile(t, outside, "secret.md", "outside secret")
+	if err := os.Symlink(filepath.Join(outside, "secret.md"), filepath.Join(mount, "link.md")); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("MYCELIUM_MOUNT", mount)
+
+	out, errOut, rc := runDispatch(t, "read", "link.md")
+	if rc == ExitOK {
+		t.Fatalf("rc: got OK, want failure (out=%q)", out)
+	}
+	if !strings.Contains(errOut, "symlink") {
+		t.Fatalf("stderr should mention symlink, got %q", errOut)
+	}
+	if strings.Contains(out, "outside secret") {
+		t.Fatalf("outside content leaked: %q", out)
+	}
+}
+
+func TestReadRejectsSymlinkParent(t *testing.T) {
+	mount := t.TempDir()
+	outside := t.TempDir()
+	mkfile(t, outside, "secret.md", "outside secret")
+	if err := os.Symlink(outside, filepath.Join(mount, "linkdir")); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("MYCELIUM_MOUNT", mount)
+
+	out, errOut, rc := runDispatch(t, "read", "linkdir/secret.md")
+	if rc == ExitOK {
+		t.Fatalf("rc: got OK, want failure (out=%q)", out)
+	}
+	if !strings.Contains(errOut, "symlink") {
+		t.Fatalf("stderr should mention symlink, got %q", errOut)
+	}
+}
+
 func TestReadFileInvalidFormat(t *testing.T) {
 	mount := t.TempDir()
 	t.Setenv("MYCELIUM_MOUNT", mount)

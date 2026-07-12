@@ -32,6 +32,10 @@ func readFile(out, errOut io.Writer, mount, requested, format string) int {
 		}
 		return ExitUsage
 	}
+	if err := rejectSymlinkComponents(mount, abs); err != nil {
+		fmt.Fprintf(errOut, "mycelium read: %v\n", err)
+		return ExitGenericError
+	}
 	data, err := os.ReadFile(abs)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {

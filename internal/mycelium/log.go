@@ -83,10 +83,16 @@ func appendActivityEntryDurable(mount string, entry LogEntry) error {
 // appendActivityLineDurable appends a pre-marshaled JSONL line and fsyncs the
 // file and containing directory so callers can treat success as durable.
 func appendActivityLineDurable(mount, agentID string, when time.Time, line []byte) error {
+	if err := validateAgentID(agentID); err != nil {
+		return err
+	}
 	logPath := activityLogPath(mount, agentID, when)
 	logDir := filepath.Dir(logPath)
 	if err := os.MkdirAll(logDir, 0o755); err != nil {
 		return fmt.Errorf("mkdir: %w", err)
+	}
+	if err := rejectSymlinkComponents(mount, logPath); err != nil {
+		return err
 	}
 
 	f, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)

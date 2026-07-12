@@ -17,12 +17,11 @@ ADR-0002 already defined portable event names as adapter conventions, not binary
 After Stage 5, the reference pi adapter should emit only:
 
 - session-boundary events (`session_startup`, `session_shutdown`, and related),
-- `compaction`,
-- deduped `context_checkpoint` events.
+- `compaction`.
 
-It should not emit `turn_start`, `turn_end`, `tool_start`, or `tool_end`.
-
-`context_checkpoint` emissions continue with deduplication via checkpoint fingerprinting to prevent duplicate telemetry.
+It should not emit `turn_start`, `turn_end`, `tool_start`, `tool_end`, or
+`context_checkpoint` events. Checkpoint volume and deduplication are left to
+adapters that choose to register context hooks.
 
 ## Consequences
 
@@ -39,7 +38,8 @@ It should not emit `turn_start`, `turn_end`, `tool_start`, or `tool_end`.
 ### Neutral
 
 - ADR-0002 portable vocabulary remains unchanged and still applies to all adapters.
-- other adapters may continue to emit full vocabulary (including turn/tool events) per their own needs; this is not a cross-adapter prohibition.
+- other adapters may continue to emit full vocabulary (including turn/tool/context events) per their own needs; this is not a cross-adapter prohibition.
+- checkpoint spam is a harness-volume tradeoff, not a core guarantee handled by the reference adapter.
 
 ## Open questions
 

@@ -25,13 +25,11 @@ function renderActivityEventsSection(): string {
 	return `### Activity events
 
 The pi-mycelium adapter automatically records portable activity events under
-\`_activity/\`: session boundaries, \`compaction\`, and deduped
-\`context_checkpoint\` entries. Older logs may contain turn/tool events or
-legacy \`context_signal\` entries; treat \`context_signal\` as a low-detail
-context checkpoint.
+\`_activity/\`: session boundaries and \`compaction\`. Older logs may contain
+turn/tool events, \`context_checkpoint\`, or legacy \`context_signal\` entries.
 
 Payloads are metadata-only by default. Read them with normal file/search tools,
-for example \`mycelium grep --path _activity --pattern context_checkpoint --format json\`.`;
+for example \`mycelium grep --path _activity --pattern session_ --format json\`.`;
 }
 
 export function systemPromptAvailable(c: AvailableContext): string {

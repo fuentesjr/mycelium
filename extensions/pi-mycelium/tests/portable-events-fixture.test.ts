@@ -39,7 +39,13 @@ describe("portable activity events fixture", () => {
 		const lines = readFileSync(fixturePath, "utf8").trim().split("\n");
 		expect(lines.length).toBeGreaterThan(0);
 
-		const entries = lines.map((line) => JSON.parse(line) as FixtureEntry);
+		const entries = lines.map((line) => {
+			try {
+				return JSON.parse(line) as FixtureEntry;
+			} catch (error) {
+				throw new Error(`invalid fixture JSONL line: ${String(error)}`);
+			}
+		});
 
 		for (const entry of entries) {
 			expect(typeof entry.ts).toBe("string");
@@ -62,7 +68,9 @@ describe("portable activity events fixture", () => {
 
 		const checkpoint = entries.find((e) => e.op === "context_checkpoint")!
 			.payload as Record<string, unknown>;
-		expect(checkpoint.fingerprint).toMatch(/^sha256:/);
+		expect(checkpoint).not.toHaveProperty("fingerprint");
+		expect(checkpoint).not.toHaveProperty("message_delta");
+		expect(checkpoint).not.toHaveProperty("suppressed_duplicates");
 		expect(checkpoint.role_counts).toEqual({ user: 1, assistant: 1 });
 
 		const toolEnd = entries.find((e) => e.op === "tool_end")!.payload as Record<

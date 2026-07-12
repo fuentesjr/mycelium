@@ -53,6 +53,10 @@ func grepFiles(out, errOut io.Writer, mount string, opts GrepOptions) int {
 			}
 			return ExitUsage
 		}
+		if err := rejectSymlinkComponents(mount, abs); err != nil {
+			fmt.Fprintf(errOut, "mycelium grep: %v\n", err)
+			return ExitGenericError
+		}
 		// Verify the resolved path exists.
 		if _, err := os.Stat(abs); err != nil {
 			if errors.Is(err, fs.ErrNotExist) {
@@ -87,13 +91,20 @@ func grepFiles(out, errOut io.Writer, mount string, opts GrepOptions) int {
 
 		name := d.Name()
 
-		// Skip the walk root itself.
-		if absPath == walkRoot {
+		// Skip the walk root itself only when it is a directory; a file scope is searchable.
+		if absPath == walkRoot && d.IsDir() {
 			return nil
 		}
 
 		// Skip dot entries (files and directories).
 		if isDotEntry(name) {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		if d.Type()&fs.ModeSymlink != 0 {
 			if d.IsDir() {
 				return filepath.SkipDir
 			}
@@ -112,8 +123,8 @@ func grepFiles(out, errOut io.Writer, mount string, opts GrepOptions) int {
 		}
 		relSlash := filepath.ToSlash(rel)
 
-		// Scan file for matching lines.
-		fileMatches, moreAvailable, scanErr := scanFile(absPath, relSlash, opts.Pattern, re, opts.Limit-len(matches))
+		// Scan for one extra match so exact-limit results are not marked truncated.
+		fileMatches, scanErr := scanFile(absPath, relSlash, opts.Pattern, re, opts.Limit+1-len(matches))
 		if scanErr != nil {
 			// Per-file errors are warnings, not fatal.
 			fmt.Fprintf(errOut, "mycelium grep: skip %s: %v\n", relSlash, scanErr)
@@ -122,12 +133,9 @@ func grepFiles(out, errOut io.Writer, mount string, opts GrepOptions) int {
 
 		matches = append(matches, fileMatches...)
 
-		if len(matches) >= opts.Limit {
-			// Check whether there were more lines available in this file
-			// or whether there are more files to walk.
-			if moreAvailable {
-				truncated = true
-			}
+		if len(matches) > opts.Limit {
+			truncated = true
+			matches = matches[:opts.Limit]
 			return filepath.SkipAll
 		}
 
@@ -138,12 +146,6 @@ func grepFiles(out, errOut io.Writer, mount string, opts GrepOptions) int {
 		fmt.Fprintf(errOut, "mycelium grep: %v\n", err)
 		return ExitGenericError
 	}
-
-	// If we hit limit exactly and there are more files, mark truncated.
-	// (The walk stopped via SkipAll so we may not know about remaining files;
-	// truncated is already set by scanFile returning moreAvailable=true, or
-	// we need to mark it because there might be more files after SkipAll.)
-	// The check above covers the SkipAll case — truncated is set before SkipAll is returned.
 
 	switch opts.Format {
 	case "text":
@@ -177,16 +179,14 @@ func grepFiles(out, errOut io.Writer, mount string, opts GrepOptions) int {
 
 // scanFile reads absPath line by line and returns matches up to quota lines.
 // relSlash is the forward-slash relative path used in match records.
-// moreAvailable is true when quota was exhausted before the file was fully scanned.
-func scanFile(absPath, relSlash, pattern string, re *regexp.Regexp, quota int) (matches []grepMatch, moreAvailable bool, err error) {
+func scanFile(absPath, relSlash, pattern string, re *regexp.Regexp, quota int) (matches []grepMatch, err error) {
 	if quota <= 0 {
-		// Already at limit; signal that there may be more.
-		return nil, true, nil
+		return nil, nil
 	}
 
 	f, err := os.Open(absPath)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 	defer f.Close()
 
@@ -215,19 +215,17 @@ func scanFile(absPath, relSlash, pattern string, re *regexp.Regexp, quota int) (
 		})
 
 		if len(matches) >= quota {
-			// There may be more matching lines in this file.
-			moreAvailable = true
-			return matches, moreAvailable, nil
+			return matches, nil
 		}
 	}
 
 	if err := scanner.Err(); err != nil {
 		// If the error is a buffer overflow (line too long), skip the file silently.
 		if errors.Is(err, bufio.ErrTooLong) {
-			return nil, false, nil
+			return nil, nil
 		}
-		return nil, false, err
+		return nil, err
 	}
 
-	return matches, false, nil
+	return matches, nil
 }

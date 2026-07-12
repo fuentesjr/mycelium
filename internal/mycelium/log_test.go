@@ -52,6 +52,36 @@ func readLogLines(t *testing.T, mount string) []LogEntry {
 
 // --- appendActivity / appendLog unit tests ---
 
+func TestLogRejectsAgentIDPathTraversal(t *testing.T) {
+	mount := t.TempDir()
+	outsideTarget := filepath.Clean(filepath.Join(mount, "..", "escaped-agent.jsonl"))
+	_ = os.Remove(outsideTarget)
+	id := Identity{AgentID: "../escaped-agent", SessionID: "s", Mount: mount}
+	var errBuf strings.Builder
+
+	rc := appendActivity(&errBuf, id, LogEntry{Op: "probe"}, fixedNow)
+	if rc != ExitGenericError {
+		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitGenericError, errBuf.String())
+	}
+	if _, err := os.Stat(outsideTarget); !os.IsNotExist(err) {
+		t.Fatalf("outside log should not be created at %s (err=%v)", outsideTarget, err)
+	}
+	if logExists(mount) {
+		t.Fatal("log file should not be created for invalid agent id")
+	}
+}
+
+func TestAppendActivityLineDurableRejectsInvalidAgentID(t *testing.T) {
+	mount := t.TempDir()
+	line := []byte(`{"ts":"2024-01-15T10:30:00Z","op":"probe"}` + "\n")
+	if err := appendActivityLineDurable(mount, "a/b", fixedNow, line); err == nil {
+		t.Fatal("appendActivityLineDurable invalid agent id: got nil, want error")
+	}
+	if logExists(mount) {
+		t.Fatal("log file should not be created for invalid agent id")
+	}
+}
+
 func TestLogHappyPathNoPathNoPayload(t *testing.T) {
 	mount := t.TempDir()
 	id := Identity{AgentID: "agent-1", SessionID: "sess-1", Mount: mount}

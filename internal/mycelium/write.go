@@ -81,6 +81,11 @@ func atomicWrite(abs string, content []byte, syncStops ...string) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
+	if len(syncStops) > 0 && syncStops[0] != "" {
+		if err := rejectSymlinkComponents(syncStops[0], abs); err != nil {
+			return err
+		}
+	}
 	tmp, err := os.CreateTemp(dir, ".mycelium-write-*")
 	if err != nil {
 		return err

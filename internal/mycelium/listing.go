@@ -45,6 +45,10 @@ func listFiles(mount string, recursive bool, pattern string) ([]string, error) {
 			return nil
 		}
 
+		if d.Type()&fs.ModeSymlink != 0 {
+			return nil
+		}
+
 		if d.IsDir() {
 			if !recursive {
 				return filepath.SkipDir
@@ -52,7 +56,7 @@ func listFiles(mount string, recursive bool, pattern string) ([]string, error) {
 			return nil
 		}
 
-		// It's a regular file (or symlink to one — we include it).
+		// It's a regular file.
 		rel, err := filepath.Rel(mount, absPath)
 		if err != nil {
 			return err

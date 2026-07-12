@@ -2,6 +2,7 @@ package mycelium
 
 import (
 	"errors"
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -39,6 +40,38 @@ func TestResolveUnderMount(t *testing.T) {
 			want := filepath.Join(tt.mount, tt.wantSub)
 			if got != want {
 				t.Errorf("path: got %q, want %q", got, want)
+			}
+		})
+	}
+}
+
+func TestRejectSymlinkComponents(t *testing.T) {
+	mount := t.TempDir()
+	outside := t.TempDir()
+	mkfile(t, mount, "dir/file.md", "ok")
+	mkfile(t, outside, "secret.md", "secret")
+	if err := os.Symlink(filepath.Join(outside, "secret.md"), filepath.Join(mount, "leaf.md")); err != nil {
+		t.Fatalf("symlink leaf: %v", err)
+	}
+	if err := os.Symlink(outside, filepath.Join(mount, "linkdir")); err != nil {
+		t.Fatalf("symlink dir: %v", err)
+	}
+
+	tests := []struct {
+		name string
+		path string
+		want error
+	}{
+		{"regular path", filepath.Join(mount, "dir", "file.md"), nil},
+		{"missing suffix after regular parent", filepath.Join(mount, "dir", "new.md"), nil},
+		{"symlink leaf", filepath.Join(mount, "leaf.md"), ErrPathSymlink},
+		{"symlink parent", filepath.Join(mount, "linkdir", "secret.md"), ErrPathSymlink},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := rejectSymlinkComponents(mount, tt.path)
+			if !errors.Is(err, tt.want) {
+				t.Fatalf("err: got %v, want %v", err, tt.want)
 			}
 		})
 	}

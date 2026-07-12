@@ -34,12 +34,12 @@ Portable adapter ops include:
   `tool_end`
 - agent-authored signals such as `decision` and `agent_note`
 
-The reference `pi-mycelium` adapter emits session boundaries,
-`session_shutdown`, `compaction`, and deduped `context_checkpoint` entries. It
-does not emit turn/tool telemetry.
+The reference `pi-mycelium` adapter emits session boundaries and `compaction`.
+It does not emit turn/tool/context telemetry.
 
 ## Payloads
 
-Payloads are metadata-only by default: counts, roles, fingerprints, sequence
-numbers, and adapter identity. Larger or sensitive details belong in normal
-files referenced with `--path`.
+Payloads are metadata-only by default: counts, roles, sequence numbers, and
+adapter identity. Larger or sensitive details belong in normal files referenced
+with `--path`. See `docs/portable-activity-events.md` for adapter vocabulary
+details.

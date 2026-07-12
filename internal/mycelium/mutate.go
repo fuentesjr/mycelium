@@ -31,6 +31,10 @@ func mutatingWrite(errOut io.Writer, id Identity, requested string, content []by
 	if rc := blockLegacyPendingTransactions(errOut, id.Mount); rc != ExitOK {
 		return "", rc
 	}
+	if err := rejectSymlinkComponents(id.Mount, abs); err != nil {
+		fmt.Fprintf(errOut, "mycelium write: %v\n", err)
+		return "", ExitGenericError
+	}
 
 	prior, err := currentVersion(abs)
 	if err != nil {
@@ -84,6 +88,10 @@ func mutatingEdit(errOut io.Writer, id Identity, requested, oldStr, newStr, expe
 
 	if rc := blockLegacyPendingTransactions(errOut, id.Mount); rc != ExitOK {
 		return "", rc
+	}
+	if err := rejectSymlinkComponents(id.Mount, abs); err != nil {
+		fmt.Fprintf(errOut, "mycelium edit: %v\n", err)
+		return "", ExitGenericError
 	}
 
 	data, err := os.ReadFile(abs)
@@ -157,6 +165,10 @@ func mutatingRemove(errOut io.Writer, id Identity, requested, expectedVersion st
 
 	if rc := blockLegacyPendingTransactions(errOut, id.Mount); rc != ExitOK {
 		return "", rc
+	}
+	if err := rejectSymlinkComponents(id.Mount, abs); err != nil {
+		fmt.Fprintf(errOut, "mycelium rm: %v\n", err)
+		return "", ExitGenericError
 	}
 
 	priorVersion, err = currentVersion(abs)
@@ -233,6 +245,14 @@ func mutatingMove(errOut io.Writer, id Identity, src, dst, expectedVersion strin
 	if rc := blockLegacyPendingTransactions(errOut, id.Mount); rc != ExitOK {
 		return "", rc
 	}
+	if err := rejectSymlinkComponents(id.Mount, srcAbs); err != nil {
+		fmt.Fprintf(errOut, "mycelium mv: %v\n", err)
+		return "", ExitGenericError
+	}
+	if err := rejectSymlinkComponents(id.Mount, dstAbs); err != nil {
+		fmt.Fprintf(errOut, "mycelium mv: %v\n", err)
+		return "", ExitGenericError
+	}
 
 	version, err = currentVersion(srcAbs)
 	if err != nil {
@@ -275,6 +295,9 @@ func mutatingMove(errOut io.Writer, id Identity, src, dst, expectedVersion strin
 		dstDir := filepath.Dir(dstAbs)
 		if err := os.MkdirAll(dstDir, 0o755); err != nil {
 			return fmt.Errorf("mkdir: %w", err)
+		}
+		if err := rejectSymlinkComponents(id.Mount, dstAbs); err != nil {
+			return err
 		}
 		if err := os.Rename(srcAbs, dstAbs); err != nil {
 			return err

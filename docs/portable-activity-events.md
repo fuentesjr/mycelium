@@ -79,9 +79,7 @@ Common fields:
 {
   "harness": "pi.dev",
   "adapter_version": "0.2.0",
-  "seq": 42,
-  "fingerprint": "sha256:...",
-  "suppressed_duplicates": 3
+  "seq": 42
 }
 ```
 
@@ -91,7 +89,6 @@ Session and turn fields:
 {
   "turn_index": 7,
   "message_count": 18,
-  "message_delta": 2,
   "last_role": "toolResult",
   "role_counts": { "user": 4, "assistant": 7, "toolResult": 7 }
 }
@@ -127,7 +124,6 @@ Assistant/model fields:
 Default adapter payloads should be metadata-only:
 
 - counts, roles, tool names/ids, timings, token usage, and error flags;
-- stable fingerprints for dedupe and correlation;
 - no prompt, assistant, tool, file, or preview text by default.
 
 If a future adapter supports previews, previews must be disabled by default,
@@ -135,19 +131,12 @@ explicitly opt-in, bounded in length, and documented by that adapter. Put large
 or sensitive details in normal agent-authored files and reference those files
 with `mycelium log <op> --path <path>` when needed.
 
-## Dedupe policy
+## Checkpoint policy
 
-Adapters should suppress repeated identical `context_checkpoint` events:
-
-1. Compute a fingerprint from stable metadata such as roles, timestamps,
-   tool ids/names, and message count.
-2. If it matches the prior checkpoint, increment an in-memory duplicate counter
-   and do not append a log entry.
-3. On the next distinct checkpoint, include `suppressed_duplicates` in the
-   payload.
-
-This keeps checkpoints informative without turning `_activity/` into a heartbeat
-log.
+Adapters may emit lightweight `context_checkpoint` events when their harness
+exposes context hooks. Checkpoints should remain metadata-only by default and
+avoid transcript text. They do not require fingerprinting or duplicate
+suppression; event volume is an adapter/harness tradeoff.
 
 ## Conformance fixture
 
@@ -185,12 +174,12 @@ mycelium log tool_end --payload-json "{\"harness\":\"tool-wrapper\",\"adapter_ve
 exit "$code"
 ```
 
-### L3 pi.dev adapter
+### pi.dev adapter
 
-`pi-mycelium` emits session boundary events, `compaction`, and deduped
-`context_checkpoint` entries using the vocabulary above. It intentionally does
-not emit turn/tool telemetry; richer adapters may still use those documented
-op names when they are memory-relevant. See
+`pi-mycelium` emits session boundary events and `compaction` using the
+vocabulary above. It intentionally does not emit turn/tool/context telemetry;
+richer adapters may still use those documented op names when they are
+memory-relevant. See
 [ADR-0006](adr/0006-reference-adapter-memory-relevant-events.md) for why the
 reference adapter emits this subset. It still registers no tools: the agent
 invokes the portable `mycelium` CLI through pi's built-in shell tool.

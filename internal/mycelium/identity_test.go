@@ -40,6 +40,22 @@ func TestReadIdentityDefaultsOptionalFieldsWhenUnset(t *testing.T) {
 	}
 }
 
+func TestValidateAgentID(t *testing.T) {
+	valid := []string{"", "agent-123", "pi_agent.1"}
+	for _, agentID := range valid {
+		if err := validateAgentID(agentID); err != nil {
+			t.Errorf("validateAgentID(%q): unexpected error %v", agentID, err)
+		}
+	}
+
+	invalid := []string{"../x", "a/b", `a\\b`, ".", "..", "bad:name", "bad\nname", "é"}
+	for _, agentID := range invalid {
+		if err := validateAgentID(agentID); err == nil {
+			t.Errorf("validateAgentID(%q): got nil, want error", agentID)
+		}
+	}
+}
+
 func TestReadIdentityGeneratedSessionStableWithinProcess(t *testing.T) {
 	t.Setenv("MYCELIUM_AGENT_ID", "")
 	t.Setenv("MYCELIUM_SESSION_ID", "")

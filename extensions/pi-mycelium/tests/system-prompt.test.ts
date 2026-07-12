@@ -57,9 +57,11 @@ describe("systemPromptAvailable", () => {
 		expect(block).toContain("_activity/YYYY/MM/DD/test-agent.jsonl");
 		expect(block).not.toContain("_tx/pending");
 		expect(block).toContain("### Activity events");
+		expect(block).toContain("compaction");
 		expect(block).toContain("context_checkpoint");
 		expect(block).not.toContain("tool_start");
 		expect(block).toContain("context_signal");
+		expect(block).not.toContain("deduped");
 	});
 });
 

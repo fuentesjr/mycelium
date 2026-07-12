@@ -1,10 +1,8 @@
-import { createRequire } from "node:module";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type {
   BeforeAgentStartEvent,
   BeforeAgentStartEventResult,
   BuildSystemPromptOptions,
-  ContextEvent,
   ExecResult,
   ExtensionAPI,
   ExtensionContext,
@@ -44,9 +42,7 @@ type AnyHandler = (event: unknown, ctx: ExtensionContext) => unknown;
 // Fixtures
 // ---------------------------------------------------------------------------
 
-const require = createRequire(import.meta.url);
 const RESOLVED_BINARY = "/usr/local/bin/mycelium";
-const ADAPTER_VERSION = (require("../package.json") as { version: string }).version;
 
 // ---------------------------------------------------------------------------
 // Factory helpers
@@ -78,7 +74,7 @@ function makeRegistration(
  * The first arg will be "which" for the PATH lookup, and RESOLVED_BINARY
  * (or any non-"which" string) for actual mycelium invocations.
  */
-function defaultExec(cmd: string, args: string[]): Promise<ExecResult> {
+function defaultExec(cmd: string, _args: string[]): Promise<ExecResult> {
   if (cmd === "which") return Promise.resolve(execResult(0, RESOLVED_BINARY));
   return Promise.resolve(execResult(0));
 }
@@ -107,10 +103,6 @@ function makeBeforeAgentStartEvent(systemPrompt: string): BeforeAgentStartEvent 
   };
 }
 
-function makeContextEvent(messages: ContextEvent["messages"]): ContextEvent {
-  return { type: "context", messages };
-}
-
 function argsFromExecCall(exec: ReturnType<typeof vi.fn>, callIndex = 0): string[] {
   return (exec.mock.calls[callIndex] as unknown as [string, string[]])[1];
 }
@@ -118,7 +110,11 @@ function argsFromExecCall(exec: ReturnType<typeof vi.fn>, callIndex = 0): string
 function payloadFromExecCall(exec: ReturnType<typeof vi.fn>, callIndex = 0): Record<string, unknown> {
   const args = argsFromExecCall(exec, callIndex);
   expect(args[2]).toBe("--payload-json");
-  return JSON.parse(args[3]) as Record<string, unknown>;
+  try {
+    return JSON.parse(args[3]) as Record<string, unknown>;
+  } catch (error) {
+    throw new Error(`invalid payload JSON: ${String(error)}`);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -138,14 +134,13 @@ describe("pi extension factory", () => {
     process.env = { ...original };
   });
 
-  it("registers lifecycle, context, and compaction handlers", () => {
+  it("registers lifecycle and compaction handlers", () => {
     const { handlers } = makeRegistration(async () => execResult(0));
     for (const eventName of [
       "session_start",
       "session_shutdown",
       "before_agent_start",
       "session_compact",
-      "context",
     ]) {
       expect(handlers.has(eventName)).toBe(true);
     }
@@ -154,6 +149,7 @@ describe("pi extension factory", () => {
       "turn_end",
       "tool_execution_start",
       "tool_execution_end",
+      "context",
     ]) {
       expect(handlers.has(eventName)).toBe(false);
     }
@@ -190,63 +186,6 @@ describe("pi extension factory", () => {
     )) as BeforeAgentStartEventResult;
     expect(result.systemPrompt).toContain("UNAVAILABLE");
     expect(result.systemPrompt?.startsWith("PREFIX\n\n")).toBe(true);
-  });
-
-  it("context handler calls mycelium log and returns undefined", async () => {
-    const { exec, handlers } = makeRegistration(defaultExec);
-    await handlers.get("session_start")!(makeSessionStartEvent(), ctx);
-    exec.mockClear();
-    const result = await handlers.get("context")!(
-      makeContextEvent([
-        { role: "user", content: "", timestamp: 0 },
-        {
-          role: "assistant",
-          content: [],
-          api: "anthropic-messages",
-          provider: "anthropic",
-          model: "m",
-          usage: {
-            input: 0,
-            output: 0,
-            cacheRead: 0,
-            cacheWrite: 0,
-            totalTokens: 0,
-            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-          },
-          stopReason: "stop",
-          timestamp: 0,
-        },
-        { role: "user", content: "", timestamp: 0 },
-      ]),
-      ctx,
-    );
-    expect(result).toBeUndefined();
-    expect(exec).toHaveBeenCalledTimes(1);
-    const args = argsFromExecCall(exec);
-    expect(args[0]).toBe("log");
-    expect(args[1]).toBe("context_checkpoint");
-    const payload = payloadFromExecCall(exec);
-    expect(payload).toMatchObject({
-      harness: "pi.dev",
-      adapter_version: ADAPTER_VERSION,
-      seq: 2,
-      message_count: 3,
-      last_role: "user",
-      role_counts: { user: 2, assistant: 1 },
-    });
-    expect(payload.fingerprint).toMatch(/^sha256:/);
-  });
-
-  it("context handler is a no-op when binary is missing", async () => {
-    const { exec, handlers } = makeRegistration(async () => execResult(1));
-    await handlers.get("session_start")!(makeSessionStartEvent(), ctx);
-    exec.mockClear();
-    const result = await handlers.get("context")!(
-      makeContextEvent([{ role: "user", content: "", timestamp: 0 }]),
-      ctx,
-    );
-    expect(result).toBeUndefined();
-    expect(exec).not.toHaveBeenCalled();
   });
 
   it("logs session_new for reason=new when binary is available", async () => {

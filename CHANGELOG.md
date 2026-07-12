@@ -17,7 +17,8 @@ This release intentionally combines the core simplification work and the portabl
 
 ### Changed (pi-mycelium extension)
 
-- Stopped emitting turn/tool telemetry from the reference adapter. It now records session boundaries, `session_shutdown`, `compaction`, and deduped `context_checkpoint` entries only; the portable vocabulary remains available for richer adapters.
+- Stopped emitting turn/tool telemetry from the reference adapter. It now records session boundaries, `session_shutdown`, and `compaction` only; the portable vocabulary remains available for richer adapters.
+- Removed the reference adapter context hook and context-checkpoint fingerprint/dedupe machinery.
 
 ### Changed (docs)
 

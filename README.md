@@ -198,7 +198,7 @@ for the full install / scope-detection / identity story.
 
 ```
 export MYCELIUM_MOUNT=$(pwd)/.mycelium-store
-# Optional: export MYCELIUM_AGENT_ID=coder        # defaults to "agent"
+# Optional: export MYCELIUM_AGENT_ID=coder        # defaults to "agent"; use letters/digits/._-
 # Optional: export MYCELIUM_SESSION_ID=session-1  # otherwise auto-generated per CLI process
 
 # Write a note (atomic, returns version)

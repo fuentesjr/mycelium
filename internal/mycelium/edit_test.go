@@ -47,6 +47,28 @@ func TestEditHappyPath(t *testing.T) {
 	}
 }
 
+func TestEditRejectsSymlinkParentEscapingMount(t *testing.T) {
+	mount := t.TempDir()
+	outside := t.TempDir()
+	mkfile(t, outside, "file.md", "outside")
+	if err := os.Symlink(outside, filepath.Join(mount, "linkdir")); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("MYCELIUM_MOUNT", mount)
+
+	_, errOut, rc := runDispatchWithStdin(t, "", "edit", "linkdir/file.md", "--old", "outside", "--new", "changed")
+	if rc == ExitOK {
+		t.Fatal("edit through symlink parent succeeded")
+	}
+	if !strings.Contains(errOut, "symlink") {
+		t.Fatalf("stderr should mention symlink, got %q", errOut)
+	}
+	disk, err := os.ReadFile(filepath.Join(outside, "file.md"))
+	if err != nil || string(disk) != "outside" {
+		t.Fatalf("outside file changed: content=%q err=%v", disk, err)
+	}
+}
+
 func TestEditNewVersionMatchesPostReplacementContent(t *testing.T) {
 	mount := t.TempDir()
 	t.Setenv("MYCELIUM_MOUNT", mount)

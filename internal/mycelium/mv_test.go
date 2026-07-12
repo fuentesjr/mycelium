@@ -35,6 +35,39 @@ func TestMvHappyPath(t *testing.T) {
 	}
 }
 
+func TestMvRejectsSymlinkParentsEscapingMount(t *testing.T) {
+	mount := t.TempDir()
+	outside := t.TempDir()
+	mkfile(t, outside, "src.md", "outside src")
+	writeTestFile(t, mount, "src.md", "inside src")
+	if err := os.Symlink(outside, filepath.Join(mount, "linkdir")); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("MYCELIUM_MOUNT", mount)
+
+	_, errOut, rc := runDispatchWithStdin(t, "", "mv", "linkdir/src.md", "dst.md")
+	if rc == ExitOK {
+		t.Fatal("mv from symlink parent succeeded")
+	}
+	if !strings.Contains(errOut, "symlink") {
+		t.Fatalf("stderr should mention symlink, got %q", errOut)
+	}
+	if _, err := os.Stat(filepath.Join(outside, "src.md")); err != nil {
+		t.Fatalf("outside source should remain: %v", err)
+	}
+
+	_, errOut, rc = runDispatchWithStdin(t, "", "mv", "src.md", "linkdir/dst.md")
+	if rc == ExitOK {
+		t.Fatal("mv to symlink parent succeeded")
+	}
+	if !strings.Contains(errOut, "symlink") {
+		t.Fatalf("stderr should mention symlink, got %q", errOut)
+	}
+	if _, err := os.Stat(filepath.Join(outside, "dst.md")); !os.IsNotExist(err) {
+		t.Fatalf("outside destination should not be created (err=%v)", err)
+	}
+}
+
 func TestMvSrcMissingIsError(t *testing.T) {
 	mount := t.TempDir()
 	t.Setenv("MYCELIUM_MOUNT", mount)

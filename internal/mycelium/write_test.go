@@ -50,6 +50,48 @@ func TestWriteFileCreatesParentDir(t *testing.T) {
 	}
 }
 
+func TestWriteRejectsSymlinkParentEscapingMount(t *testing.T) {
+	mount := t.TempDir()
+	outside := t.TempDir()
+	if err := os.Symlink(outside, filepath.Join(mount, "linkdir")); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("MYCELIUM_MOUNT", mount)
+
+	_, errOut, rc := runDispatchWithStdin(t, "new", "write", "linkdir/file.md")
+	if rc == ExitOK {
+		t.Fatal("write through symlink parent succeeded")
+	}
+	if !strings.Contains(errOut, "symlink") {
+		t.Fatalf("stderr should mention symlink, got %q", errOut)
+	}
+	if _, err := os.Stat(filepath.Join(outside, "file.md")); !os.IsNotExist(err) {
+		t.Fatalf("outside file should not be created (err=%v)", err)
+	}
+}
+
+func TestWriteRejectsSymlinkLeaf(t *testing.T) {
+	mount := t.TempDir()
+	outside := t.TempDir()
+	mkfile(t, outside, "file.md", "outside")
+	if err := os.Symlink(filepath.Join(outside, "file.md"), filepath.Join(mount, "file.md")); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("MYCELIUM_MOUNT", mount)
+
+	_, errOut, rc := runDispatchWithStdin(t, "new", "write", "file.md")
+	if rc == ExitOK {
+		t.Fatal("write through symlink leaf succeeded")
+	}
+	if !strings.Contains(errOut, "symlink") {
+		t.Fatalf("stderr should mention symlink, got %q", errOut)
+	}
+	disk, err := os.ReadFile(filepath.Join(outside, "file.md"))
+	if err != nil || string(disk) != "outside" {
+		t.Fatalf("outside file changed: content=%q err=%v", disk, err)
+	}
+}
+
 func TestWriteFileCASMatch(t *testing.T) {
 	mount := t.TempDir()
 	t.Setenv("MYCELIUM_MOUNT", mount)

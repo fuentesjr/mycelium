@@ -57,33 +57,32 @@ include:
 {
   "harness": "pi.dev",
   "adapter_version": "0.1.7",
-  "seq": 42,
-  "fingerprint": "sha256:...",
-  "suppressed_duplicates": 3
+  "seq": 42
 }
 ```
 
 Adapters should avoid full prompt, assistant, tool, file, and preview contents
-by default. Counts, roles, tool names/ids, timings, token usage, error flags,
-and stable fingerprints are appropriate defaults. If a future adapter supports
-previews, they must be disabled by default, explicitly opt-in, bounded in length,
-and documented by that adapter. Larger or sensitive details belong in normal
-agent-authored files referenced by `--path`.
+by default. Counts, roles, tool names/ids, timings, token usage, and error flags
+are appropriate defaults. If a future adapter supports previews, they must be
+disabled by default, explicitly opt-in, bounded in length, and documented by
+that adapter. Larger or sensitive details belong in normal agent-authored files
+referenced by `--path`.
 
 ## Implementation
 
 At acceptance, `pi-mycelium` provided the reference L3 adapter behavior:
 
-- emits `context_checkpoint` instead of `context_signal` from the `context` hook;
-- fingerprints checkpoint metadata and suppresses duplicates;
-- emits `turn_start`/`turn_end`, `tool_start`/`tool_end`, `compaction`, and
-  `session_shutdown` when pi.dev exposes those hooks;
+- emitted `context_checkpoint` instead of `context_signal` from the `context` hook;
+- fingerprinted checkpoint metadata and suppressed duplicates;
+- emitted `turn_start`/`turn_end`, `tool_start`/`tool_end`, `compaction`, and
+  `session_shutdown` when pi.dev exposed those hooks;
 - enriches payloads with generic fields such as message counts, role counts,
   usage/cost, tool ids, durations, and output sizes;
 - originally kept a legacy helper export for low-detail context signals, but no
   longer used it from the extension entrypoint.
 
-ADR-0006 later narrows the reference adapter to memory-relevant events only and
+ADR-0006 later narrows the reference adapter to memory-relevant events only,
+removes the context hook and checkpoint dedupe/fingerprint machinery, and
 removes the legacy helper export. The portable vocabulary above remains
 unchanged.
 
@@ -101,8 +100,9 @@ The adapter vocabulary and examples are documented in
   default.
 - **Readers can degrade gracefully.** Unknown op names or payload fields are
   tolerated because adapter telemetry is convention, not core schema.
-- **Duplicate checkpoint spam is reduced.** Fingerprint suppression prevents
-  context hooks from becoming heartbeat logs.
+- **Checkpoint volume is adapter-owned.** Adapters that emit context checkpoints
+  choose their own volume controls; core does not require fingerprinting or
+  suppression.
 
 ### Negative
 
@@ -119,10 +119,10 @@ The adapter vocabulary and examples are documented in
 
 ### Neutral
 
-- **No migration required.** Existing `context_signal` entries remain valid log
-  history. New pi.dev sessions append `context_checkpoint`.
+- **No migration required.** Existing `context_signal` and `context_checkpoint`
+  entries remain valid log history. Current pi.dev sessions do not append
+  checkpoint events by default.
 
 ## Open questions
 
-- Should a future helper package expose payload shaping and dedupe for non-pi
-  adapters?
+- Should a future helper package expose payload shaping for non-pi adapters?

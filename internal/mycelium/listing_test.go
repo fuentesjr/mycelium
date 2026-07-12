@@ -81,6 +81,24 @@ func TestListFilesNonRecursiveOmitsSubdirFiles(t *testing.T) {
 	}
 }
 
+func TestListFilesSkipsSymlinkFiles(t *testing.T) {
+	mount := t.TempDir()
+	outside := t.TempDir()
+	mkfile(t, mount, "visible.md", "v")
+	mkfile(t, outside, "secret.md", "secret")
+	if err := os.Symlink(filepath.Join(outside, "secret.md"), filepath.Join(mount, "link.md")); err != nil {
+		t.Fatal(err)
+	}
+
+	files, err := listFiles(mount, true, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(files) != 1 || files[0] != "visible.md" {
+		t.Fatalf("got %v, want [visible.md]", files)
+	}
+}
+
 func TestListFilesRecursiveIncludesNested(t *testing.T) {
 	mount := t.TempDir()
 	mkfile(t, mount, "root.md", "r")

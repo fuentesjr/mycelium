@@ -41,8 +41,8 @@ gets resolved.
   a rationale nudge for operations whose reasoning is worth preserving. Chains
   off `event.systemPrompt` so other
   extensions' contributions are preserved.
-- **memory-relevant activity events** — records `compaction` and deduped
-  `context_checkpoint` entries using the portable vocabulary in
+- **memory-relevant activity events** — records session boundaries and
+  `compaction` using the portable vocabulary in
   [`docs/portable-activity-events.md`](https://github.com/fuentesjr/mycelium/blob/main/docs/portable-activity-events.md),
   without modifying the agent's message stream.
 
@@ -73,7 +73,8 @@ A locally-checked-out copy loaded via `pi -e ./path.ts` is treated as project.
 
 ## Identity
 
-`MYCELIUM_AGENT_ID` defaults to `pi-agent`. Set it explicitly when running
+`MYCELIUM_AGENT_ID` defaults to `pi-agent`. Agent IDs are filename-safe ASCII
+values using letters, digits, `.`, `_`, or `-`. Set it explicitly when running
 multiple concurrent agents against the same store:
 
 ```bash

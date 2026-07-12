@@ -3,6 +3,8 @@ package mycelium
 import (
 	"bytes"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -193,6 +195,66 @@ func TestGrepPathScope(t *testing.T) {
 	}
 }
 
+func TestGrepPathScopeCanBeFile(t *testing.T) {
+	mount := t.TempDir()
+	mkfile(t, mount, "target.md", "nope\nneedle on line 2\n")
+	mkfile(t, mount, "other.md", "needle elsewhere\n")
+	t.Setenv("MYCELIUM_MOUNT", mount)
+
+	out, errOut, rc := runDispatch(t, "grep", "--pattern", "needle", "--path", "target.md")
+	if rc != ExitOK {
+		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitOK, errOut)
+	}
+	want := "target.md:2:needle on line 2\n"
+	if out != want {
+		t.Fatalf("stdout: got %q, want %q", out, want)
+	}
+
+	out, errOut, rc = runDispatch(t, "grep", "--pattern", "needle", "--path", "target.md", "--format", "json")
+	if rc != ExitOK {
+		t.Fatalf("json rc: got %d, want %d (stderr=%q)", rc, ExitOK, errOut)
+	}
+	var result struct {
+		Matches   []grepMatch `json:"matches"`
+		Truncated bool        `json:"truncated"`
+	}
+	if err := json.Unmarshal([]byte(out), &result); err != nil {
+		t.Fatalf("json unmarshal: %v (output=%q)", err, out)
+	}
+	if len(result.Matches) != 1 || result.Matches[0].Path != "target.md" || result.Matches[0].Line != 2 {
+		t.Fatalf("unexpected matches: %+v", result.Matches)
+	}
+	if result.Truncated {
+		t.Fatal("file-scoped exact result should not be truncated")
+	}
+}
+
+func TestGrepRejectsSymlinkScopeAndSkipsSymlinkFiles(t *testing.T) {
+	mount := t.TempDir()
+	outside := t.TempDir()
+	mkfile(t, outside, "secret.md", "needle outside\n")
+	if err := os.Symlink(filepath.Join(outside, "secret.md"), filepath.Join(mount, "link.md")); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("MYCELIUM_MOUNT", mount)
+
+	out, errOut, rc := runDispatch(t, "grep", "--pattern", "needle")
+	if rc != ExitOK {
+		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitOK, errOut)
+	}
+	if out != "" {
+		t.Fatalf("symlink file should be skipped, got %q", out)
+	}
+
+	_, errOut, rc = runDispatch(t, "grep", "--pattern", "needle", "--path", "link.md")
+	if rc == ExitOK {
+		t.Fatal("grep scoped to symlink leaf succeeded")
+	}
+	if !strings.Contains(errOut, "symlink") {
+		t.Fatalf("stderr should mention symlink, got %q", errOut)
+	}
+}
+
 func TestGrepRejectsFileTypeFilter(t *testing.T) {
 	mount := t.TempDir()
 	t.Setenv("MYCELIUM_MOUNT", mount)
@@ -269,6 +331,39 @@ func TestGrepLimitTruncates(t *testing.T) {
 	}
 	if !result.Truncated {
 		t.Errorf("json truncated: got false, want true")
+	}
+}
+
+func TestGrepExactLimitNotTruncated(t *testing.T) {
+	mount := t.TempDir()
+	mkfile(t, mount, "exact.md", "match one\nmatch two\n")
+	t.Setenv("MYCELIUM_MOUNT", mount)
+
+	out, errOut, rc := runDispatch(t, "grep", "--pattern", "match", "--limit", "2")
+	if rc != ExitOK {
+		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitOK, errOut)
+	}
+	if strings.Contains(out, "truncated") {
+		t.Fatalf("exact-limit output should not be truncated, got %q", out)
+	}
+	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("got %d lines, want 2: %q", len(lines), out)
+	}
+
+	outJSON, errOutJSON, rcJSON := runDispatch(t, "grep", "--pattern", "match", "--limit", "2", "--format", "json")
+	if rcJSON != ExitOK {
+		t.Fatalf("json rc: got %d, want %d (stderr=%q)", rcJSON, ExitOK, errOutJSON)
+	}
+	var result struct {
+		Matches   []interface{} `json:"matches"`
+		Truncated bool          `json:"truncated"`
+	}
+	if err := json.Unmarshal([]byte(outJSON), &result); err != nil {
+		t.Fatalf("json unmarshal: %v (output=%q)", err, outJSON)
+	}
+	if len(result.Matches) != 2 || result.Truncated {
+		t.Fatalf("got len=%d truncated=%v, want len=2 truncated=false", len(result.Matches), result.Truncated)
 	}
 }
 

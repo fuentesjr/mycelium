@@ -48,11 +48,4 @@ export default function (pi: ExtensionAPI) {
 	pi.on("session_compact", async (event, _ctx) => {
 		if (binaryPath) await activity.recordCompaction(pi, binaryPath, event);
 	});
-
-	pi.on("context", async (event, _ctx) => {
-		if (binaryPath) {
-			await activity.recordContextCheckpoint(pi, binaryPath, event);
-		}
-		return undefined;
-	});
 }
