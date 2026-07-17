@@ -33,7 +33,10 @@ find better shapes:
 - `INDEX.md` — a hand-maintained map you build as patterns emerge; record its refresh rule here once it earns maintenance
 
 You will likely invent your own directories ad-hoc — that's expected. When
-a new shape stabilizes, update this file. Prefer descriptive names over opaque timestamps. Archive stale regions with `mycelium mv` plus `--rationale`; if the move creates a durable policy, record the policy here.
+a new shape stabilizes, update this file. Prefer descriptive names over opaque
+timestamps. `mycelium mv` moves one file at a time, not directories; archive
+stale files individually with `--rationale`, or consolidate a region into an
+archive file. If the move creates a durable policy, record the policy here.
 
 ## Reading your own activity
 
@@ -65,5 +68,7 @@ not conflict.
 
 ## Edit me
 
-This file has no special status. When the conventions above stop matching how
-you actually work, rewrite them.
+The contents are yours, but this filename is the extension's well-known
+conventions entry point. Rewrite the file when these defaults stop fitting. If
+you delete it, the extension will attempt to restore the starter template at
+the next session start.

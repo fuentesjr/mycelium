@@ -31,12 +31,18 @@ Google Frontier and open-weights are out of scope for Phase 1; revisit in a late
 
 ## Task suite
 
-Each task ships as a directory under `docs/benchmarks/tasks/T<n>-<slug>/`, containing:
+Each task ships under `docs/benchmarks/tasks/T<n>-<slug>/` with a
+`harness.md` operator protocol plus task-specific artifacts:
 
-- `task.md` — agent-facing brief, given verbatim as the user prompt for that session.
-- `harness.md` — operator-facing run protocol.
-- `held-out.md` — questions used by the rubric grader.
-- `seed/` (T2 only) — pre-populated store contents and synthetic activity log.
+- [T1 multi-session research](tasks/T1-multi-session-research/harness.md):
+  `task.md` agent prompts, `held-out.md` grading questions, and an
+  operator-held, source-backed answer key stored outside the repository and
+  model-visible workspaces.
+- [T2 seeded self-evolution](tasks/T2-seeded-self-evolution/harness.md):
+  `task.md` agent prompts, `grading.md`, and a pre-populated `seed/` store.
+- [T3 failure detectors](tasks/T3-failure-detectors/harness.md): executable
+  detector tooling and fixtures; it intentionally has no model task or held-out
+  grader.
 
 ### T1 — Multi-session research synthesis (acceptance #1)
 
@@ -67,7 +73,12 @@ Three sessions, not two: two sessions test "did the agent re-read its notes"; th
 1. The agent is told it is `glp1-researcher` continuing prior work, and asked to extend the analytics into cardiovascular outcomes for the same patient cohort.
 2. "Continue. Take a moment first to look at how the store is shaped."
 
-**Pass.** After session 2, the rubric grader judges that the agent recognized the seeded pattern and responded with at least one convention-file edit, index file, reconciliation, or grep-before-write behavior visible in the post-run store or activity log. Single grader judgment; no signal-counting threshold. Per `harness.md`: run 5 instances per model; pass requires majority (≥3/5).
+**Pass.** After session 2, `MYCELIUM_MEMORY.md` must contain a new or revised
+rule responding to the seeded pattern, and the run's activity log must contain
+the matching mutation with a non-empty rationale. Index creation,
+reconciliation, and transcript-visible grep-before-write behavior are supporting
+signals, not standalone passes. Per `harness.md`: run 5 instances per model;
+pass requires majority (≥3/5).
 
 Why seeded: self-evolution requires something to evolve in response to. A clean store has nothing for the agent to notice.
 
@@ -119,6 +130,11 @@ Rationale: model-run validation does not change the artifact, only the public cl
 
 T3 is executable as standalone benchmark tooling: detectors and fixtures live under `docs/benchmarks/tasks/T3-failure-detectors/tool/`, harness at `docs/benchmarks/tasks/T3-failure-detectors/harness.md`. Run via `go test ./docs/benchmarks/tasks/T3-failure-detectors/tool`.
 
-T1 is drafted: `task.md`, `harness.md`, `held-out.md` under `docs/benchmarks/tasks/T1-multi-session-research/`. Awaiting first runs against Opus 4.7 and GPT-5.5.
+T1's public protocol is fully specified by `task.md`, `harness.md`, and
+`held-out.md`. Before a campaign, the operator must prepare and archive the
+private, source-backed answer key outside the repository and every environment
+used by the models under test. Only after those processes end may the operator
+provision it to the separate grading environment and record its checksum. T1
+awaits first runs against Opus 4.7 and GPT-5.5.
 
 T2 is drafted: `task.md`, `harness.md`, `grading.md`, plus `seed/` (6 notes, weakened `MYCELIUM_MEMORY.md`, 30-entry activity log) under `docs/benchmarks/tasks/T2-seeded-self-evolution/`. Awaiting first runs against Opus 4.7 and GPT-5.5.

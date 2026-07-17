@@ -11,8 +11,8 @@
 1. Decide the version. Update every version-bearing field atomically:
    - `Makefile`: `VERSION ?= vX.Y.Z`
    - `extensions/pi-mycelium/package.json`: `"version": "X.Y.Z"`
-   - all four `@fuentesjr/mycelium-cli-*` optional-dependency pins in `package.json`
-   - the top-level/root versions and four optional-dependency pins in `package-lock.json`
+   - all four `@fuentesjr/mycelium-cli-*` optional-dependency pins in `extensions/pi-mycelium/package.json`
+   - the top-level/root versions and four optional-dependency pins in `extensions/pi-mycelium/package-lock.json`
 
 2. Add a concise `CHANGELOG.md` entry for the release's user-visible changes.
 
@@ -54,8 +54,19 @@
 
 **Test failure on tag** — no artifacts are published. Fix on `main`, bump to a new patch version, and retag.
 
-**npm authentication/access failure** — rotate the token to one with publish access to all required packages, then rerun or cut a clean patch release.
+**npm authentication/access failure** — rotate the token to one with publish access to all required packages, then rerun the same tag workflow. No version bump is needed when nothing was published incorrectly.
 
-**npm publish partial failure** — npm may not allow clean unpublishing. Bump to the next patch, document the orphaned version in `CHANGELOG.md`, and run a clean release.
+**npm publish partial failure** — rerun the same tag workflow first. Publishing
+is ordered platform packages → `pi-mycelium` → GitHub release, and both npm
+steps skip packages already present at that version. A retry therefore fills in
+the missing packages without republishing successful ones. Do not bump merely
+because the first run was partial.
 
-**GitHub release created but npm publish failed** — delete the GitHub release manually if needed, then bump and retry the whole release.
+**npm packages published but GitHub release creation failed** — rerun the same
+tag workflow; the npm steps skip existing versions and the final step creates or
+updates the GitHub release.
+
+**A published package has wrong contents or the tag must change** — npm versions
+are immutable in the normal recovery path. Bump to the next patch, document the
+bad/orphaned version in `CHANGELOG.md`, and run a clean release. Reserve this for
+incorrect artifacts, not transient workflow failures.

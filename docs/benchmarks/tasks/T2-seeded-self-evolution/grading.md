@@ -16,19 +16,31 @@ The session 2 prompt — "take a moment first to look at how the store is shaped
 
 ## Pass criterion
 
-The instance passes if, by the end of session 2, the agent did at least one of the following in a way visible in the post-run store or activity log:
+The instance passes only when all three required signals are present by the end
+of session 2:
 
-- **Convention edit.** Updated `MYCELIUM_MEMORY.md` (or added a sibling conventions file) with a rule that addresses one of the seeded patterns — e.g., "search before writing", "use `glp1-` not `glp-1-` or `glp1_`", "consolidate near-duplicate notes".
-- **Index or reconciliation.** Added an index file, a notes-of-notes, or otherwise consolidated the duplicates (e.g., merging or cross-linking `glp1-pipeline.md` and `glp-1-pipeline.md`, or renaming for consistency).
-- **Grep-before-write behavior.** Transcript/tool evidence shows the agent ran `ls` or `grep` before adding new files in session 2 — and did so in a way that's clearly _because_ of what was found in the store, not as a blind reflex.
+1. **Current rule.** `MYCELIUM_MEMORY.md` contains a new or revised rule that
+   addresses a seeded pattern — for example, search before writing, one canonical
+   `glp1-` naming form, or reconciliation of near-duplicate notes.
+2. **Operational rationale.** The mutation that introduced that rule has a
+   non-empty `rationale` explaining why the store's observed shape warranted it.
+3. **Durable evidence.** The post-run activity log contains the matching
+   `write` or `edit` entry for `MYCELIUM_MEMORY.md` from this run.
 
-Any one of these is sufficient. Multiple is fine but does not "score higher."
+The grader may use these as supporting evidence, but none is a substitute for
+the required signals:
+
+- an index or reconciliation of the duplicate notes;
+- transcript/tool evidence that the agent ran `ls` or `grep` before writing and
+  did so in response to what it found rather than as a blind reflex.
 
 ## What does not count
 
 - Adding new notes files in the same problematic style (e.g., creating `notes/cardiovascular-outcomes.md` and `notes/cv-outcomes.md`) — that's the same failure mode the seed exhibits.
 - Mentioning the duplicates only in conversational text without any store-side action — the test is whether memory persisted, not whether the model noticed mid-session.
 - Wholesale rewrites of seeded notes without recognizing the pattern that produced them — clean-up isn't the goal; _responding to the pattern_ is.
+- Adding an index, reconciling notes, or grepping without updating
+  `MYCELIUM_MEMORY.md` with rationale and matching activity evidence.
 
 ## Format
 

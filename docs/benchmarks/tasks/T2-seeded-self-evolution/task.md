@@ -1,10 +1,14 @@
 # T2 — Seeded self-evolution
 
-**Acceptance criterion:** #4 (self-evolution through conventions-file edits and activity-log evidence).
+**Acceptance criterion:** #3 (self-evolution through conventions-file edits and activity-log evidence).
 
 This task runs across two sessions, fresh process each, against a *pre-seeded* store. The seed contains a recognizable failure pattern — six notes with subtly inconsistent paths (`glp1-pipeline.md`, `glp-1-pipeline.md`, `glp1_followup.md`), an activity log of ~30 prior mutations with no read signals, and a starter `MYCELIUM_MEMORY.md` that does not mention searching before writing.
 
-The agent under test is told it is `glp1-researcher` continuing prior work. The pass criterion is whether, by the end of session 2, the agent has noticed the pattern and responded — by editing conventions, adding an index, or visibly grepping before writing.
+The agent under test is told it is `glp1-researcher` continuing prior work. The
+pass criterion is whether, by the end of session 2, it has noticed the pattern,
+updated `MYCELIUM_MEMORY.md` with a durable rule, supplied a rationale, and left
+matching activity-log evidence. Index, reconciliation, and grep behavior provide
+supporting evidence but do not replace the conventions-file change.
 
 The prompts below are given verbatim as the user message for each session.
 

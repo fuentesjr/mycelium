@@ -1,5 +1,20 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- Split fast local feedback from exhaustive deterministic property coverage with `make test`, `make test-full`, and `make test-race`, while retaining exhaustive and race gates in CI and releases.
+- Made T1/T2 benchmark runs reproducible by pinning provider-qualified model IDs, pi/package metadata, isolated startup flags, exact grading inputs, and a checksum-pinned external T1 answer-key contract.
+- Hardened releases with cross-file version validation, npm access preflight, provenance-enabled publishing, idempotent same-tag retries, and complete npm repository metadata.
+- Aligned active documentation with the pi-only support boundary, supported platform matrix, best-effort lifecycle/bootstrap behavior, CLI edge cases, offline activity retention, and idempotent release recovery.
+
+### Fixed
+
+- Fixed `mycelium grep` so matching lines larger than 64 KiB are returned instead of silently skipped.
+- Fixed project-local scope detection for version-pinned `npm:pi-mycelium@<version>` registrations.
+- Clarified agent guidance so CAS conflicts use re-read/merge/retry while `mv destination_exists` requires an explicit destination-content decision.
+
 ## [0.5.0] - 2026-07-12
 
 ### Changed
@@ -52,7 +67,7 @@ This release intentionally combines the core simplification work and the portabl
 
 - `--rationale "..."` flag on `write`, `edit`, `rm`, `mv`, and `log`. When supplied, the rationale is captured as a top-level `rationale` field (`omitempty`) on the corresponding activity log entry. When absent, behavior is unchanged and the field is omitted.
 - `rationale` field on `LogEntry` (`internal/mycelium/log.go`) — `string`, `json:"rationale,omitempty"`.
-- `rationale` field on `conflictEnvelope` (`internal/mycelium/write.go`) — when a CAS or destination-exists conflict occurs, the losing caller's rationale is included alongside `current_version` so retrying agents see both sides' intent.
+- `rationale` field on `conflictEnvelope` (`internal/mycelium/write.go`) — when a CAS or destination-exists conflict occurs, the losing caller's rationale is included alongside `current_version` so retrying agents retain the attempted intent while re-reading the winning content.
 - Rationale size validation: input exceeding 64 KiB is rejected before the mutation runs with exit code 65 (`ExitReservedPrefix`) and message `mycelium <op>: --rationale exceeds N bytes`.
 
 ### Added (pi-mycelium extension)

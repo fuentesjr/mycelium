@@ -4,6 +4,13 @@
 - **Date:** 2026-05-01
 - **Deciders:** Sal Fuentes Jr.
 
+> **Historical decision only. Do not use the commands below.** ADR-0004
+> superseded this design and Mycelium 0.4.0 removed functional
+> `mycelium evolve`. Current conventions live in `MYCELIUM_MEMORY.md`; the
+> hidden `evolve` stub only prints migration guidance and exits non-zero. The
+> examples below are not an operational reference and include directory moves,
+> which the current single-file `mycelium mv` command does not support.
+
 ## Context
 
 Mycelium's original design treated agent self-evolution — adopting and retiring conventions, building self-built indices, archiving stale regions of the store, recording lessons — as **emergent agent behavior** rather than a first-class concept. The activity log captured raw operations (`write`, `edit`, `rm`, `mv`, `context_signal`, `session_*`) but had no notion of _evolution events_. The expectation was that an evaluator or future-self agent could derive evolution patterns post-hoc from raw traces: "first write under `notes/incidents/` = a new convention", "writes to `MYCELIUM_MEMORY.md` = a policy change", "`mv` into `archive/` = archiving".
@@ -18,7 +25,9 @@ The user directive: self-evolution should be a first-class concept in Mycelium a
 
 ## Decision
 
-Mycelium models self-evolution as explicit activity-log metadata and exposes it through a single CLI command: `mycelium evolve`.
+This ADR decided that Mycelium would model self-evolution as explicit
+activity-log metadata through a single CLI command, `mycelium evolve`. That
+decision is no longer the current implementation; see the warning above.
 
 The command has record and query modes:
 

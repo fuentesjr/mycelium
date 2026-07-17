@@ -4,7 +4,7 @@ Mycelium's active activity-event contract is pi-only. The log remains plain JSON
 
 ## Current pi extension entries
 
-`pi-mycelium` records lifecycle signals that matter for memory continuity:
+`pi-mycelium` attempts to record lifecycle signals that matter for memory continuity:
 
 - `session_startup`, `session_reload`, `session_new`, `session_resume`, or
   `session_fork` when pi reports the corresponding session-start reason;
@@ -12,6 +12,12 @@ Mycelium's active activity-event contract is pi-only. The log remains plain JSON
 - `compaction` when pi reports a compaction event.
 
 Payloads are metadata-only by default. The extension does not log full prompts, assistant messages, tool contents, or file previews.
+
+Lifecycle writes are best-effort so logging trouble does not make pi unusable.
+A missing boundary, shutdown, or compaction line can therefore mean the hook
+could not invoke the CLI; it must not be interpreted as proof the lifecycle
+event never occurred. Operators who depend on continuity should verify the
+mount, `MYCELIUM_MEMORY.md`, and current-day activity file after installation.
 
 ## Core mutation entries
 

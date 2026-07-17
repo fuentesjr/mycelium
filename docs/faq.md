@@ -29,7 +29,7 @@ The npm package resolves the platform-matching bundled CLI package. Source build
 
 ## What does the pi extension configure?
 
-On session start it resolves the bundled binary, sets `MYCELIUM_MOUNT`, `MYCELIUM_AGENT_ID`, and `MYCELIUM_SESSION_ID`, bootstraps `MYCELIUM_MEMORY.md` if needed, and appends a session-boundary activity entry. Before the agent starts it injects concise operating guidance.
+On session start it resolves the bundled binary, sets `MYCELIUM_MOUNT`, `MYCELIUM_AGENT_ID`, and `MYCELIUM_SESSION_ID`, then attempts to bootstrap `MYCELIUM_MEMORY.md` and append a session-boundary activity entry. Those two writes are best-effort so an unavailable journal does not prevent pi from starting. Before the agent starts it injects concise operating guidance, including whether the binary is available.
 
 ## Can I use it outside pi?
 
@@ -57,7 +57,12 @@ Use a local POSIX filesystem on macOS or Linux. Mycelium relies on `flock`, atom
 
 ## How do I audit activity?
 
-Read `_activity/YYYY/MM/DD/<agent_id>.jsonl` with `cat`, `tail -f`, `grep`, or `mycelium grep`. The pi extension records session boundaries, `session_shutdown`, and `compaction`; the CLI records `write`, `edit`, `rm`, `mv`, and explicit `log` entries.
+Read `_activity/YYYY/MM/DD/<agent_id>.jsonl` with `cat`, `tail -f`, `grep`, or `mycelium grep`. The pi extension attempts to record session boundaries, `session_shutdown`, and `compaction`; the CLI records `write`, `edit`, `rm`, `mv`, and explicit `log` entries.
+
+For example, `mycelium grep --path _activity --pattern '"op":"write"'
+--format json` searches all visible activity files. `mycelium grep` deliberately
+skips dotfiles and dot-directories. A search with no matches is successful: text
+format prints nothing and JSON returns `{"matches":[],"truncated":false}`.
 
 ## What should agents record for future reviewers?
 
@@ -71,18 +76,27 @@ You can. A journal is plain files plus JSONL logs. The tradeoff is log growth an
 
 Stop pi, archive or copy the directory, then place it at the selected install
 scope's journal path: `~/.pi/agent/extensions/pi-mycelium/journal/` globally or
-`<repo>/.pi/pi-mycelium/journal/` for a project-local install. The extension
+`<cwd>/.pi/pi-mycelium/journal/` for a project-local install. The extension
 selects that path and overwrites `MYCELIUM_MOUNT` at session start. Direct CLI
 diagnostics may point `MYCELIUM_MOUNT` at an arbitrary copied journal. There is
 no database migration.
 
 ## How big does the activity log get?
 
-It grows with successful mutations and explicit signals. There is no built-in retention policy yet. Manual archival of older `_activity/YYYY/` subtrees is possible when you no longer need those logs online.
+It grows with successful mutations and explicit signals. There is no built-in
+retention command. To archive old years safely:
+
+1. Stop every pi process and CLI writer sharing the journal.
+2. Copy or tar the selected `_activity/YYYY/` subtree to storage outside the
+   live journal and verify the archive can be read.
+3. Remove the archived subtree with ordinary filesystem tools while the journal
+   remains offline. This is operator maintenance of reserved history, not a
+   supported live-store mutation.
+4. Restart pi and confirm new activity entries appear under the current UTC day.
 
 ## Is Mycelium production-ready?
 
-It is early-access pre-1.0. The core storage and mutation behavior has tests, and the supported integration is pi-only. API details and activity wording may still change before 1.0, while journal compatibility remains a transition constraint.
+It is early-access pre-1.0. The core storage and mutation behavior have tests, and the supported integration is pi-only. API details and activity wording may still change before 1.0, while journal compatibility remains a transition constraint.
 
 ## Are benchmarks available?
 

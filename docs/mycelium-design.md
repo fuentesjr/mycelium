@@ -72,7 +72,7 @@ There is one operational boundary: **raw filesystem reads are allowed; raw files
 
 ### Hints over enforcement; conventions over schemas
 
-System opinions about how the agent should organize memory live as **starter files inside the store** — not system features, not enforced layouts, not middleware that rewrites calls. Hints are removable. Schemas are sticky.
+System opinions about how the agent should organize memory live as **starter files inside the store** — not system features, not enforced layouts, not middleware that rewrites calls. Their contents are replaceable. The supported pi extension does, however, treat `MYCELIUM_MEMORY.md` as a well-known entry point and attempts to reseed the template whenever that path is absent.
 
 One principled exception (sections 4, 5, and 8): the `_` prefix at the store root is reserved for system paths, and `mycelium` rejects agent mutations under it. The activity log, lock file, and any future system metadata need a collision-free namespace. Reserving the prefix rather than just the current paths prevents future namespace collisions.
 
@@ -139,9 +139,9 @@ A single binary, `mycelium`, invoked through the agent's shell. Eight visible su
 - **`mycelium write <path> [--expected-version SHA] [--rationale STR]`** — create or overwrite from stdin. With `--expected-version`, conditional on the current version; otherwise unconditional. Prints the new version on success. `--rationale` is captured as a top-level field on the activity log entry and in the conflict envelope on CAS failure.
 - **`mycelium edit <path> --old STR --new STR [--expected-version SHA] [--rationale STR]`** — find-and-replace a unique substring. Fails if `--old` is absent or non-unique. _Earns its complexity:_ token economy on large files, diff quality under git/jj, and the unique-substring constraint catches stale-view errors a full overwrite would silently paper over.
 - **`mycelium ls [pattern] [--recursive]`** — list paths under the mount, optionally filtered by a glob pattern. Without `--recursive`, only top-level files are listed or matched. _Earns its complexity:_ one survey/path-discovery verb covers both browsing and pattern matching.
-- **`mycelium grep --pattern STR [--path PATH] [--regex] [--format text|json] [--limit N]`** — print matching lines with paths and line numbers. `--format=text` is `path:line:text`; `--format=json` returns `{matches: [{path, line, text}, ...], truncated}`. `--limit` caps results (default 1000). Implementation is pure Go: one search path, one regex dialect, deterministic behavior across machines. _Earns its complexity:_ JSON output makes the activity log usable through general tools; the `--limit` cap keeps log-reflection from overflowing context.
+- **`mycelium grep --pattern STR [--path PATH] [--regex] [--format text|json] [--limit N]`** — print matching lines with paths and line numbers. Dotfiles and dot-directories are skipped. `--format=text` is `path:line:text`; `--format=json` returns `{matches: [{path, line, text}, ...], truncated}`. `--limit` caps results (default 1000). No matches is a successful search: text output is empty and JSON contains an empty `matches` array. Implementation is pure Go: one search path, one regex dialect, deterministic behavior across machines. _Earns its complexity:_ JSON output makes the activity log usable through general tools; the `--limit` cap keeps log-reflection from overflowing context.
 - **`mycelium rm <path> [--expected-version SHA] [--rationale STR]`** — remove. _Earns its complexity:_ not expressible as `write` — empty content creates an empty file, not a deletion.
-- **`mycelium mv <src> <dst> [--expected-version SHA] [--rationale STR]`** — atomic rename within the store. `--expected-version`, when supplied, checks the source version. The destination must not exist; destination collisions return a structured conflict. _Earns its complexity:_ read+write+delete is not atomic; emulating rename loses the guarantee.
+- **`mycelium mv <src> <dst> [--expected-version SHA] [--rationale STR]`** — atomic single-file rename within the store. Directory moves are unsupported. `--expected-version`, when supplied, checks the source version. The destination must not exist; destination collisions return a structured conflict. _Earns its complexity:_ read+write+delete is not atomic; emulating rename loses the guarantee.
 
 ### Metadata operations
 
@@ -150,9 +150,9 @@ A single binary, `mycelium`, invoked through the agent's shell. Eight visible su
 **Failure modes:**
 
 - exit 0 — success
-- exit 1 — generic error (path not found, malformed args, log append failure after content commit, legacy pending transaction)
-- exit 2 — usage error (bad flags, malformed args, invalid regex, invalid output format)
-- exit 64 — CAS conflict; stderr is JSON `{"error":"conflict","op":"write","path":"...","current_version":"sha256:...","expected_version":"sha256:..."}`.
+- exit 1 — runtime error (path not found, I/O failure, post-commit log append failure, or a legacy pending transaction)
+- exit 2 — usage error (bad flags, missing or extra arguments, invalid regex, invalid output format, or an invalid path shape)
+- exit 64 — CAS or move-destination conflict; stderr is a JSON envelope whose `error` is `conflict` or `destination_exists`.
 - exit 65 — protocol violation such as a reserved `_` path or oversize rationale.
 
 A successful `write` or `edit` prints `{"version":"sha256:..."}` on stdout. `read --format json` prints a read envelope. `rm`, `mv`, and `log` are silent on success.
@@ -169,11 +169,11 @@ Five contract notes:
 
 **Conditional writes are first-class.** Every content-mutating subcommand (`write`, `edit`, `rm`, `mv`) accepts optional `--expected-version`. Version tokens are opaque strings to the caller; the LocalFS implementation uses content hashes (`sha256:...`) and the sentinel `sha256:absent` for a missing file. A single-agent store can ignore CAS and the system behaves like a regular filesystem with an audit log.
 
-**Operational rationale is optional on every mutation and signal.** `write`, `edit`, `rm`, `mv`, and `log` all accept optional `--rationale "..."`. When supplied, rationale appears as `rationale` on the activity log entry and on the conflict envelope. Maximum 64 KiB; oversize input is rejected with exit 65 before the mutation runs.
+**Operational rationale is optional on every mutation and signal.** `write`, `edit`, `rm`, `mv`, and `log` all accept optional `--rationale "..."`. When supplied, rationale appears as `rationale` on the activity log entry and on any conflict envelope emitted for that attempted operation. A conflict envelope contains the losing caller's attempted rationale; it does not recover the successful writer's rationale. Maximum 64 KiB; oversize input is rejected with exit 65 before the mutation runs.
 
 **The `_` prefix is reserved at the store root.** `mycelium` rejects `write`, `edit`, `rm`, and `mv` whose target/source is under any path beginning with `_`. Currently `_activity/` and `_lock` are system-owned; legacy `_tx/` records are detected for compatibility. Future system paths inherit the same protection without code changes.
 
-**Identity travels via environment.** The harness sets `MYCELIUM_MOUNT` (the store directory) once. `MYCELIUM_AGENT_ID` is optional and defaults to `agent`; `MYCELIUM_SESSION_ID` is optional and auto-generated per CLI process when absent. The pi extension provides stable agent/session ids for clearer multi-agent timelines. Every invocation reads identity from the environment/defaults; every log entry records the agent and session. Standard Unix request identity.
+**Identity travels via environment.** The harness sets `MYCELIUM_MOUNT` (the store directory) once. `MYCELIUM_AGENT_ID` is optional and defaults to `agent`; after defaulting it must be 1–128 ASCII letters, digits, `.`, `_`, or `-`, and cannot be `.` or `..`. `MYCELIUM_SESSION_ID` is optional and auto-generated once per CLI process when absent; it is log metadata and does not use the filename grammar. The pi extension provides stable agent/session ids for clearer multi-agent timelines. Every invocation reads identity from the environment/defaults; every log entry records the agent and session. Standard Unix request identity.
 
 ---
 
@@ -246,7 +246,10 @@ Multiple agents may mount the same local store simultaneously. Guarantees:
 
 1. **No silent loss.** Concurrent writes to the same path don't silently overwrite each other when conditional writes are used. Unconditional writes are documented as last-writer-wins.
 2. **Visible conflicts.** A failed conditional write returns a typed error with the current version; the agent re-reads, merges, retries.
-3. **Atomic single-file ops.** `write`, `edit`, `rm`, `mv` either fully apply or fail. No half-written files, no partial renames.
+3. **Atomic single-file content phase.** `write`, `edit`, `rm`, and `mv` do not
+   expose half-written files or partial renames. A command can still return
+   failure after that atomic content commit when the required activity append
+   fails, as described next.
 4. **Authoritative mutation log.** Every successful mutation has a durable activity entry. If content commits but logging fails, the command exits non-zero and reports that the post-commit append failed.
 5. **Per-agent log files.** Each agent writes its daily activity stream at `_activity/YYYY/MM/DD/{agent_id}.jsonl`. Cross-agent order can be reconstructed by sorting on `ts` or `tx_id`.
 
@@ -271,8 +274,9 @@ Operation-specific guidance:
 - `edit`: re-locate the substring; if it is gone, decide whether the change is
   still semantically correct.
 - `rm`: re-read before deleting when deletion is based on observed content.
-- `mv destination_exists`: read the destination first; choosing a new path,
-  deleting the destination, or aborting is a content decision.
+- `mv destination_exists`: this is exit 64, but it is not a stale-source CAS
+  failure. Read the destination first; choosing a new path, deleting the
+  destination, or aborting is a content decision.
 
 Stop instead of looping when repeated conflicts show another active writer, the
 current content contradicts the intended change, or a destination collision has
@@ -288,17 +292,22 @@ A Frontier agent doesn't just use general file tools well — it _reflects on it
 
 The system _enables_ this with primitives the agent already has, and is careful not to _do_ it on the agent's behalf:
 
-> **Scaffolding lives in prompts and conventions — mutable, optional, removable. It never lives as automatic content-retrieval or organization policy in the binary.**
+> **Scaffolding lives in prompts and conventions — mutable and replaceable. It never lives as automatic content-retrieval or organization policy in the binary.**
 
 ### Concrete applications
 
-**Starter conventions are files inside the store, not code paths.** A new mount can optionally be initialized with `MYCELIUM_MEMORY.md` at the root proposing a default layout (`agents/{agent_id}/`, `memories/`, `shared/`, `learnings/`, `INDEX.md`). The template tells the agent it owns the file and should revise it proactively as better conventions emerge.
+**Starter conventions are files inside the store, not code paths.** On session start, the supported pi extension best-effort creates `MYCELIUM_MEMORY.md` when the path is absent. It proposes a default layout (`agents/{agent_id}/`, `memories/`, `shared/`, `learnings/`, `INDEX.md`) and tells the agent to revise the contents proactively as better conventions emerge.
 
 **No automatic injection of retrieved memory content into agent context.** The pi extension surfaces minimal mount metadata and the exact conventions-file path at session start. It should not prefetch, rank, summarize, or inject arbitrary memory content.
 
 **No automatic intervention.** The system never summarizes, dedupes, organizes, prunes, or rewrites the agent's files. If the activity log shows behavior the operator dislikes, the lever is the prompt or the model — not a system feature.
 
-**Every piece of scaffolding is removable.** Starter `MYCELIUM_MEMORY.md`, layout conventions, anything else can be deleted or ignored without breaking the runtime. If removing it breaks the system, it doesn't belong.
+**Scaffolding content is replaceable.** Agents may rewrite or ignore every
+starter convention without breaking the runtime. The filename
+`MYCELIUM_MEMORY.md` is the one stable hook: deleting it is not a persistent way
+to opt out because the extension attempts to restore the starter file on the
+next session. Keeping the path while replacing its contents preserves the
+startup contract without accepting the default organization policy.
 
 ### How self-evolution is enabled
 
@@ -334,7 +343,7 @@ Observability is plain JSONL files at a reserved path. No sidecar service, no au
 
 ### The activity log
 
-Two paths produce entries in `_activity/YYYY/MM/DD/{agent_id}.jsonl`: every content-mutating subcommand (`write`, `edit`, `rm`, `mv`) appends automatically on commit, and `mycelium log` appends explicit signal entries. Reads (`read`, `ls`, `grep`) aren't logged; the log records what changed and what was observed, not what was looked at.
+Two paths produce entries in `_activity/YYYY/MM/DD/{agent_id}.jsonl`: every content-mutating subcommand (`write`, `edit`, `rm`, `mv`) appends automatically on commit, and `mycelium log` appends explicit signal entries. Reads (`read`, `ls`, `grep`) aren't logged; the log records what changed and what callers explicitly signaled, not what was looked at.
 
 The activity log is authoritative for state-changing Mycelium operations: no mutating command returns success unless its activity entry is durable. If content changes but logging cannot complete, the command fails loudly after the content commit. A power loss in that same narrow window can leave the final content mutation unlogged; that bounded gap is part of the durable-history contract.
 
@@ -369,7 +378,9 @@ On a CAS or destination-exists conflict, the `rationale` field also appears on t
 }
 ```
 
-This lets the retrying agent merge intent rather than just bytes when both sides supplied rationale.
+This preserves the attempted operation's intent while the agent re-reads current
+bytes. The envelope does not contain the successful writer's rationale; that
+remains on the corresponding activity line when the writer supplied one.
 
 A move entry:
 
@@ -403,7 +414,7 @@ A `mycelium log` entry with an inline payload:
 
 Pi lifecycle events and compatibility expectations are documented in [pi activity events](pi-activity-events.md). The binary does not enforce a closed set of `log` operation names.
 
-**Path layout: `_activity/YYYY/MM/DD/{agent_id}.jsonl`.** Each agent writes its own daily file; `agent_id` must be filename-safe ASCII using letters, digits, `.`, `_`, or `-`. Cross-agent order is reconstructed by sorting on `ts` or `tx_id`. Time-windowed queries use path patterns with `mycelium ls --recursive`, for example `"_activity/$(date -u +%Y/%m)/*/*.jsonl"` for the current month or `"_activity/$(date -u +%Y/%m/%d)/*.jsonl"` for the current UTC day. Payloads from `mycelium log` are inlined on the entry; larger signals belong in a regular file referenced via `--path`.
+**Path layout: `_activity/YYYY/MM/DD/{agent_id}.jsonl`.** Each agent writes its own daily file; after defaulting, `agent_id` is 1–128 ASCII letters, digits, `.`, `_`, or `-`, excluding `.` and `..`. Cross-agent order is reconstructed by sorting on `ts` or `tx_id`. Time-windowed queries use path patterns with `mycelium ls --recursive`, for example `"_activity/$(date -u +%Y/%m)/*/*.jsonl"` for the current month or `"_activity/$(date -u +%Y/%m/%d)/*.jsonl"` for the current UTC day. Payloads from `mycelium log` are inlined on the entry; larger signals belong in a regular file referenced via `--path`.
 
 **Same files, two readers, one mutation path:**
 

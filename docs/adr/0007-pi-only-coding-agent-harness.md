@@ -5,6 +5,10 @@
 - **Deciders:** Sal Fuentes Jr.
 - **Supersedes:** ADR-0002, ADR-0006
 
+> Operational clarification (2026-07-17): pi lifecycle activity writes and
+> first-file bootstrap are best-effort so hook failures do not prevent pi from
+> starting. This does not change the pi-only support decision.
+
 ## Context
 
 Mycelium was originally described as a harness-neutral memory substrate with a portable Agent Skill and cross-harness activity-event conventions. In practice, the only complete integration is `pi-mycelium`: it installs through pi, selects the journal mount, ships the starter template, injects the runtime prompt, records pi lifecycle events, and bundles the Go CLI engine.

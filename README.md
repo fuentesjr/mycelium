@@ -28,7 +28,7 @@ The everyday loop is: list or grep paths, read relevant files, write or edit a n
 
 ## Features
 
-- **Pi extension install.** `pi install npm:pi-mycelium` sets the journal mount, identity, prompt guidance, starter `MYCELIUM_MEMORY.md`, and lifecycle activity entries.
+- **Pi extension install.** `pi install npm:pi-mycelium` sets the journal mount, identity, and prompt guidance, and best-effort bootstraps `MYCELIUM_MEMORY.md` and lifecycle activity entries.
 - **Bundled Go CLI engine.** The extension invokes `mycelium` through pi's `bash` tool. The CLI remains a separate, testable engine for filesystem safety and diagnostics.
 - **Atomic writes with optimistic concurrency.** Mutations can use `--expected-version`; conflicts return structured JSON and exit 64.
 - **Crash-aware durable history.** Mutations commit atomically and append a durable JSONL activity entry before reporting success.
@@ -49,6 +49,16 @@ pi install npm:pi-mycelium -l
 Verify with `pi list`. Update with `pi update npm:pi-mycelium`.
 
 The npm package depends on platform-specific `@fuentesjr/mycelium-cli-*` optional packages and selects the one matching your OS/architecture. No separate binary or PATH setup is needed for supported pi installs.
+
+| Environment | Architecture | Install status |
+| --- | --- | --- |
+| macOS | Apple silicon (`arm64`) and Intel (`x64`) | Bundled CLI; supported |
+| Linux | `arm64` and `x64` | Bundled CLI; supported |
+| Windows, other OS/architectures, or non-POSIX/network filesystems | Any | Unsupported |
+
+The extension declares pi as a peer dependency without a pinned compatibility
+range. Release checks therefore validate the current development baseline; they
+do not imply compatibility with every historical or future pi release.
 
 ## Direct CLI use
 
@@ -73,7 +83,7 @@ For diagnostics outside pi, set `MYCELIUM_MOUNT` to a journal directory and opti
 | Everyday | `write` | Safe write with optional CAS and rationale |
 | Everyday | `edit` | Safe unique-substring replacement |
 | Everyday | `ls` | List journal entries, optionally by pattern |
-| Everyday | `grep` | Search content and activity logs |
+| Everyday | `grep` | Search non-dotfile content and activity logs; no matches still exits 0 |
 | Occasional | `rm` | Remove a note |
 | Occasional | `mv` | Move/rename a note |
 | Metadata | `log` | Append an agent-authored signal such as `decision` or `agent_note` |
@@ -90,14 +100,19 @@ printf 'incident: query latency spike at 14:30\n' \
 
 mycelium read notes/incident-2026-07-12.md --format json
 mycelium grep --pattern latency --format json
-mycelium log decision --rationale "Treat cache eviction as leading hypothesis." \
-  --payload-json '{"path":"notes/incident-2026-07-12.md"}'
+mycelium log decision --path notes/incident-2026-07-12.md \
+  --rationale "Treat cache eviction as leading hypothesis."
 mycelium grep --path _activity --pattern '"op":"write"' --format json
 ```
 
 ## Activity log
 
-Activity is plain JSONL at `<journal>/_activity/YYYY/MM/DD/<agent_id>.jsonl`. The pi extension records session boundaries, `session_shutdown`, and `compaction`. The CLI records successful `write`, `edit`, `rm`, `mv`, and explicit `log` entries. Historical journals may contain older event names; readers should tolerate unknown operations. See [`docs/pi-activity-events.md`](docs/pi-activity-events.md).
+Activity is plain JSONL at `<journal>/_activity/YYYY/MM/DD/<agent_id>.jsonl`. The pi extension attempts to record session boundaries, `session_shutdown`, and `compaction`. The CLI records successful `write`, `edit`, `rm`, `mv`, and explicit `log` entries. Historical journals may contain older event names; readers should tolerate unknown operations. See [`docs/pi-activity-events.md`](docs/pi-activity-events.md).
+
+Lifecycle and first-file bootstrap are best-effort extension hooks: they do not
+make pi unusable when logging or template creation fails. After installation,
+verify the mount path shown in the prompt, confirm `MYCELIUM_MEMORY.md` exists,
+and inspect `_activity/` if continuity matters.
 
 ## What agents record
 
@@ -119,9 +134,11 @@ Activity is plain JSONL at `<journal>/_activity/YYYY/MM/DD/<agent_id>.jsonl`. Th
 
 ## Repository layout
 
-- `cmd/mycelium/` — Go CLI engine for safe mutations, search, and activity appends.
+- `cmd/mycelium/` — thin Go CLI entry point.
+- `internal/mycelium/` — command, storage, concurrency, search, and activity-log engine with its tests.
 - `extensions/pi-mycelium/` — supported pi extension, prompt, tests, and journal template.
-- `docs/` — design, roadmap, benchmarks, ADRs, release notes.
+- `docs/` — design, roadmap, benchmarks, ADRs, and release operations.
+- `CHANGELOG.md` — release notes.
 
 ## Development
 

@@ -11,6 +11,12 @@
 > ADR-0004 later removed the functional `evolve` command; the rationale
 > decision for `write`, `edit`, `rm`, `mv`, and `log` remains active.
 
+> **Current implementation clarification (2026-07-17):** a conflict envelope
+> carries the rationale supplied by the failed/attempted operation alongside
+> the current version. It does not include the successful writer's rationale;
+> that rationale is available only in the successful operation's activity
+> entry. Current `edit` flags are `--old` and `--new`.
+
 ## Context
 
 Mycelium asks agents to capture rationale at the moment of decision. At the
@@ -63,8 +69,9 @@ operational meaning.
 Rationale also propagates through the **CAS conflict envelope**: when a
 write or edit loses a `--expected-version` race, the JSON envelope
 emitted to stderr includes the losing caller's `rationale` field
-alongside `current_version`. The reviewer or retrying agent sees both
-sides' intent, not just the winning version hash.
+alongside `current_version`. The reviewer or retrying agent sees the attempted
+operation's intent as well as the winning version hash, then re-reads the
+current content before merging.
 
 The note-body discipline ("write the _why_ into the note itself")
 remains a documented convention. Documentation describes it as a craft
@@ -106,7 +113,7 @@ mycelium write notes/incident-2026-05-12.md \
   --rationale "API began returning 503 at 14:22; recording symptoms before mitigation closes the window."
 
 mycelium edit notes/runbook.md \
-  --old-string "..." --new-string "..." \
+  --old "..." --new "..." \
   --rationale "Removing the manual restart step; the operator-init bug it worked around was fixed in v0.1.7."
 
 mycelium rm notes/spikes/2026-Q1/deprecated.md \
@@ -140,9 +147,9 @@ mycelium log decision \
 - **Symmetry across the CLI.** Every rationale-bearing op accepts the
   same flag with the same size bound and the same on-disk shape. Agents
   learn one pattern, not five.
-- **Conflict resolution gains context.** Both sides' rationale surface
-  on the envelope, so the retrying agent can merge intent, not just
-  bytes.
+- **Conflict resolution gains context.** The losing operation's rationale
+  surfaces on the envelope, so the retrying agent retains its attempted intent
+  while re-reading the winning bytes.
 - **No coercion of low-signal operations.** Routine writes, appends,
   artifact saves, and cleanups carry no rationale and produce no
   placeholder text. The schema reflects the actual epistemic state.
@@ -207,9 +214,9 @@ mycelium log decision \
 The original Proposed draft included three open questions. They were
 resolved during acceptance:
 
-- **CAS conflict envelope:** _Yes_, propagate. Both sides' rationale
-  appears in the envelope so the retrying agent can merge intent, not
-  just bytes. Implemented as an `omitempty` field on
+- **CAS conflict envelope:** _Yes_, propagate. The failed operation's rationale
+  appears in the envelope so the retrying agent retains its intended change
+  while re-reading current bytes. Implemented as an `omitempty` field on
   `conflictEnvelope`.
 - **`mycelium log` flag:** _Yes_, accept `--rationale` as a top-level
   flag on `mycelium log <op>` for symmetry with the mutation verbs.
