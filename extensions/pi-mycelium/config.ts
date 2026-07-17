@@ -13,15 +13,21 @@ export interface MyceliumConfig {
 export const GLOBAL_EXT_ROOT = path.join(os.homedir(), ".pi", "agent", "extensions");
 const PKG_NAME = "pi-mycelium";
 
-// True if `pi-mycelium` is registered in pi's project-local settings file at
-// <cwd>/.pi/settings.json. `pi install -l` writes here; `pi install` writes to
-// the global settings file under ~/.pi/agent/.
+// True if `pi-mycelium`, optionally with an npm version, is registered in pi's
+// project-local settings file at <cwd>/.pi/settings.json. `pi install -l`
+// writes here; `pi install` writes to the global settings file under
+// ~/.pi/agent/.
 function isRegisteredProjectLocal(cwd: string): boolean {
   const projectSettings = path.join(cwd, ".pi", "settings.json");
   try {
     const raw = fs.readFileSync(projectSettings, "utf8");
     const parsed = JSON.parse(raw) as { packages?: string[] };
-    return (parsed.packages ?? []).some((p) => p === `npm:${PKG_NAME}` || p.endsWith(`/${PKG_NAME}`));
+    return (parsed.packages ?? []).some(
+      (p) =>
+        p === `npm:${PKG_NAME}` ||
+        p.startsWith(`npm:${PKG_NAME}@`) ||
+        p.endsWith(`/${PKG_NAME}`),
+    );
   } catch {
     return false;
   }

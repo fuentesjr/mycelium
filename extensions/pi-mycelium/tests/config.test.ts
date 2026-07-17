@@ -29,6 +29,15 @@ describe("detectScope", () => {
     expect(detectScope("/opt/somewhere/node_modules/pi-mycelium/index.ts", tmp)).toBe("project");
   });
 
+  it("returns 'project' for a version-pinned npm registration", () => {
+    fs.mkdirSync(path.join(tmp, ".pi"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmp, ".pi", "settings.json"),
+      JSON.stringify({ packages: ["npm:pi-mycelium@0.5.0"] }),
+    );
+    expect(detectScope("/opt/somewhere/node_modules/pi-mycelium/index.ts", tmp)).toBe("project");
+  });
+
   it("defaults to 'global' for npm-installed paths with no project-local registration", () => {
     expect(detectScope("/opt/somewhere/node_modules/pi-mycelium/index.ts", tmp)).toBe("global");
   });
