@@ -51,7 +51,9 @@ describe("systemPromptAvailable", () => {
 		);
 		expect(block).toContain("Do not broad-search for a substitute");
 		expect(block).toContain("edit that file in the same session");
-		expect(block).toContain("mycelium log decision|agent_note");
+		expect(block).toContain('mycelium log decision --rationale "..."');
+		expect(block).toContain('mycelium log agent_note --rationale "..."');
+		expect(block).not.toContain("decision|agent_note");
 	});
 
 	it("describes the conflict-recovery contract", () => {

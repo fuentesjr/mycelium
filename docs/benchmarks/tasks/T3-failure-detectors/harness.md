@@ -1,6 +1,6 @@
 # T3 — Failure-mode detectors
 
-**Acceptance criterion:** #5 (failure-mode observability).
+**Acceptance criterion:** #4 (failure-mode observability).
 **Model-independent.** No real model runs; T3 is pure trajectory classification.
 
 ## What this task validates

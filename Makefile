@@ -10,6 +10,7 @@ build:
 
 test:
 	go test -count=1 ./...
+	npm test --prefix extensions/pi-mycelium
 
 dist: clean
 	mkdir -p $(DIST)
@@ -43,9 +44,9 @@ npm-dist: dist
 npm-publish: npm-dist
 	# shellcheck disable=SC1073,SC1061,SC1036,SC1062,SC1072
 	for plat in darwin-arm64 darwin-amd64 linux-arm64 linux-amd64; do \
-	  cd $(NPM_DIR)/cli-$$plat && npm publish --access=public && cd $(CURDIR); \
+	  cd $(NPM_DIR)/cli-$$plat && npm publish --access=public --provenance && cd $(CURDIR); \
 	done
-	cd extensions/pi-mycelium && npm publish --access=public
+	cd extensions/pi-mycelium && npm publish --access=public --provenance
 
 clean:
 	rm -rf $(DIST)

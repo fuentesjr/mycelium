@@ -69,7 +69,12 @@ You can. A journal is plain files plus JSONL logs. The tradeoff is log growth an
 
 ## How do I move a journal between machines?
 
-Archive or copy the directory, then point pi or `MYCELIUM_MOUNT` at the copied journal. There is no database migration.
+Stop pi, archive or copy the directory, then place it at the selected install
+scope's journal path: `~/.pi/agent/extensions/pi-mycelium/journal/` globally or
+`<repo>/.pi/pi-mycelium/journal/` for a project-local install. The extension
+selects that path and overwrites `MYCELIUM_MOUNT` at session start. Direct CLI
+diagnostics may point `MYCELIUM_MOUNT` at an arbitrary copied journal. There is
+no database migration.
 
 ## How big does the activity log get?
 

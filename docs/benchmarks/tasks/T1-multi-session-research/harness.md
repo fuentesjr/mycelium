@@ -2,30 +2,49 @@
 
 ## Prerequisites
 
-- `mycelium` binary on `$PATH` (built from this repo or installed from a release).
+- Run setup from the Mycelium repository root.
 - `pi` CLI installed and authenticated against the model under test.
-- `extensions/pi-mycelium/` symlinked into `.pi/extensions/pi-mycelium` (project-scoped install). Verify: `ls .pi/extensions/pi-mycelium`.
-- The pi extension's system-prompt block is the *only* scaffolding the agent gets. Do not add custom system prompts.
+- The released `pi-mycelium` package, or an absolute local package path supplied
+  through `PACKAGE_SOURCE`.
+- The pi extension's system prompt and canonical starter template are the only
+  scaffolding the agent gets. Do not add custom system prompts or seed files.
 
 ## Per-run setup
 
-Each of the 5 instances per model gets its own mount and a unique agent ID:
+Each of the 5 instances per model gets its own working directory, project-local
+extension registration, derived journal mount, and unique agent ID:
 
-```
+```bash
+REPO_ROOT=$(pwd)
 RUN_ID=$(uuidgen | tr '[:upper:]' '[:lower:]' | head -c 8)
 MODEL=opus-4-7   # or gpt-5-5
-export MYCELIUM_MOUNT=/tmp/t1-${MODEL}-${RUN_ID}
+RUN_DIR=$(mktemp -d "/tmp/t1-${MODEL}-${RUN_ID}.XXXXXX")
+PACKAGE_SOURCE=${PACKAGE_SOURCE:-npm:pi-mycelium}
+
+cd "$RUN_DIR"
+pi install "$PACKAGE_SOURCE" -l --approve
+MOUNT="$RUN_DIR/.pi/pi-mycelium/journal"
 export MYCELIUM_AGENT_ID=t1-${MODEL}-${RUN_ID}
-mkdir -p $MYCELIUM_MOUNT
 ```
 
-The store starts empty. Do not seed `MYCELIUM_MEMORY.md` — letting the agent organize from scratch is part of what's being measured.
+For a local checkout, set `PACKAGE_SOURCE` to the absolute path
+`$REPO_ROOT/extensions/pi-mycelium`. Do not export `MYCELIUM_MOUNT`; the
+extension owns it and derives `MOUNT` from project-local registration.
+
+The operator adds no seed. On the first session the shipped extension
+bootstraps its canonical `MYCELIUM_MEMORY.md`; that product behavior is part of
+the benchmark.
 
 ## Sessions
 
-Run three sessions per instance, fresh `pi` process each, same mount. Use the prompts in `task.md` verbatim — copy-paste, no edits.
+Run three sessions per instance from `RUN_DIR`, fresh `pi` process each, same
+project-local mount. Use the prompts in `task.md` verbatim — copy-paste, no
+edits.
 
-Between sessions: kill the pi process, start a new one, re-export the env vars (`MYCELIUM_MOUNT`, `MYCELIUM_AGENT_ID`, `MYCELIUM_SESSION_ID` if your harness sets one). The new session's first activity-log entry will be in a fresh `_activity/YYYY/MM/DD/<agent>.jsonl` (or appended to today's, depending on date).
+After session 1, assert that `MOUNT/MYCELIUM_MEMORY.md` exists and that the
+captured system prompt reports exactly `MOUNT`. Abort the run if either check
+fails. Between sessions, stop pi and start a new process from `RUN_DIR`; pi
+provides a fresh session identity while the mount and agent identity persist.
 
 Do not provide cross-session context as user prompts. Session 2 says "continuing from the prior session" — discovering and re-reading prior content is the agent's job.
 
@@ -33,19 +52,25 @@ Do not provide cross-session context as user prompts. Session 2 says "continuing
 
 Per session: capture the full pi transcript (the model's tool calls and text output). Per instance, after session 3:
 
-```
-tar -czf t1-${MODEL}-${RUN_ID}-store.tar.gz -C $(dirname $MYCELIUM_MOUNT) $(basename $MYCELIUM_MOUNT)
+```bash
+tar -czf "t1-${MODEL}-${RUN_ID}-store.tar.gz" -C "$(dirname "$MOUNT")" "$(basename "$MOUNT")"
 ```
 
 Save the session-3 transcript separately for the comparison-run grading step.
 
 ## Comparison run (no-memory baseline)
 
-Per instance, after the three Mycelium sessions complete: run the same task once more, single session, no Mycelium mount, same model. The agent has only what it can do in one shot.
+Per instance, after the three Mycelium sessions complete: run the same task once
+more in a separate working directory, single session, same model. Disable all
+extension discovery so a globally installed Mycelium cannot contaminate the
+control.
 
-```
-unset MYCELIUM_MOUNT MYCELIUM_AGENT_ID MYCELIUM_SESSION_ID
-# then start pi and feed it: task.md session 1 + session 2 + session 3 prompts concatenated
+```bash
+BASELINE_DIR=$(mktemp -d "/tmp/t1-baseline-${MODEL}-${RUN_ID}.XXXXXX")
+cd "$BASELINE_DIR"
+env -u MYCELIUM_MOUNT -u MYCELIUM_AGENT_ID -u MYCELIUM_SESSION_ID \
+  pi --no-extensions
+# Feed task.md session 1 + session 2 + session 3 prompts concatenated.
 ```
 
 Capture the transcript only. There is no store to tar.

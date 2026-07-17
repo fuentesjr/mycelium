@@ -54,13 +54,13 @@ The npm package depends on platform-specific `@fuentesjr/mycelium-cli-*` optiona
 
 The `mycelium` binary remains documented for development, diagnostics, advanced operation, and for pi agents' normal shell-invoked memory operations. A source build is not a supported generic harness integration path.
 
-Requires Go 1.26+:
+Requires Go 1.26.2+:
 
 ```bash
 git clone https://github.com/fuentesjr/mycelium.git
 cd mycelium
 make build
-./cmd/mycelium/mycelium --help
+MYCELIUM_MOUNT="$(mktemp -d)" ./cmd/mycelium/mycelium ls
 ```
 
 For diagnostics outside pi, set `MYCELIUM_MOUNT` to a journal directory and optionally set `MYCELIUM_AGENT_ID` / `MYCELIUM_SESSION_ID`. Existing journals remain compatible.
@@ -126,6 +126,7 @@ Activity is plain JSONL at `<journal>/_activity/YYYY/MM/DD/<agent_id>.jsonl`. Th
 ## Development
 
 ```bash
+npm install --prefix extensions/pi-mycelium
 make test
 make build
 make dist

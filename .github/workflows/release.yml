@@ -36,32 +36,7 @@ jobs:
           registry-url: "https://registry.npmjs.org"
 
       - name: Verify version consistency
-        run: |
-          TAG="${{ github.ref_name }}"
-          TAG_VER="${TAG#v}"
-
-          MAKEFILE_VER=$(sed -n -E 's/^VERSION[[:space:]]*\?=[[:space:]]*v?([^[:space:]]+).*/\1/p' Makefile)
-          PKG_VER=$(node -p "require('./extensions/pi-mycelium/package.json').version")
-
-          echo "Tag version:      $TAG_VER"
-          echo "Makefile VERSION: $MAKEFILE_VER"
-          echo "package.json:     $PKG_VER"
-
-          FAILED=0
-          if [ "$TAG_VER" != "$MAKEFILE_VER" ]; then
-            echo "ERROR: Tag version ($TAG_VER) does not match Makefile VERSION ($MAKEFILE_VER)"
-            FAILED=1
-          fi
-          if [ "$TAG_VER" != "$PKG_VER" ]; then
-            echo "ERROR: Tag version ($TAG_VER) does not match extensions/pi-mycelium/package.json version ($PKG_VER)"
-            FAILED=1
-          fi
-          if [ "$FAILED" -eq 1 ]; then
-            echo ""
-            echo "Fix the version in the lagging file, recommit, delete the tag, and push a new tag."
-            exit 1
-          fi
-          echo "Version consistency check passed: $TAG_VER"
+        run: node bin/check-release-versions.mjs "${{ github.ref_name }}"
 
       - name: Verify npm publish access
         run: |
@@ -104,7 +79,7 @@ jobs:
               continue
             fi
             echo "Publishing $pkg@$ver ..."
-            (cd dist/npm/cli-$plat && npm publish --access=public)
+            (cd dist/npm/cli-$plat && npm publish --access=public --provenance)
           done
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -117,7 +92,7 @@ jobs:
             echo "pi-mycelium@$ver already published, skipping"
             exit 0
           fi
-          cd extensions/pi-mycelium && npm publish --access=public
+          cd extensions/pi-mycelium && npm publish --access=public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 

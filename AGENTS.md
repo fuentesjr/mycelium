@@ -12,11 +12,11 @@ Prefer `jj` for day-to-day operations:
 jj status          # Working copy status
 jj log             # Commit graph
 jj diff            # Uncommitted changes
-jj new             # Create a new change (analogous to git checkout -b)
+jj new             # Create a new child change
 jj describe -m "message"  # Set the current change's description
 jj squash          # Fold working copy into parent change
 jj git push        # Push to git remote
 ```
 
 Jujutsu does not require staging — all tracked file changes are automatically included in the current change.
-Addtionally Jujutsu documentation can be accessed here: https://docs.jj-vcs.dev/latest/cli-reference/
+Additionally, Jujutsu documentation is available here: https://docs.jj-vcs.dev/latest/cli-reference/

@@ -5,6 +5,12 @@
     "extensions": ["./index.ts"]
   },
   "description": "Persistent memory for pi coding agents",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fuentesjr/mycelium.git",
+    "directory": "extensions/pi-mycelium"
+  },
   "type": "module",
   "main": "index.ts",
   "files": [

@@ -32,12 +32,15 @@ The active pi contract is session boundaries, `session_shutdown`, `compaction`, 
 
 ## Mount location
 
-| Install scope | Extension path | Mount path |
-| --- | --- | --- |
-| Global | `~/.pi/agent/extensions/` | `~/.pi/agent/extensions/pi-mycelium/journal/` |
-| Project | `<repo>/.pi/extensions/` | `<repo>/.pi/pi-mycelium/journal/` |
+| Install scope | Mount path |
+| --- | --- |
+| Global | `~/.pi/agent/extensions/pi-mycelium/journal/` |
+| Project | `<repo>/.pi/pi-mycelium/journal/` |
 
-Detection compares `import.meta.url` against `~/.pi/agent/extensions/`. A locally checked-out copy loaded with `pi -e ./path.ts` is treated as project-local.
+Project scope requires `pi-mycelium` to be registered in the current working
+directory's `.pi/settings.json`, as `pi install ... -l` does. A package loaded
+only with `pi -e` has no project registration and defaults to the global mount.
+Legacy/manual copies already under `~/.pi/agent/extensions/` are also global.
 
 ## Identity
 
@@ -59,10 +62,11 @@ For troubleshooting: exit 64 is a CAS/destination conflict with a JSON envelope;
 
 ```bash
 git clone https://github.com/fuentesjr/mycelium
-cd mycelium/extensions/pi-mycelium
-npm install
-npm test
-pi -e ./index.ts
+cd mycelium
+npm install --prefix extensions/pi-mycelium
+npm test --prefix extensions/pi-mycelium
+pi install ./extensions/pi-mycelium -l --approve
+pi
 ```
 
 A stub binary at `stub/mycelium` returns canned successful JSON for extension tests and local smoke checks.

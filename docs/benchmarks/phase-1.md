@@ -1,15 +1,18 @@
 # Phase 1 Benchmark Rubric
 
-**Status:** Active. Release-decoupled — `v0.1.0` ships on binary-side criteria; T1/T2 model runs land here as they complete.
-**Owns:** Acceptance criteria 1, 4, and 5 from `mycelium-phases.md`.
+**Status:** Active and release-decoupled. T1/T2 model runs land here as they
+complete; released artifacts are not gated on those runs.
+**Owns:** Multi-session (#1), self-evolution (#3), and failure-mode
+observability (#4) from `mycelium-phases.md`.
 
 This rubric operationalizes the three Phase 1 criteria that depend on real model runs:
 
 - **#1 Single-agent multi-session.** Validated by T1.
-- **#4 Self-evolution through conventions-file edits and activity-log evidence.** Validated by T2.
-- **#5 Failure-mode observability.** Validated by T3.
+- **#3 Self-evolution through conventions-file edits and activity-log evidence.** Validated by T2.
+- **#4 Failure-mode observability.** Validated by T3.
 
-Criteria 2, 3, 6, 7, 8, and 9 are validated by the binary's property tests, concurrent-process tests, crash-recovery tests, and tarball inspection — not here.
+Criteria #2 (concurrent conflict handling) and #5 (automated verification) are
+validated by tests and package inspection rather than model runs.
 
 ---
 
@@ -20,7 +23,7 @@ Phase 1 targets one Anthropic model and one OpenAI model:
 - **Anthropic:** Claude Opus 4.7
 - **OpenAI:** GPT-5.5
 
-Both must pass the model-dependent criteria (#1 and #4) to show the pi product works across model families. Single-provider passes do not count. Model diversity is benchmark coverage, not harness portability.
+Both must pass the model-dependent criteria (#1 and #3) to show the pi product works across model families. Single-provider passes do not count. Model diversity is benchmark coverage, not harness portability.
 
 Google Frontier and open-weights are out of scope for Phase 1; revisit in a later phase if the MVP holds up.
 
@@ -51,7 +54,7 @@ Three sessions, not two: two sessions test "did the agent re-read its notes"; th
 
 **Comparison run.** Same task, same model, no Mycelium mount, single session with the three prompts concatenated. The grader reads the transcript only. **Pass: the Mycelium run's output is judged more substantively grounded than the no-memory run.** Per `harness.md`: run 5 instances per model; both criteria require ≥3/5 to pass.
 
-### T2 — Seeded self-evolution scenario (acceptance #4)
+### T2 — Seeded self-evolution scenario (acceptance #3)
 
 **Seed.** A pre-populated store under `docs/benchmarks/tasks/T2-seeded-self-evolution/seed/` containing a recognizable failure pattern:
 
@@ -68,7 +71,7 @@ Three sessions, not two: two sessions test "did the agent re-read its notes"; th
 
 Why seeded: self-evolution requires something to evolve in response to. A clean store has nothing for the agent to notice.
 
-### T3 — Failure-mode detectors (acceptance #5)
+### T3 — Failure-mode detectors (acceptance #4)
 
 **Detectors** operate on activity-log content alone:
 
@@ -88,10 +91,10 @@ The writes-without-reads detector was dropped: reads are not emitted by Mycelium
 A _run_ executes T1–T3 against one model. Per-task scoring is binary (pass/fail).
 
 - **Acceptance #1** passes for a model if T1 passes.
-- **Acceptance #4** passes for a model if T2 passes.
-- **Acceptance #5** passes when T3's detectors classify the 3 hand-crafted trajectories correctly. Model-independent.
+- **Acceptance #3** passes for a model if T2 passes.
+- **Acceptance #4** passes when T3's detectors classify the 3 hand-crafted trajectories correctly. Model-independent.
 
-The **multi-model pi benchmark passes** when both Claude Opus 4.7 and GPT-5.5 clear #1 and #4. Acceptance #3 (conflict recovery) is verified by the binary's property tests.
+The **multi-model pi benchmark passes** when both Claude Opus 4.7 and GPT-5.5 clear #1 and #3. Acceptance #2 (concurrent conflict handling) is verified by the binary's property and sibling-process tests.
 
 ---
 
@@ -103,9 +106,14 @@ Performance, long-running stores, cost ceilings, and deeper pi workflow quality 
 
 ## Release decoupling
 
-Binary-side acceptance criteria (#2 multi-agent concurrency, #5 failure-mode observability, #6 activity-log integrity, #7 reserved-path protection, #8 LocalFS correctness, #9 store readability) are met by tests in `cmd/mycelium/` and ship with the binary. Model-run criteria (#1 multi-session synthesis, #3 conflict recovery on real models, #4 self-evolution) are open and validate against the released artifact rather than gating release. Results land here as runs complete.
+Acceptance #2 (multi-agent concurrency) and #5 (automated verification) are met
+by tests under `internal/mycelium/`, the standalone T3 detector tests, extension
+tests, race checks, and package inspection. Model-run criteria #1
+(multi-session synthesis) and #3 (self-evolution) remain open and validate
+against released artifacts rather than gating release. T3 directly exercises
+#4 (failure-mode observability).
 
-Rationale: model-run validation does not change the artifact, only the public claim about it. Shipping early-access lets real users exercise the multi-session and concurrent-agent paths that the synthetic suite covers; waiting for full validation costs months of zero-feedback delay. Release framing is "early access, validation in progress" until both target models pass #1 and #4.
+Rationale: model-run validation does not change the artifact, only the public claim about it. Shipping early-access lets real users exercise the multi-session and concurrent-agent paths that the synthetic suite covers; waiting for full validation costs months of zero-feedback delay. Release framing is "early access, validation in progress" until both target models pass #1 and #3.
 
 ## Open issues
 

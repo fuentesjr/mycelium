@@ -8,9 +8,9 @@ Filename convention: `NNNN-kebab-case-title.md`, sequentially numbered.
 
 ## Index
 
-- ADR 0001 — Self-evolution as a first-class concept
+- ADR 0001 — Self-evolution as a first-class concept (**superseded by ADR 0004**)
 - ADR 0002 — Portable activity events as adapter conventions (**superseded by ADR 0007**)
-- ADR 0003 — Optional rationale on write and edit
+- ADR 0003 — Optional rationale on rationale-bearing operations
 - ADR 0004 — Conventions as files
 - ADR 0005 — Activity log as durable history
 - ADR 0006 — Reference adapter emits only memory-relevant events (**superseded by ADR 0007**)

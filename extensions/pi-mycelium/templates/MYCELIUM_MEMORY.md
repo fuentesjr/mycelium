@@ -48,7 +48,7 @@ reads are not logged. Standard tools work; `mycelium grep` and patterned
 mycelium read _activity/$(date -u +%Y/%m/%d)/${MYCELIUM_AGENT_ID:-agent}.jsonl
 
 # This month, all agents
-mycelium ls '_activity/2026/04/*/*.jsonl' --recursive
+mycelium ls "_activity/$(date -u +%Y/%m)/*/*.jsonl" --recursive
 
 # Find write ops
 mycelium grep --path _activity --pattern '"op":"write"' --format=json

@@ -1,6 +1,6 @@
 # Mycelium: Pi Agent Memory System
 
-**Status:** Design draft
+**Status:** Current design and LocalFS storage contract
 **Project:** Mycelium
 
 A persistent memory substrate for pi coding agents, on the bet that **a real filesystem driven by general file tools outperforms specialized memory infrastructure as models improve**. Mycelium is model-flexible inside pi, but pi is the sole supported coding-agent harness.
@@ -139,13 +139,13 @@ A single binary, `mycelium`, invoked through the agent's shell. Eight visible su
 - **`mycelium write <path> [--expected-version SHA] [--rationale STR]`** — create or overwrite from stdin. With `--expected-version`, conditional on the current version; otherwise unconditional. Prints the new version on success. `--rationale` is captured as a top-level field on the activity log entry and in the conflict envelope on CAS failure.
 - **`mycelium edit <path> --old STR --new STR [--expected-version SHA] [--rationale STR]`** — find-and-replace a unique substring. Fails if `--old` is absent or non-unique. _Earns its complexity:_ token economy on large files, diff quality under git/jj, and the unique-substring constraint catches stale-view errors a full overwrite would silently paper over.
 - **`mycelium ls [pattern] [--recursive]`** — list paths under the mount, optionally filtered by a glob pattern. Without `--recursive`, only top-level files are listed or matched. _Earns its complexity:_ one survey/path-discovery verb covers both browsing and pattern matching.
-- **`mycelium grep --pattern STR [--path PATH] [--regex] [--format text|json] [--limit N]`** — print matching lines with paths and line numbers. `--format=text` is `path:line:text`; `--format=json` returns `{matches: [{path, line, text}, ...], truncated}`. `--limit` caps results (default 1000, hard ceiling). Implementation is pure Go: one search path, one regex dialect, deterministic behavior across machines. _Earns its complexity:_ JSON output makes the activity log usable through general tools; the `--limit` cap keeps log-reflection from overflowing context.
+- **`mycelium grep --pattern STR [--path PATH] [--regex] [--format text|json] [--limit N]`** — print matching lines with paths and line numbers. `--format=text` is `path:line:text`; `--format=json` returns `{matches: [{path, line, text}, ...], truncated}`. `--limit` caps results (default 1000). Implementation is pure Go: one search path, one regex dialect, deterministic behavior across machines. _Earns its complexity:_ JSON output makes the activity log usable through general tools; the `--limit` cap keeps log-reflection from overflowing context.
 - **`mycelium rm <path> [--expected-version SHA] [--rationale STR]`** — remove. _Earns its complexity:_ not expressible as `write` — empty content creates an empty file, not a deletion.
 - **`mycelium mv <src> <dst> [--expected-version SHA] [--rationale STR]`** — atomic rename within the store. `--expected-version`, when supplied, checks the source version. The destination must not exist; destination collisions return a structured conflict. _Earns its complexity:_ read+write+delete is not atomic; emulating rename loses the guarantee.
 
 ### Metadata operations
 
-- **`mycelium log <op> [--path PATH] [--payload-json STR | --stdin] [--rationale STR]`** — append a non-mutation signal entry to `_activity/YYYY/MM/DD/{agent_id}.jsonl`. The system fills `ts`, `agent_id`, `session_id`; the caller supplies `op` (a non-mutation tag like `context_checkpoint`, `compaction`, or an agent annotation), an optional `--path`, an optional JSON payload, and an optional `--rationale`. Silent on success.
+- **`mycelium log <op> [--path PATH] [--payload-json STR | --stdin] [--rationale STR]`** — append a non-mutation signal entry to `_activity/YYYY/MM/DD/{agent_id}.jsonl`. The system fills `ts`, `agent_id`, `session_id`; the caller supplies `op` (a non-mutation tag like `decision`, `agent_note`, or `compaction`), an optional `--path`, an optional JSON payload, and an optional `--rationale`. Silent on success.
 
 **Failure modes:**
 
@@ -188,6 +188,10 @@ Mycelium is filesystem-native. The supported storage contract is a local POSIX f
 - normal path and permission semantics.
 
 NFS, SMB, FUSE, and non-POSIX synchronization layers are outside the v1 guarantee set unless they faithfully provide those semantics.
+
+Mycelium rejects symlink components it observes before filesystem operations,
+but it is not an OS-level `openat`/`O_NOFOLLOW` sandbox against hostile
+concurrent filesystem mutation by non-cooperating processes.
 
 Implementation shape:
 
@@ -399,7 +403,7 @@ A `mycelium log` entry with an inline payload:
 
 Pi lifecycle events and compatibility expectations are documented in [pi activity events](pi-activity-events.md). The binary does not enforce a closed set of `log` operation names.
 
-**Path layout: `_activity/YYYY/MM/DD/{agent_id}.jsonl`.** Each agent writes its own daily file; `agent_id` must be filename-safe ASCII using letters, digits, `.`, `_`, or `-`. Cross-agent order is reconstructed by sorting on `ts` or `tx_id`. Time-windowed queries use path patterns with `mycelium ls --recursive`: `_activity/2026/04/*/*.jsonl` (this month, all agents); `_activity/2026/04/26/*.jsonl` (today, all agents); `_activity/2026/04/26/glp1-research.jsonl` (today, one agent). Payloads from `mycelium log` are inlined on the entry; larger signals belong in a regular file referenced via `--path`.
+**Path layout: `_activity/YYYY/MM/DD/{agent_id}.jsonl`.** Each agent writes its own daily file; `agent_id` must be filename-safe ASCII using letters, digits, `.`, `_`, or `-`. Cross-agent order is reconstructed by sorting on `ts` or `tx_id`. Time-windowed queries use path patterns with `mycelium ls --recursive`, for example `"_activity/$(date -u +%Y/%m)/*/*.jsonl"` for the current month or `"_activity/$(date -u +%Y/%m/%d)/*.jsonl"` for the current UTC day. Payloads from `mycelium log` are inlined on the entry; larger signals belong in a regular file referenced via `--path`.
 
 **Same files, two readers, one mutation path:**
 
@@ -409,7 +413,7 @@ Pi lifecycle events and compatibility expectations are documented in [pi activit
 
 ### Export
 
-Export is `tar` or `cp -r`. No proprietary format; a directory of UTF-8 files plus JSONL logs is the export format. If a legacy store still has `_tx/pending/*.json`, recover it with the last v0.2 binary before treating the export as clean.
+Export is `tar` or `cp -r`. No proprietary format; ordinary files plus UTF-8 JSONL logs are the export format. Agent-authored files may contain arbitrary bytes, although JSON reads require UTF-8. If a legacy store still has `_tx/pending/*.json`, recover it with the last v0.2 binary before treating the export as clean.
 
 ---
 

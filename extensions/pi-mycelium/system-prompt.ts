@@ -18,7 +18,8 @@ questions. Do not broad-search for a substitute.
 When a durable pattern, mistake, preference, index, or open question emerges,
 edit that file in the same session with \`--rationale\`. For point-in-time
 signals that should remain history but not become standing guidance, use
-\`mycelium log decision|agent_note --rationale "..."\`.`;
+\`mycelium log decision --rationale "..."\` or
+\`mycelium log agent_note --rationale "..."\`.`;
 }
 
 function renderActivityEventsSection(): string {
