@@ -20,9 +20,8 @@
 
    ```bash
    node bin/check-release-versions.mjs vX.Y.Z
-   go test ./...
-   go test -race ./internal/mycelium
-   npm test --prefix extensions/pi-mycelium
+   make test-full
+   make test-race
    (cd extensions/pi-mycelium && npm pack --dry-run)
    ```
 

@@ -99,6 +99,10 @@ func captureWriteVersion(t *testing.T, path, content string) string {
 // first segment starts with '_', every agent-facing mutating op exits 65 and
 // stderr contains "reserved".
 func TestProperty_ReservedPrefixAlwaysRejected(t *testing.T) {
+	if testing.Short() {
+		t.Skip("50-case property breadth runs in the full test suite")
+	}
+
 	cfg := &quick.Config{
 		MaxCount: 50,
 		Rand:     rand.New(rand.NewSource(1)),
@@ -181,6 +185,10 @@ func TestProperty_ReservedPrefixAlwaysRejected(t *testing.T) {
 // segment does NOT start with '_', every agent-facing mutating op never exits
 // ExitProtocolViolation=65.
 func TestProperty_ValidPathNeverReturns65(t *testing.T) {
+	if testing.Short() {
+		t.Skip("50-case property breadth runs in the full test suite")
+	}
+
 	cfg := &quick.Config{
 		MaxCount: 50,
 		Rand:     rand.New(rand.NewSource(1)),
@@ -247,6 +255,10 @@ func TestProperty_ValidPathNeverReturns65(t *testing.T) {
 // the write operation across a random space of (path, content_v0, content_v1)
 // triples.
 func TestProperty_CASConflictEnvelope(t *testing.T) {
+	if testing.Short() {
+		t.Skip("50-case property breadth runs in the full test suite")
+	}
+
 	cfg := &quick.Config{
 		MaxCount: 50,
 		Rand:     rand.New(rand.NewSource(1)),

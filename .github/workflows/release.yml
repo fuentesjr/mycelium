@@ -57,7 +57,10 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Run Go tests
-        run: go test ./...
+        run: go test -count=1 ./...
+
+      - name: Run Go race tests
+        run: make test-race
 
       - name: Run TypeScript tests
         # Use `npm install` rather than `npm ci`: optionalDependencies pin

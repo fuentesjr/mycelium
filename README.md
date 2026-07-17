@@ -127,11 +127,17 @@ Activity is plain JSONL at `<journal>/_activity/YYYY/MM/DD/<agent_id>.jsonl`. Th
 
 ```bash
 npm install --prefix extensions/pi-mycelium
-make test
+make test       # fast feedback: skips only the exhaustive property cases
+make test-full  # all deterministic property cases plus TypeScript tests
+make test-race  # race detector without the sequential property breadth
 make build
 make dist
 make clean
 ```
+
+Cross-process concurrency and tar round-trip coverage remain in the fast suite.
+Pull requests, pushes to `main`, and releases also run the full property suite
+and short race suite.
 
 The repository uses [Jujutsu](https://docs.jj-vcs.dev/) (`jj`) co-located with git. Either toolchain works against the same history. See `AGENTS.md` for repository conventions.
 

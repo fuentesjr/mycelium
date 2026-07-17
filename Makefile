@@ -1,4 +1,4 @@
-.PHONY: build test dist clean npm-dist npm-publish
+.PHONY: build test test-fast test-full test-race dist clean npm-dist npm-publish
 
 VERSION ?= v0.5.0
 DIST    := dist
@@ -8,9 +8,18 @@ NPM_DIR := $(DIST)/npm
 build:
 	go build -o $(CMD)/mycelium ./$(CMD)
 
-test:
+test: test-fast
+
+test-fast:
+	go test -short -count=1 ./...
+	npm test --prefix extensions/pi-mycelium
+
+test-full:
 	go test -count=1 ./...
 	npm test --prefix extensions/pi-mycelium
+
+test-race:
+	go test -short -race -count=1 ./internal/mycelium
 
 dist: clean
 	mkdir -p $(DIST)

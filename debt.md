@@ -1,0 +1,2 @@
+2026-07-17 | testing | item:exhaustive-tests-on-default-path | task: comprehensive documentation review | claim: the default small-change test target should provide fast feedback while explicit full and race targets retain property, cross-process, and durability verification
+2026-07-17 | PAID | item:exhaustive-tests-on-default-path | made the default suite short while preserving explicit full and race gates locally, on PR/main CI, and before release
