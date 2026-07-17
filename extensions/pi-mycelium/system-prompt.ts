@@ -71,8 +71,13 @@ collision, the command exits 64 and prints one JSON line:
 {"error":"destination_exists","op":"mv","path":"dst.md","current_version":"sha256:..."}
 \`\`\`
 
-Recovery: re-read with \`mycelium read <path> --format json\`, merge, and retry
-with the fresh version token.
+CAS recovery: re-read with \`mycelium read <path> --format json\`, merge, and
+retry with the fresh version token.
+
+Destination collision recovery: inspect the destination named by the envelope.
+Its \`current_version\` is the destination's version, not a source CAS token.
+Choose a different destination, explicitly remove the existing destination, or
+abort the move.
 
 Reserved paths: \`mycelium\` rejects writes to any first-segment path beginning
 with \`_\`. \`_activity/YYYY/MM/DD/${c.agentId}.jsonl\` is auto-generated,

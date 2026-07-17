@@ -61,9 +61,10 @@ describe("systemPromptAvailable", () => {
 		expect(block).toContain("exits 64");
 		expect(block).toContain('"error":"conflict"');
 		expect(block).toContain('"error":"destination_exists"');
-		expect(block).toContain(
-			"re-read with `mycelium read <path> --format json`",
-		);
+		expect(block).toContain("CAS recovery");
+		expect(block).toContain("Destination collision recovery");
+		expect(block).toContain("inspect the destination");
+		expect(block).toContain("not a source CAS token");
 		expect(block).not.toContain("--include-current-content");
 	});
 

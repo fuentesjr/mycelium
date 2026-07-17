@@ -48,6 +48,21 @@ func TestGrepLiteralMatch(t *testing.T) {
 	}
 }
 
+func TestGrepMatchesLineLargerThanScannerDefault(t *testing.T) {
+	mount := t.TempDir()
+	longLine := strings.Repeat("x", 70*1024) + "needle"
+	mkfile(t, mount, "large.jsonl", longLine+"\n")
+	t.Setenv("MYCELIUM_MOUNT", mount)
+
+	out, errOut, rc := runDispatch(t, "grep", "--pattern", "needle", "--format", "json")
+	if rc != ExitOK {
+		t.Fatalf("rc: got %d, want %d (stderr=%q)", rc, ExitOK, errOut)
+	}
+	if !strings.Contains(out, "needle") {
+		t.Fatalf("stdout missing match from large line: %s", out)
+	}
+}
+
 func TestGrepRegexMatch(t *testing.T) {
 	mount := t.TempDir()
 	mkfile(t, mount, "words.txt", "foo\nfoo bar\nfuuo\nf.+o\n")

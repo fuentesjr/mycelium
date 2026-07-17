@@ -190,41 +190,41 @@ func scanFile(absPath, relSlash, pattern string, re *regexp.Regexp, quota int) (
 	}
 	defer f.Close()
 
-	scanner := bufio.NewScanner(f)
-	// Use default MaxScanTokenSize (64KB). If a line exceeds it, skip the file.
+	reader := bufio.NewReader(f)
 	lineNum := 0
-	for scanner.Scan() {
-		lineNum++
-		line := scanner.Text()
+	for {
+		line, readErr := reader.ReadString('\n')
+		if len(line) > 0 {
+			lineNum++
+			line = strings.TrimSuffix(line, "\n")
+			line = strings.TrimSuffix(line, "\r")
 
-		var matched bool
-		if re != nil {
-			matched = re.MatchString(line)
-		} else {
-			matched = strings.Contains(line, pattern)
+			var matched bool
+			if re != nil {
+				matched = re.MatchString(line)
+			} else {
+				matched = strings.Contains(line, pattern)
+			}
+
+			if matched {
+				matches = append(matches, grepMatch{
+					Path: relSlash,
+					Line: lineNum,
+					Text: line,
+				})
+
+				if len(matches) >= quota {
+					return matches, nil
+				}
+			}
 		}
 
-		if !matched {
-			continue
+		if readErr != nil {
+			if errors.Is(readErr, io.EOF) {
+				break
+			}
+			return nil, readErr
 		}
-
-		matches = append(matches, grepMatch{
-			Path: relSlash,
-			Line: lineNum,
-			Text: line,
-		})
-
-		if len(matches) >= quota {
-			return matches, nil
-		}
-	}
-
-	if err := scanner.Err(); err != nil {
-		// If the error is a buffer overflow (line too long), skip the file silently.
-		if errors.Is(err, bufio.ErrTooLong) {
-			return nil, nil
-		}
-		return nil, err
 	}
 
 	return matches, nil
